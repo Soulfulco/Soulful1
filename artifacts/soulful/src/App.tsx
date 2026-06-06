@@ -16,12 +16,15 @@ const PractitionerProfile = lazy(() => import("@/pages/PractitionerProfile"));
 const ForCorporates = lazy(() => import("@/pages/ForCorporates"));
 const ForPractitioners = lazy(() => import("@/pages/ForPractitioners"));
 const Locations = lazy(() => import("@/pages/Locations"));
+const Join = lazy(() => import("@/pages/Join"));
+const EmployeePortal = lazy(() => import("@/pages/EmployeePortal"));
 
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const DashboardBookings = lazy(() => import("@/pages/DashboardBookings"));
 const DashboardPractitioners = lazy(() => import("@/pages/DashboardPractitioners"));
 const DashboardCompanies = lazy(() => import("@/pages/DashboardCompanies"));
 const DashboardSubscriptions = lazy(() => import("@/pages/DashboardSubscriptions"));
+const DashboardEmployees = lazy(() => import("@/pages/DashboardEmployees"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -68,6 +71,12 @@ function Router() {
         <Route path="/locations">
           <MainLayout><Locations /></MainLayout>
         </Route>
+        <Route path="/join">
+          <Join />
+        </Route>
+        <Route path="/employee">
+          <EmployeePortal />
+        </Route>
 
         {/* Dashboard Routes */}
         <Route path="/dashboard">
@@ -81,6 +90,9 @@ function Router() {
         </Route>
         <Route path="/dashboard/companies">
           <DashboardLayout><DashboardCompanies /></DashboardLayout>
+        </Route>
+        <Route path="/dashboard/employees">
+          <DashboardLayout><DashboardEmployees /></DashboardLayout>
         </Route>
         <Route path="/dashboard/subscriptions">
           <DashboardLayout><DashboardSubscriptions /></DashboardLayout>

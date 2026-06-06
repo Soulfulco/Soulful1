@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Calendar, Users, Building2, CreditCard, Leaf } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Building2, CreditCard, Leaf, HeartHandshake } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
@@ -7,6 +7,7 @@ const navigation = [
   { name: "Bookings", href: "/dashboard/bookings", icon: Calendar },
   { name: "Practitioners", href: "/dashboard/practitioners", icon: Users },
   { name: "Companies", href: "/dashboard/companies", icon: Building2 },
+  { name: "Employee Wellbeing", href: "/dashboard/employees", icon: HeartHandshake },
   { name: "Subscriptions", href: "/dashboard/subscriptions", icon: CreditCard },
 ];
 

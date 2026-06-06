@@ -25,6 +25,8 @@ tags:
     description: Dashboard summary operations
   - name: locations
     description: Event location operations
+  - name: employees
+    description: Employee self-booking and invite operations
 
 paths:
   /healthz:
@@ -521,6 +523,119 @@ paths:
                 items:
                   $ref: "#/components/schemas/SpecialismCount"
 
+  # ── Employees ─────────────────────────────────────────────────────────────────
+  /employees:
+    post:
+      operationId: registerEmployee
+      tags: [employees]
+      summary: Register an employee (via invite code or direct companyId)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EmployeeCreate" }
+      responses:
+        "201":
+          description: Employee registered
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Employee" }
+
+  /employees/login:
+    post:
+      operationId: loginEmployee
+      tags: [employees]
+      summary: Look up an employee by email and companyId (passwordless)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EmployeeLogin" }
+      responses:
+        "200":
+          description: Employee found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Employee" }
+        "404":
+          description: Not found
+
+  /employees/{id}:
+    get:
+      operationId: getEmployee
+      tags: [employees]
+      summary: Get employee by ID
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Employee
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Employee" }
+
+  /employees/{id}/bookings:
+    get:
+      operationId: listEmployeeBookings
+      tags: [employees]
+      summary: List bookings for an employee
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: List of bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Booking" }
+
+  /companies/{id}/employees:
+    get:
+      operationId: listCompanyEmployees
+      tags: [employees]
+      summary: List all employees for a company (HR view)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: List of employees
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Employee" }
+
+  /companies/{id}/utilisation:
+    get:
+      operationId: getCompanyUtilisation
+      tags: [employees]
+      summary: Get utilisation stats for a company
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Utilisation stats
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Utilisation" }
+
+  /companies/join/{code}:
+    get:
+      operationId: resolveInviteCode
+      tags: [employees]
+      summary: Resolve an invite code to a company (public)
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Company info
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompanyPublic" }
+        "404":
+          description: Invalid invite code
+
   # ── Locations ────────────────────────────────────────────────────────────────
   /locations:
     get:
@@ -901,3 +1016,51 @@ components:
         imageUrl:    { type: string }
         amenities:   { type: array, items: { type: string } }
         isActive:    { type: boolean }
+
+    Employee:
+      type: object
+      required: [id, companyId, name, email, sessionAllowancePerMonth, sessionsUsedThisMonth, isActive, createdAt]
+      properties:
+        id:                       { type: integer }
+        companyId:                { type: integer }
+        name:                     { type: string }
+        email:                    { type: string }
+        sessionAllowancePerMonth: { type: integer }
+        sessionsUsedThisMonth:    { type: integer }
+        isActive:                 { type: boolean }
+        createdAt:                { type: string, format: date-time }
+
+    EmployeeCreate:
+      type: object
+      required: [name, email, companyId]
+      properties:
+        name:                     { type: string }
+        email:                    { type: string }
+        companyId:                { type: integer }
+        sessionAllowancePerMonth: { type: integer, default: 2 }
+
+    EmployeeLogin:
+      type: object
+      required: [email, companyId]
+      properties:
+        email:     { type: string }
+        companyId: { type: integer }
+
+    CompanyPublic:
+      type: object
+      required: [id, name, inviteCode]
+      properties:
+        id:         { type: integer }
+        name:       { type: string }
+        inviteCode: { type: string }
+        logoUrl:    { type: string }
+
+    Utilisation:
+      type: object
+      required: [totalEmployees, activeThisMonth, sessionsBooked, totalAllowance]
+      properties:
+        totalEmployees:   { type: integer }
+        activeThisMonth:  { type: integer }
+        sessionsBooked:   { type: integer }
+        totalAllowance:   { type: integer }
+        utilisationRate:  { type: number }

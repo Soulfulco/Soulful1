@@ -14,6 +14,7 @@ export const companiesTable = pgTable("companies", {
   logoUrl: text("logo_url"),
   contactName: text("contact_name"),
   totalBookings: integer("total_bookings").notNull().default(0),
+  inviteCode: text("invite_code").unique(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

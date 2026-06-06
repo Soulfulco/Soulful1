@@ -511,6 +511,135 @@ export const GetSpecialismBreakdownResponse = zod.array(GetSpecialismBreakdownRe
 
 
 /**
+ * @summary Register an employee (via invite code or direct companyId)
+ */
+export const registerEmployeeBodySessionAllowancePerMonthDefault = 2;
+
+export const RegisterEmployeeBody = zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "companyId": zod.number(),
+  "sessionAllowancePerMonth": zod.number().default(registerEmployeeBodySessionAllowancePerMonthDefault)
+})
+
+
+/**
+ * @summary Look up an employee by email and companyId (passwordless)
+ */
+export const LoginEmployeeBody = zod.object({
+  "email": zod.string(),
+  "companyId": zod.number()
+})
+
+export const LoginEmployeeResponse = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "sessionAllowancePerMonth": zod.number(),
+  "sessionsUsedThisMonth": zod.number(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Get employee by ID
+ */
+export const GetEmployeeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetEmployeeResponse = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "sessionAllowancePerMonth": zod.number(),
+  "sessionsUsedThisMonth": zod.number(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary List bookings for an employee
+ */
+export const ListEmployeeBookingsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListEmployeeBookingsResponseItem = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "practitionerId": zod.number(),
+  "timeSlotId": zod.number(),
+  "status": zod.enum(['pending', 'confirmed', 'completed', 'cancelled']),
+  "sessionType": zod.string(),
+  "employeeName": zod.string(),
+  "employeeEmail": zod.string(),
+  "notes": zod.string().nullish(),
+  "practitionerName": zod.string().nullish(),
+  "companyName": zod.string().nullish(),
+  "startTime": zod.string().nullish(),
+  "endTime": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+export const ListEmployeeBookingsResponse = zod.array(ListEmployeeBookingsResponseItem)
+
+
+/**
+ * @summary List all employees for a company (HR view)
+ */
+export const ListCompanyEmployeesParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListCompanyEmployeesResponseItem = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "sessionAllowancePerMonth": zod.number(),
+  "sessionsUsedThisMonth": zod.number(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
+export const ListCompanyEmployeesResponse = zod.array(ListCompanyEmployeesResponseItem)
+
+
+/**
+ * @summary Get utilisation stats for a company
+ */
+export const GetCompanyUtilisationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetCompanyUtilisationResponse = zod.object({
+  "totalEmployees": zod.number(),
+  "activeThisMonth": zod.number(),
+  "sessionsBooked": zod.number(),
+  "totalAllowance": zod.number(),
+  "utilisationRate": zod.number().optional()
+})
+
+
+/**
+ * @summary Resolve an invite code to a company (public)
+ */
+export const ResolveInviteCodeParams = zod.object({
+  "code": zod.coerce.string()
+})
+
+export const ResolveInviteCodeResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "inviteCode": zod.string(),
+  "logoUrl": zod.string().optional()
+})
+
+
+/**
  * @summary List all event locations
  */
 export const ListLocationsResponseItem = zod.object({

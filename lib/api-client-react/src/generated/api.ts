@@ -25,10 +25,14 @@ import type {
   BookingUpdate,
   Company,
   CompanyInput,
+  CompanyPublic,
   CompanySubscription,
   CompanySubscriptionInput,
   CompanyUpdate,
   DashboardSummary,
+  Employee,
+  EmployeeCreate,
+  EmployeeLogin,
   GetUpcomingBookingsParams,
   HealthStatus,
   ListBookingsParams,
@@ -46,7 +50,8 @@ import type {
   SpecialismCount,
   SubscriptionPlan,
   TimeSlot,
-  TimeSlotInput
+  TimeSlotInput,
+  Utilisation
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -2086,6 +2091,533 @@ export function useGetSpecialismBreakdown<TData = Awaited<ReturnType<typeof getS
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetSpecialismBreakdownQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getRegisterEmployeeUrl = () => {
+
+
+
+
+  return `/api/employees`
+}
+
+/**
+ * @summary Register an employee (via invite code or direct companyId)
+ */
+export const registerEmployee = async (employeeCreate: EmployeeCreate, options?: RequestInit): Promise<Employee> => {
+
+  return customFetch<Employee>(getRegisterEmployeeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      employeeCreate,)
+  }
+);}
+
+
+
+
+export const getRegisterEmployeeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerEmployee>>, TError,{data: BodyType<EmployeeCreate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof registerEmployee>>, TError,{data: BodyType<EmployeeCreate>}, TContext> => {
+
+const mutationKey = ['registerEmployee'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registerEmployee>>, {data: BodyType<EmployeeCreate>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  registerEmployee(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegisterEmployeeMutationResult = NonNullable<Awaited<ReturnType<typeof registerEmployee>>>
+    export type RegisterEmployeeMutationBody = BodyType<EmployeeCreate>
+    export type RegisterEmployeeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Register an employee (via invite code or direct companyId)
+ */
+export const useRegisterEmployee = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerEmployee>>, TError,{data: BodyType<EmployeeCreate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof registerEmployee>>,
+        TError,
+        {data: BodyType<EmployeeCreate>},
+        TContext
+      > => {
+      return useMutation(getRegisterEmployeeMutationOptions(options));
+    }
+
+export const getLoginEmployeeUrl = () => {
+
+
+
+
+  return `/api/employees/login`
+}
+
+/**
+ * @summary Look up an employee by email and companyId (passwordless)
+ */
+export const loginEmployee = async (employeeLogin: EmployeeLogin, options?: RequestInit): Promise<Employee> => {
+
+  return customFetch<Employee>(getLoginEmployeeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      employeeLogin,)
+  }
+);}
+
+
+
+
+export const getLoginEmployeeMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof loginEmployee>>, TError,{data: BodyType<EmployeeLogin>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof loginEmployee>>, TError,{data: BodyType<EmployeeLogin>}, TContext> => {
+
+const mutationKey = ['loginEmployee'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof loginEmployee>>, {data: BodyType<EmployeeLogin>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  loginEmployee(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LoginEmployeeMutationResult = NonNullable<Awaited<ReturnType<typeof loginEmployee>>>
+    export type LoginEmployeeMutationBody = BodyType<EmployeeLogin>
+    export type LoginEmployeeMutationError = ErrorType<void>
+
+    /**
+ * @summary Look up an employee by email and companyId (passwordless)
+ */
+export const useLoginEmployee = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof loginEmployee>>, TError,{data: BodyType<EmployeeLogin>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof loginEmployee>>,
+        TError,
+        {data: BodyType<EmployeeLogin>},
+        TContext
+      > => {
+      return useMutation(getLoginEmployeeMutationOptions(options));
+    }
+
+export const getGetEmployeeUrl = (id: number,) => {
+
+
+
+
+  return `/api/employees/${id}`
+}
+
+/**
+ * @summary Get employee by ID
+ */
+export const getEmployee = async (id: number, options?: RequestInit): Promise<Employee> => {
+
+  return customFetch<Employee>(getGetEmployeeUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEmployeeQueryKey = (id: number,) => {
+    return [
+    `/api/employees/${id}`
+    ] as const;
+    }
+
+
+export const getGetEmployeeQueryOptions = <TData = Awaited<ReturnType<typeof getEmployee>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmployee>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEmployeeQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEmployee>>> = ({ signal }) => getEmployee(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEmployee>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEmployeeQueryResult = NonNullable<Awaited<ReturnType<typeof getEmployee>>>
+export type GetEmployeeQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get employee by ID
+ */
+
+export function useGetEmployee<TData = Awaited<ReturnType<typeof getEmployee>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmployee>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEmployeeQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListEmployeeBookingsUrl = (id: number,) => {
+
+
+
+
+  return `/api/employees/${id}/bookings`
+}
+
+/**
+ * @summary List bookings for an employee
+ */
+export const listEmployeeBookings = async (id: number, options?: RequestInit): Promise<Booking[]> => {
+
+  return customFetch<Booking[]>(getListEmployeeBookingsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListEmployeeBookingsQueryKey = (id: number,) => {
+    return [
+    `/api/employees/${id}/bookings`
+    ] as const;
+    }
+
+
+export const getListEmployeeBookingsQueryOptions = <TData = Awaited<ReturnType<typeof listEmployeeBookings>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEmployeeBookings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListEmployeeBookingsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listEmployeeBookings>>> = ({ signal }) => listEmployeeBookings(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listEmployeeBookings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListEmployeeBookingsQueryResult = NonNullable<Awaited<ReturnType<typeof listEmployeeBookings>>>
+export type ListEmployeeBookingsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List bookings for an employee
+ */
+
+export function useListEmployeeBookings<TData = Awaited<ReturnType<typeof listEmployeeBookings>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEmployeeBookings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListEmployeeBookingsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListCompanyEmployeesUrl = (id: number,) => {
+
+
+
+
+  return `/api/companies/${id}/employees`
+}
+
+/**
+ * @summary List all employees for a company (HR view)
+ */
+export const listCompanyEmployees = async (id: number, options?: RequestInit): Promise<Employee[]> => {
+
+  return customFetch<Employee[]>(getListCompanyEmployeesUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCompanyEmployeesQueryKey = (id: number,) => {
+    return [
+    `/api/companies/${id}/employees`
+    ] as const;
+    }
+
+
+export const getListCompanyEmployeesQueryOptions = <TData = Awaited<ReturnType<typeof listCompanyEmployees>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCompanyEmployees>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCompanyEmployeesQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCompanyEmployees>>> = ({ signal }) => listCompanyEmployees(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCompanyEmployees>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCompanyEmployeesQueryResult = NonNullable<Awaited<ReturnType<typeof listCompanyEmployees>>>
+export type ListCompanyEmployeesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all employees for a company (HR view)
+ */
+
+export function useListCompanyEmployees<TData = Awaited<ReturnType<typeof listCompanyEmployees>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCompanyEmployees>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCompanyEmployeesQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetCompanyUtilisationUrl = (id: number,) => {
+
+
+
+
+  return `/api/companies/${id}/utilisation`
+}
+
+/**
+ * @summary Get utilisation stats for a company
+ */
+export const getCompanyUtilisation = async (id: number, options?: RequestInit): Promise<Utilisation> => {
+
+  return customFetch<Utilisation>(getGetCompanyUtilisationUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCompanyUtilisationQueryKey = (id: number,) => {
+    return [
+    `/api/companies/${id}/utilisation`
+    ] as const;
+    }
+
+
+export const getGetCompanyUtilisationQueryOptions = <TData = Awaited<ReturnType<typeof getCompanyUtilisation>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCompanyUtilisation>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCompanyUtilisationQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCompanyUtilisation>>> = ({ signal }) => getCompanyUtilisation(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCompanyUtilisation>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCompanyUtilisationQueryResult = NonNullable<Awaited<ReturnType<typeof getCompanyUtilisation>>>
+export type GetCompanyUtilisationQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get utilisation stats for a company
+ */
+
+export function useGetCompanyUtilisation<TData = Awaited<ReturnType<typeof getCompanyUtilisation>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCompanyUtilisation>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCompanyUtilisationQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getResolveInviteCodeUrl = (code: string,) => {
+
+
+
+
+  return `/api/companies/join/${code}`
+}
+
+/**
+ * @summary Resolve an invite code to a company (public)
+ */
+export const resolveInviteCode = async (code: string, options?: RequestInit): Promise<CompanyPublic> => {
+
+  return customFetch<CompanyPublic>(getResolveInviteCodeUrl(code),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getResolveInviteCodeQueryKey = (code: string,) => {
+    return [
+    `/api/companies/join/${code}`
+    ] as const;
+    }
+
+
+export const getResolveInviteCodeQueryOptions = <TData = Awaited<ReturnType<typeof resolveInviteCode>>, TError = ErrorType<void>>(code: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof resolveInviteCode>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getResolveInviteCodeQueryKey(code);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof resolveInviteCode>>> = ({ signal }) => resolveInviteCode(code, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(code), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof resolveInviteCode>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ResolveInviteCodeQueryResult = NonNullable<Awaited<ReturnType<typeof resolveInviteCode>>>
+export type ResolveInviteCodeQueryError = ErrorType<void>
+
+
+/**
+ * @summary Resolve an invite code to a company (public)
+ */
+
+export function useResolveInviteCode<TData = Awaited<ReturnType<typeof resolveInviteCode>>, TError = ErrorType<void>>(
+ code: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof resolveInviteCode>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getResolveInviteCodeQueryOptions(code,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -347,6 +347,44 @@ export interface LocationUpdate {
   isActive?: boolean;
 }
 
+export interface Employee {
+  id: number;
+  companyId: number;
+  name: string;
+  email: string;
+  sessionAllowancePerMonth: number;
+  sessionsUsedThisMonth: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface EmployeeCreate {
+  name: string;
+  email: string;
+  companyId: number;
+  sessionAllowancePerMonth?: number;
+}
+
+export interface EmployeeLogin {
+  email: string;
+  companyId: number;
+}
+
+export interface CompanyPublic {
+  id: number;
+  name: string;
+  inviteCode: string;
+  logoUrl?: string;
+}
+
+export interface Utilisation {
+  totalEmployees: number;
+  activeThisMonth: number;
+  sessionsBooked: number;
+  totalAllowance: number;
+  utilisationRate?: number;
+}
+
 export type ListPractitionersParams = {
 specialism?: string;
 search?: string;
