@@ -1,22 +1,37 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Soulful Corporate Wellbeing Platform API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: practitioners
+    description: Practitioner operations
+  - name: companies
+    description: Corporate company operations
+  - name: bookings
+    description: Booking operations
+  - name: availability
+    description: Practitioner availability / timetable
+  - name: subscriptions
+    description: Subscription plan operations
+  - name: reviews
+    description: Review operations
+  - name: dashboard
+    description: Dashboard summary operations
+  - name: locations
+    description: Event location operations
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +39,865 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ── Practitioners ──────────────────────────────────────────────────────────
+  /practitioners:
+    get:
+      operationId: listPractitioners
+      tags: [practitioners]
+      summary: List all active practitioners
+      parameters:
+        - in: query
+          name: specialism
+          schema: { type: string }
+        - in: query
+          name: search
+          schema: { type: string }
+      responses:
+        "200":
+          description: List of practitioners
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Practitioner"
+    post:
+      operationId: createPractitioner
+      tags: [practitioners]
+      summary: Register as a practitioner
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PractitionerInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Practitioner"
+
+  /practitioners/{id}:
+    get:
+      operationId: getPractitioner
+      tags: [practitioners]
+      summary: Get a practitioner by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Practitioner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Practitioner"
+        "404":
+          description: Not found
+    patch:
+      operationId: updatePractitioner
+      tags: [practitioners]
+      summary: Update practitioner profile
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PractitionerUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Practitioner"
+
+  /practitioners/{id}/reviews:
+    get:
+      operationId: getPractitionerReviews
+      tags: [practitioners]
+      summary: Get reviews for a practitioner
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Reviews
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Review"
+
+  # ── Companies ───────────────────────────────────────────────────────────────
+  /companies:
+    get:
+      operationId: listCompanies
+      tags: [companies]
+      summary: List companies
+      responses:
+        "200":
+          description: List of companies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Company"
+    post:
+      operationId: createCompany
+      tags: [companies]
+      summary: Register a corporate company
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompanyInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Company"
+
+  /companies/{id}:
+    get:
+      operationId: getCompany
+      tags: [companies]
+      summary: Get a company by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Company
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Company"
+    patch:
+      operationId: updateCompany
+      tags: [companies]
+      summary: Update company details
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompanyUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Company"
+
+  # ── Availability / Timetable ────────────────────────────────────────────────
+  /practitioners/{id}/availability:
+    get:
+      operationId: listPractitionerSlots
+      tags: [availability]
+      summary: Get available time slots for a practitioner
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Time slots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TimeSlot"
+    post:
+      operationId: createTimeSlot
+      tags: [availability]
+      summary: Add a time slot (practitioner manages own timetable)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TimeSlotInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TimeSlot"
+
+  /timeslots/{id}:
+    delete:
+      operationId: deleteTimeSlot
+      tags: [availability]
+      summary: Remove a time slot
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  # ── Bookings ────────────────────────────────────────────────────────────────
+  /bookings:
+    get:
+      operationId: listBookings
+      tags: [bookings]
+      summary: List bookings (filterable by company or practitioner)
+      parameters:
+        - in: query
+          name: companyId
+          schema: { type: integer }
+        - in: query
+          name: practitionerId
+          schema: { type: integer }
+        - in: query
+          name: status
+          schema: { type: string, enum: [pending, confirmed, completed, cancelled] }
+      responses:
+        "200":
+          description: List of bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Booking"
+    post:
+      operationId: createBooking
+      tags: [bookings]
+      summary: Book a session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookingInput"
+      responses:
+        "201":
+          description: Booking created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+
+  /bookings/{id}:
+    get:
+      operationId: getBooking
+      tags: [bookings]
+      summary: Get a booking by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Booking
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+    patch:
+      operationId: updateBooking
+      tags: [bookings]
+      summary: Update booking status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookingUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+
+  # ── Subscriptions ───────────────────────────────────────────────────────────
+  /subscriptions:
+    get:
+      operationId: listSubscriptions
+      tags: [subscriptions]
+      summary: List all subscription plans
+      responses:
+        "200":
+          description: Plans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SubscriptionPlan"
+
+  /subscriptions/company:
+    get:
+      operationId: listCompanySubscriptions
+      tags: [subscriptions]
+      summary: List active corporate subscriptions
+      responses:
+        "200":
+          description: Corporate subscriptions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CompanySubscription"
+    post:
+      operationId: createCompanySubscription
+      tags: [subscriptions]
+      summary: Subscribe a company to a plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompanySubscriptionInput"
+      responses:
+        "201":
+          description: Subscription created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompanySubscription"
+
+  /subscriptions/practitioner:
+    get:
+      operationId: listPractitionerSubscriptions
+      tags: [subscriptions]
+      summary: List active practitioner subscriptions
+      responses:
+        "200":
+          description: Practitioner subscriptions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PractitionerSubscription"
+    post:
+      operationId: createPractitionerSubscription
+      tags: [subscriptions]
+      summary: Subscribe a practitioner to a listing plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PractitionerSubscriptionInput"
+      responses:
+        "201":
+          description: Subscription created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PractitionerSubscription"
+
+  # ── Reviews ─────────────────────────────────────────────────────────────────
+  /reviews:
+    post:
+      operationId: createReview
+      tags: [reviews]
+      summary: Submit a review for a practitioner
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+
+  # ── Dashboard ────────────────────────────────────────────────────────────────
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Platform-wide summary stats
+      responses:
+        "200":
+          description: Summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/upcoming-bookings:
+    get:
+      operationId: getUpcomingBookings
+      tags: [dashboard]
+      summary: Next 5 upcoming bookings
+      parameters:
+        - in: query
+          name: companyId
+          schema: { type: integer }
+        - in: query
+          name: practitionerId
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Upcoming bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Booking"
+
+  /dashboard/popular-practitioners:
+    get:
+      operationId: getPopularPractitioners
+      tags: [dashboard]
+      summary: Top practitioners by booking count
+      responses:
+        "200":
+          description: Popular practitioners
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Practitioner"
+
+  /dashboard/specialisms:
+    get:
+      operationId: getSpecialismBreakdown
+      tags: [dashboard]
+      summary: Booking counts grouped by specialism
+      responses:
+        "200":
+          description: Specialism breakdown
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SpecialismCount"
+
+  # ── Locations ────────────────────────────────────────────────────────────────
+  /locations:
+    get:
+      operationId: listLocations
+      tags: [locations]
+      summary: List all event locations
+      responses:
+        "200":
+          description: List of locations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Location"
+    post:
+      operationId: createLocation
+      tags: [locations]
+      summary: Add a new event location
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LocationInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Location"
+
+  /locations/{id}:
+    get:
+      operationId: getLocation
+      tags: [locations]
+      summary: Get a location by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Location
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Location"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateLocation
+      tags: [locations]
+      summary: Update a location
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LocationUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Location"
+    delete:
+      operationId: deleteLocation
+      tags: [locations]
+      summary: Delete a location
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
+    # ── Practitioner ────────────────────────────────────────────────────────
+    Practitioner:
+      type: object
+      required: [id, name, email, specialism, bio, sessionRateGbp, isActive, subscriptionStatus, avatarUrl, createdAt]
+      properties:
+        id:            { type: integer }
+        name:          { type: string }
+        email:         { type: string }
+        specialism:    { type: string }
+        bio:           { type: string }
+        sessionRateGbp: { type: number }
+        isActive:      { type: boolean }
+        subscriptionStatus: { type: string, enum: [active, inactive, trial] }
+        avatarUrl:     { type: ["string", "null"] }
+        location:      { type: ["string", "null"] }
+        qualifications: { type: ["string", "null"] }
+        averageRating: { type: ["number", "null"] }
+        totalReviews:  { type: integer }
+        createdAt:     { type: string }
+
+    PractitionerInput:
+      type: object
+      required: [name, email, specialism, bio, sessionRateGbp]
+      properties:
+        name:          { type: string }
+        email:         { type: string }
+        specialism:    { type: string }
+        bio:           { type: string }
+        sessionRateGbp: { type: number }
+        location:      { type: string }
+        qualifications: { type: string }
+        avatarUrl:     { type: string }
+
+    PractitionerUpdate:
+      type: object
+      properties:
+        name:          { type: string }
+        bio:           { type: string }
+        specialism:    { type: string }
+        sessionRateGbp: { type: number }
+        location:      { type: string }
+        qualifications: { type: string }
+        avatarUrl:     { type: string }
+        isActive:      { type: boolean }
+
+    # ── Company ─────────────────────────────────────────────────────────────
+    Company:
+      type: object
+      required: [id, name, email, industry, employeeCount, subscriptionStatus, createdAt]
+      properties:
+        id:               { type: integer }
+        name:             { type: string }
+        email:            { type: string }
+        industry:         { type: string }
+        employeeCount:    { type: integer }
+        subscriptionStatus: { type: string, enum: [active, inactive, trial] }
+        logoUrl:          { type: ["string", "null"] }
+        contactName:      { type: ["string", "null"] }
+        totalBookings:    { type: integer }
+        createdAt:        { type: string }
+
+    CompanyInput:
+      type: object
+      required: [name, email, industry, employeeCount, contactName]
+      properties:
+        name:          { type: string }
+        email:         { type: string }
+        industry:      { type: string }
+        employeeCount: { type: integer }
+        contactName:   { type: string }
+        logoUrl:       { type: string }
+
+    CompanyUpdate:
+      type: object
+      properties:
+        name:          { type: string }
+        industry:      { type: string }
+        employeeCount: { type: integer }
+        contactName:   { type: string }
+        logoUrl:       { type: string }
+
+    # ── TimeSlot ─────────────────────────────────────────────────────────────
+    TimeSlot:
+      type: object
+      required: [id, practitionerId, startTime, endTime, isBooked]
+      properties:
+        id:             { type: integer }
+        practitionerId: { type: integer }
+        startTime:      { type: string }
+        endTime:        { type: string }
+        isBooked:       { type: boolean }
+        sessionType:    { type: ["string", "null"] }
+
+    TimeSlotInput:
+      type: object
+      required: [startTime, endTime]
+      properties:
+        startTime:   { type: string }
+        endTime:     { type: string }
+        sessionType: { type: string }
+
+    # ── Booking ──────────────────────────────────────────────────────────────
+    Booking:
+      type: object
+      required: [id, companyId, practitionerId, timeSlotId, status, sessionType, employeeName, employeeEmail, createdAt]
+      properties:
+        id:             { type: integer }
+        companyId:      { type: integer }
+        practitionerId: { type: integer }
+        timeSlotId:     { type: integer }
+        status:         { type: string, enum: [pending, confirmed, completed, cancelled] }
+        sessionType:    { type: string }
+        employeeName:   { type: string }
+        employeeEmail:  { type: string }
+        notes:          { type: ["string", "null"] }
+        practitionerName: { type: ["string", "null"] }
+        companyName:    { type: ["string", "null"] }
+        startTime:      { type: ["string", "null"] }
+        endTime:        { type: ["string", "null"] }
+        createdAt:      { type: string }
+
+    BookingInput:
+      type: object
+      required: [companyId, practitionerId, timeSlotId, sessionType, employeeName, employeeEmail]
+      properties:
+        companyId:      { type: integer }
+        practitionerId: { type: integer }
+        timeSlotId:     { type: integer }
+        sessionType:    { type: string }
+        employeeName:   { type: string }
+        employeeEmail:  { type: string }
+        notes:          { type: string }
+
+    BookingUpdate:
+      type: object
+      properties:
+        status: { type: string, enum: [pending, confirmed, completed, cancelled] }
+        notes:  { type: string }
+
+    # ── Subscriptions ────────────────────────────────────────────────────────
+    SubscriptionPlan:
+      type: object
+      required: [id, name, priceGbp, billingCycle, description, features, planType]
+      properties:
+        id:           { type: integer }
+        name:         { type: string }
+        priceGbp:     { type: number }
+        billingCycle: { type: string, enum: [monthly, annual] }
+        description:  { type: string }
+        features:     { type: array, items: { type: string } }
+        planType:     { type: string, enum: [corporate, practitioner] }
+        maxBookings:  { type: ["integer", "null"] }
+
+    CompanySubscription:
+      type: object
+      required: [id, companyId, planId, status, startDate, companyName, planName, priceGbp]
+      properties:
+        id:          { type: integer }
+        companyId:   { type: integer }
+        planId:      { type: integer }
+        status:      { type: string, enum: [active, cancelled, past_due] }
+        startDate:   { type: string }
+        endDate:     { type: ["string", "null"] }
+        companyName: { type: string }
+        planName:    { type: string }
+        priceGbp:    { type: number }
+
+    CompanySubscriptionInput:
+      type: object
+      required: [companyId, planId]
+      properties:
+        companyId: { type: integer }
+        planId:    { type: integer }
+
+    PractitionerSubscription:
+      type: object
+      required: [id, practitionerId, planId, status, startDate, practitionerName, planName, priceGbp]
+      properties:
+        id:               { type: integer }
+        practitionerId:   { type: integer }
+        planId:           { type: integer }
+        status:           { type: string, enum: [active, cancelled, past_due] }
+        startDate:        { type: string }
+        endDate:          { type: ["string", "null"] }
+        practitionerName: { type: string }
+        planName:         { type: string }
+        priceGbp:         { type: number }
+
+    PractitionerSubscriptionInput:
+      type: object
+      required: [practitionerId, planId]
+      properties:
+        practitionerId: { type: integer }
+        planId:         { type: integer }
+
+    # ── Reviews ──────────────────────────────────────────────────────────────
+    Review:
+      type: object
+      required: [id, practitionerId, companyId, rating, comment, reviewerName, createdAt]
+      properties:
+        id:             { type: integer }
+        practitionerId: { type: integer }
+        companyId:      { type: integer }
+        rating:         { type: integer }
+        comment:        { type: string }
+        reviewerName:   { type: string }
+        createdAt:      { type: string }
+
+    ReviewInput:
+      type: object
+      required: [practitionerId, companyId, rating, comment, reviewerName]
+      properties:
+        practitionerId: { type: integer }
+        companyId:      { type: integer }
+        rating:         { type: integer }
+        comment:        { type: string }
+        reviewerName:   { type: string }
+
+    # ── Dashboard ─────────────────────────────────────────────────────────────
+    DashboardSummary:
+      type: object
+      required: [totalPractitioners, totalCompanies, totalBookings, totalRevenue, activePractitioners, activeCompanies, bookingsThisMonth, averageRating]
+      properties:
+        totalPractitioners:   { type: integer }
+        totalCompanies:       { type: integer }
+        totalBookings:        { type: integer }
+        totalRevenue:         { type: number }
+        activePractitioners:  { type: integer }
+        activeCompanies:      { type: integer }
+        bookingsThisMonth:    { type: integer }
+        averageRating:        { type: number }
+
+    SpecialismCount:
+      type: object
+      required: [specialism, count]
+      properties:
+        specialism: { type: string }
+        count:      { type: integer }
+
+    # ── Location ─────────────────────────────────────────────────────────────
+    Location:
+      type: object
+      required: [id, name, address, city, postcode, capacity, description, type, isActive, amenities, createdAt]
+      properties:
+        id:          { type: integer }
+        name:        { type: string }
+        address:     { type: string }
+        city:        { type: string }
+        postcode:    { type: string }
+        capacity:    { type: integer }
+        description: { type: string }
+        type:        { type: string, enum: [office, studio, outdoor, virtual, hotel] }
+        imageUrl:    { type: ["string", "null"] }
+        amenities:   { type: array, items: { type: string } }
+        isActive:    { type: boolean }
+        createdAt:   { type: string }
+
+    LocationInput:
+      type: object
+      required: [name, address, city, postcode, capacity, description, type]
+      properties:
+        name:        { type: string }
+        address:     { type: string }
+        city:        { type: string }
+        postcode:    { type: string }
+        capacity:    { type: integer }
+        description: { type: string }
+        type:        { type: string, enum: [office, studio, outdoor, virtual, hotel] }
+        imageUrl:    { type: string }
+        amenities:   { type: array, items: { type: string } }
+
+    LocationUpdate:
+      type: object
+      properties:
+        name:        { type: string }
+        address:     { type: string }
+        city:        { type: string }
+        postcode:    { type: string }
+        capacity:    { type: integer }
+        description: { type: string }
+        type:        { type: string, enum: [office, studio, outdoor, virtual, hotel] }
+        imageUrl:    { type: string }
+        amenities:   { type: array, items: { type: string } }
+        isActive:    { type: boolean }

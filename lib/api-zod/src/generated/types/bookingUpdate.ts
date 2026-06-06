@@ -5,7 +5,9 @@
  * Soulful Corporate Wellbeing Platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { BookingUpdateStatus } from './bookingUpdateStatus';
 
-export interface HealthStatus {
-  status: string;
+export interface BookingUpdate {
+  status?: BookingUpdateStatus;
+  notes?: string;
 }

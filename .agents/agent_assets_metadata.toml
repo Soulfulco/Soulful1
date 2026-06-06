@@ -1,0 +1,32 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "PsZnHcBkf22OBand1Pzbs"
+uri = "file://artifacts/soulful/public/images/avatar-yoga.png"
+type = "image"
+title = "Female yoga instructor avatar"
+
+[[generated]]
+id = "Atpsf1ALxUoZIZl03T-gn"
+uri = "file://artifacts/soulful/public/images/avatar-meditation.png"
+type = "image"
+title = "Male meditation coach avatar"
+
+[[generated]]
+id = "cMsINqalNZlZTFNzWUk29"
+uri = "file://artifacts/soulful/public/images/avatar-nutrition.png"
+type = "image"
+title = "Female nutrition expert avatar"
+
+[[generated]]
+id = "DgzYF1nOad6zRf6vuYSWA"
+uri = "file://artifacts/soulful/public/images/avatar-massage.png"
+type = "image"
+title = "Male massage therapist avatar"
+
+[[generated]]
+id = "Ad50g0KqlXIgtYUx9ExO_"
+uri = "file://artifacts/soulful/public/images/hero.png"
+type = "image"
+title = "Hero section wellbeing image"

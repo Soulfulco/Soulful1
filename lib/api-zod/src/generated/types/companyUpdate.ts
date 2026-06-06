@@ -6,6 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface HealthStatus {
-  status: string;
+export interface CompanyUpdate {
+  name?: string;
+  industry?: string;
+  employeeCount?: number;
+  contactName?: string;
+  logoUrl?: string;
 }
