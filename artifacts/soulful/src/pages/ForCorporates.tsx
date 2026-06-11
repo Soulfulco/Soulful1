@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CheckCircle2, Building2, Info, Dumbbell, Leaf, Brain, HandHeart, Utensils, Mic2, Wind, Music } from "lucide-react";
+import { CheckCircle2, XCircle, Building2, Info, Dumbbell, Leaf, Brain, HandHeart, Utensils, Mic2, Wind, Music, TrendingUp } from "lucide-react";
 
 const SESSION_RATES = [
   { discipline: "Personal Training", icon: Dumbbell, corporateRate: 75, marketRange: "£80–£150" },
@@ -97,6 +97,86 @@ export default function ForCorporates() {
                 <br /><br />
                 Practitioners publicly charge £60–£250/session. Because Soulful delivers guaranteed volume,
                 we negotiate wholesale rates and pass the saving directly to you.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* EAP Comparison */}
+        <div>
+          <div className="text-center mb-10">
+            <p className="text-sm font-medium text-primary uppercase tracking-widest mb-3">Not your typical EAP</p>
+            <h2 className="text-3xl font-serif mb-3">Your EAP has 4% utilisation.<br />Soulful is built to hit 40%.</h2>
+            <p className="text-muted-foreground max-w-xl mx-auto">
+              Traditional Employee Assistance Programmes sit unused until someone hits a crisis. Soulful is the proactive layer that keeps employees well before they ever need one.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6 mb-10">
+            {/* EAP column */}
+            <Card className="border-2 border-border/50 rounded-2xl overflow-hidden">
+              <CardHeader className="bg-muted/40 pb-4">
+                <CardTitle className="text-lg font-serif text-muted-foreground">Typical EAP</CardTitle>
+                <CardDescription>The counselling helpline bundled with your health insurance</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-5">
+                <ul className="space-y-3">
+                  {[
+                    "Crisis-reactive — employees call when things go wrong",
+                    "Counselling only — no PT, yoga, massage, or coaching",
+                    "Assigned to a practitioner — no choice",
+                    "Phone or video only — no in-person sessions",
+                    "Call a helpline — no self-service booking",
+                    "HR sees nothing — zero utilisation visibility",
+                    "Under 5% of employees ever use it",
+                  ].map((item, i) => (
+                    <li key={i} className="flex items-start gap-3 text-sm">
+                      <XCircle className="h-4 w-4 text-muted-foreground/50 shrink-0 mt-0.5" />
+                      <span className="text-muted-foreground">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Soulful column */}
+            <Card className="border-2 border-primary rounded-2xl overflow-hidden shadow-md">
+              <CardHeader className="bg-primary/5 pb-4">
+                <CardTitle className="text-lg font-serif text-primary">Soulful</CardTitle>
+                <CardDescription>A proactive wellbeing marketplace your team actually uses</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-5">
+                <ul className="space-y-3">
+                  {[
+                    "Proactive — ongoing, preventative wellbeing as a daily habit",
+                    "8 disciplines — PT, yoga, massage, nutrition, coaching, breathwork & more",
+                    "Employees choose who they want, when they want",
+                    "In-person, studio, office visit, or virtual — employee's choice",
+                    "Self-service booking in seconds via the employee portal",
+                    "Live HR dashboard — see utilisation, sessions booked, who hasn't engaged",
+                    "Designed to drive utilisation above 40%",
+                  ].map((item, i) => (
+                    <li key={i} className="flex items-start gap-3 text-sm">
+                      <CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                      <span className="text-muted-foreground">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Stat callout */}
+          <div className="bg-foreground text-background rounded-2xl px-8 py-8 flex flex-col md:flex-row items-center gap-6 text-center md:text-left">
+            <div className="flex-shrink-0">
+              <TrendingUp className="h-12 w-12 text-primary mx-auto md:mx-0" />
+            </div>
+            <div className="flex-1">
+              <p className="text-2xl font-serif font-bold mb-1">
+                Soulful doesn't replace your EAP — it means employees never need to call it.
+              </p>
+              <p className="text-background/70 text-sm leading-relaxed">
+                Regular PT sessions, yoga, and coaching keep stress, burnout, and absenteeism low. The EAP is still there for crises. Soulful is the reason crises happen less often.
               </p>
             </div>
           </div>
