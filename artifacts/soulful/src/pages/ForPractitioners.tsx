@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useCreatePractitioner, useListSubscriptions, getListSubscriptionsQueryKey } from "@workspace/api-client-react";
+import { useSiteContent } from "@/hooks/useSiteContent";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ const SPECIALISMS = [
 ];
 
 export default function ForPractitioners() {
+  const c = useSiteContent();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   
@@ -77,9 +79,9 @@ export default function ForPractitioners() {
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-secondary/10 text-secondary rounded-full text-sm font-medium mb-6">
             <User className="h-4 w-4" /> For Practitioners
           </div>
-          <h1 className="text-4xl md:text-5xl font-serif text-foreground mb-6">Focus on healing, not marketing.</h1>
+          <h1 className="text-4xl md:text-5xl font-serif text-foreground mb-6">{c("prac_hero_headline", "Focus on healing, not marketing.")}</h1>
           <p className="text-xl text-muted-foreground">
-            Join our curated directory to get your services in front of engaged corporate clients looking for exactly what you offer.
+            {c("prac_hero_body", "Join our curated directory to get your services in front of engaged corporate clients looking for exactly what you offer.")}
           </p>
         </div>
       </div>
@@ -145,9 +147,9 @@ export default function ForPractitioners() {
                   <CheckCircle2 className="h-4 w-4 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-foreground">Already a Soulful practitioner?</p>
+                  <p className="text-sm font-semibold text-foreground">{c("prac_already_listed_title", "Already a Soulful practitioner?")}</p>
                   <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-                    Pitch a group session directly to corporate clients — no cold outreach needed. We'll match you to the right company and schedule it for you.
+                    {c("prac_already_listed_body", "Pitch a group session directly to corporate clients — no cold outreach needed. We'll match you to the right company and schedule it for you.")}
                   </p>
                   <Button asChild size="sm" className="mt-3 rounded-full" variant="default">
                     <a href="/propose-session">Propose a session →</a>

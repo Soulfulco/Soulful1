@@ -16,6 +16,7 @@ import hrAuthRouter from "./hrAuth";
 import wellbeingRouter from "./wellbeing";
 import proposalsRouter from "./proposals";
 import calendarTemplatesRouter from "./calendarTemplates";
+import siteContentRouter from "./siteContent";
 
 const router: IRouter = Router();
 
@@ -37,5 +38,6 @@ router.use(hrAuthRouter);
 router.use(wellbeingRouter);
 router.use(proposalsRouter);
 router.use(calendarTemplatesRouter);
+router.use(siteContentRouter);
 
 export default router;

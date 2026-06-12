@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useCreateCompany, useListSubscriptions, getListSubscriptionsQueryKey } from "@workspace/api-client-react";
+import { useSiteContent } from "@/hooks/useSiteContent";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ const SESSION_RATES = [
 ];
 
 export default function ForCorporates() {
+  const c = useSiteContent();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -74,10 +76,10 @@ export default function ForCorporates() {
             <Building2 className="h-4 w-4" /> For Corporates
           </div>
           <h1 className="text-4xl md:text-5xl font-serif text-foreground mb-6">
-            Invest in the soul of your company.
+            {c("corp_hero_headline", "Invest in the soul of your company.")}
           </h1>
           <p className="text-xl text-muted-foreground">
-            Give your team access to the UK's top wellbeing practitioners — personal trainers, yoga instructors, therapists, coaches, and more — at negotiated corporate rates.
+            {c("corp_hero_body", "Give your team access to the UK's top wellbeing practitioners — personal trainers, yoga instructors, therapists, coaches, and more — at negotiated corporate rates.")}
           </p>
         </div>
       </div>

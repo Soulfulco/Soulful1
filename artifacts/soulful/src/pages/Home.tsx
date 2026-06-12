@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, CheckCircle2, Star } from "lucide-react";
 import heroImage from "/images/hero.png";
+import { useSiteContent } from "@/hooks/useSiteContent";
 
 export default function Home() {
+  const c = useSiteContent();
   const { data: practitioners, isLoading } = useListPractitioners({ query: { queryKey: getListPractitionersQueryKey() } });
 
   const featuredPractitioners = practitioners?.slice(0, 3) || [];
@@ -19,23 +21,23 @@ export default function Home() {
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
             <div className="flex flex-col gap-8 max-w-2xl">
               <h1 className="text-5xl lg:text-7xl font-serif leading-[1.1] text-foreground tracking-tight">
-                Corporate wellbeing, <span className="text-primary italic">rooted in nature.</span>
+                {c("home_hero_headline", "Corporate wellbeing,")} <span className="text-primary italic">{c("home_hero_headline_2", "rooted in nature.")}</span>
               </h1>
               <p className="text-lg lg:text-xl text-muted-foreground leading-relaxed max-w-lg">
-                Soulful connects forward-thinking UK corporations with vetted wellbeing practitioners. Build a culture of care through yoga, meditation, coaching, and more.
+                {c("home_hero_body", "Soulful connects forward-thinking UK corporations with vetted wellbeing practitioners. Build a culture of care through yoga, meditation, coaching, and more.")}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <Button size="lg" className="rounded-full text-base h-14 px-8 shadow-sm" asChild>
-                  <Link href="/for-corporates">Get Started for Teams</Link>
+                  <Link href="/for-corporates">{c("home_cta_primary", "Get Started for Teams")}</Link>
                 </Button>
                 <Button size="lg" variant="outline" className="rounded-full text-base h-14 px-8 border-primary/20 text-foreground hover:bg-primary/5" asChild>
-                  <Link href="/practitioners">Browse Practitioners</Link>
+                  <Link href="/practitioners">{c("home_cta_secondary", "Browse Practitioners")}</Link>
                 </Button>
               </div>
               <div className="flex items-center gap-6 text-sm font-medium text-muted-foreground pt-4">
-                <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> Vetted Experts</div>
-                <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> Easy Booking</div>
-                <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> Clear ROI</div>
+                <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> {c("home_trust_1", "Vetted Experts")}</div>
+                <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> {c("home_trust_2", "Easy Booking")}</div>
+                <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> {c("home_trust_3", "Clear ROI")}</div>
               </div>
             </div>
             <div className="relative">
