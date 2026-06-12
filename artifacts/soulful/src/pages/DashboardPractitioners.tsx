@@ -1,36 +1,210 @@
-import { useListPractitioners, getListPractitionersQueryKey, useUpdatePractitioner } from "@workspace/api-client-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { useState } from "react";
+import {
+  useListPractitioners,
+  getListPractitionersQueryKey,
+  useUpdatePractitioner,
+  useCreatePractitioner,
+} from "@workspace/api-client-react";
+import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { Plus } from "lucide-react";
+
+const SPECIALISMS = [
+  "Personal Training",
+  "Yoga",
+  "Massage Therapy",
+  "Nutrition",
+  "Life Coaching",
+  "Breathwork",
+  "Sound Healing",
+  "Meditation",
+  "Pilates",
+  "Physiotherapy",
+  "Counselling",
+  "Mindfulness",
+];
+
+const EMPTY_FORM = {
+  name: "",
+  email: "",
+  specialism: "",
+  bio: "",
+  sessionRateGbp: "",
+  location: "",
+  qualifications: "",
+  avatarUrl: "",
+  subscriptionStatus: "trial" as "active" | "inactive" | "trial",
+};
 
 export default function DashboardPractitioners() {
   const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState(EMPTY_FORM);
+
   const updatePractitioner = useUpdatePractitioner();
+  const createPractitioner = useCreatePractitioner();
 
   const { data: practitioners, isLoading, refetch } = useListPractitioners(
-    {}, 
+    {},
     { query: { queryKey: getListPractitionersQueryKey() } }
   );
 
   const handleToggleActive = (id: number, currentStatus: boolean) => {
-    updatePractitioner.mutate({
-      id,
-      data: { isActive: !currentStatus }
-    }, {
-      onSuccess: () => {
-        toast({ title: "Status updated", description: `Practitioner is now ${!currentStatus ? 'active' : 'inactive'}.` });
-        refetch();
+    updatePractitioner.mutate(
+      { id, data: { isActive: !currentStatus } },
+      {
+        onSuccess: () => {
+          toast({ title: "Status updated", description: `Practitioner is now ${!currentStatus ? "active" : "inactive"}.` });
+          refetch();
+        },
       }
-    });
+    );
+  };
+
+  const handleChange = (field: keyof typeof EMPTY_FORM, value: string) => {
+    setForm((f) => ({ ...f, [field]: value }));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name || !form.email || !form.specialism || !form.bio || !form.sessionRateGbp) {
+      toast({ title: "Missing fields", description: "Please fill in all required fields.", variant: "destructive" });
+      return;
+    }
+    createPractitioner.mutate(
+      {
+        data: {
+          name: form.name,
+          email: form.email,
+          specialism: form.specialism,
+          bio: form.bio,
+          sessionRateGbp: Number(form.sessionRateGbp),
+          location: form.location || undefined,
+          qualifications: form.qualifications || undefined,
+          avatarUrl: form.avatarUrl || undefined,
+          subscriptionStatus: form.subscriptionStatus,
+          isActive: true,
+        },
+      },
+      {
+        onSuccess: () => {
+          toast({ title: "Practitioner added", description: `${form.name} is now in the directory.` });
+          setForm(EMPTY_FORM);
+          setOpen(false);
+          refetch();
+        },
+        onError: () => {
+          toast({ title: "Error", description: "Could not add practitioner. Check the email isn't already in use.", variant: "destructive" });
+        },
+      }
+    );
   };
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-serif text-foreground">Practitioners Directory</h1>
-        <p className="text-muted-foreground text-sm">Manage practitioner profiles and directory visibility.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-serif text-foreground">Practitioners Directory</h1>
+          <p className="text-muted-foreground text-sm">Manage practitioner profiles and directory visibility.</p>
+        </div>
+
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button className="gap-2">
+              <Plus className="h-4 w-4" />
+              Add Practitioner
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="font-serif text-xl">Add New Practitioner</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="name">Full Name <span className="text-destructive">*</span></Label>
+                  <Input id="name" placeholder="e.g. Hannah Smith" value={form.name} onChange={(e) => handleChange("name", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="email">Email <span className="text-destructive">*</span></Label>
+                  <Input id="email" type="email" placeholder="hannah@example.com" value={form.email} onChange={(e) => handleChange("email", e.target.value)} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label>Specialism <span className="text-destructive">*</span></Label>
+                  <Select value={form.specialism} onValueChange={(v) => handleChange("specialism", v)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select discipline" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SPECIALISMS.map((s) => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="rate">Session Rate (£) <span className="text-destructive">*</span></Label>
+                  <Input id="rate" type="number" min="0" step="5" placeholder="75" value={form.sessionRateGbp} onChange={(e) => handleChange("sessionRateGbp", e.target.value)} />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="bio">Bio <span className="text-destructive">*</span></Label>
+                <Textarea id="bio" placeholder="A short description of the practitioner's background and approach..." rows={3} value={form.bio} onChange={(e) => handleChange("bio", e.target.value)} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="location">Location</Label>
+                  <Input id="location" placeholder="e.g. London, SE1" value={form.location} onChange={(e) => handleChange("location", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Subscription Status</Label>
+                  <Select value={form.subscriptionStatus} onValueChange={(v) => handleChange("subscriptionStatus", v)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="trial">Trial</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="qualifications">Qualifications</Label>
+                <Input id="qualifications" placeholder="e.g. REPs Level 3, YMCA Diploma" value={form.qualifications} onChange={(e) => handleChange("qualifications", e.target.value)} />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="avatar">Photo URL</Label>
+                <Input id="avatar" placeholder="https://..." value={form.avatarUrl} onChange={(e) => handleChange("avatarUrl", e.target.value)} />
+                <p className="text-xs text-muted-foreground">Paste a direct link to their headshot photo.</p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                <Button type="submit" disabled={createPractitioner.isPending}>
+                  {createPractitioner.isPending ? "Adding..." : "Add Practitioner"}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Card className="border-none shadow-sm overflow-hidden bg-card">
@@ -82,9 +256,9 @@ export default function DashboardPractitioners() {
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={
-                        practitioner.subscriptionStatus === 'active' ? 'bg-primary/10 text-primary border-primary/20' : 
-                        practitioner.subscriptionStatus === 'trial' ? 'bg-secondary/10 text-secondary border-secondary/20' : 
-                        'bg-muted text-muted-foreground'
+                        practitioner.subscriptionStatus === "active" ? "bg-primary/10 text-primary border-primary/20" :
+                        practitioner.subscriptionStatus === "trial" ? "bg-secondary/10 text-secondary border-secondary/20" :
+                        "bg-muted text-muted-foreground"
                       }>
                         {practitioner.subscriptionStatus}
                       </Badge>
@@ -92,10 +266,10 @@ export default function DashboardPractitioners() {
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
                         <span className="text-xs text-muted-foreground w-12 text-right">
-                          {practitioner.isActive ? 'Active' : 'Hidden'}
+                          {practitioner.isActive ? "Active" : "Hidden"}
                         </span>
-                        <Switch 
-                          checked={practitioner.isActive} 
+                        <Switch
+                          checked={practitioner.isActive}
                           onCheckedChange={() => handleToggleActive(practitioner.id, practitioner.isActive)}
                           disabled={updatePractitioner.isPending}
                         />
@@ -106,7 +280,7 @@ export default function DashboardPractitioners() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
-                    No practitioners found.
+                    No practitioners found. Add one above.
                   </TableCell>
                 </TableRow>
               )}
