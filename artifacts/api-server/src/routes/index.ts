@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import authRouter from "./auth";
 import practitionersRouter from "./practitioners";
 import companiesRouter from "./companies";
 import availabilityRouter from "./availability";
@@ -11,10 +12,12 @@ import locationsRouter from "./locations";
 import { employeesRouter, companyEmployeesRouter } from "./employees";
 import groupSessionsRouter from "./groupSessions";
 import socialCalendarRouter from "./socialCalendar";
+import hrAuthRouter from "./hrAuth";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(authRouter);
 router.use(practitionersRouter);
 router.use(companiesRouter);
 router.use(companyEmployeesRouter);
@@ -27,5 +30,6 @@ router.use(locationsRouter);
 router.use(employeesRouter);
 router.use(groupSessionsRouter);
 router.use(socialCalendarRouter);
+router.use(hrAuthRouter);
 
 export default router;

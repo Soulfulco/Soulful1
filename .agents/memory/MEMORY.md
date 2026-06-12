@@ -1,0 +1,2 @@
+- [Auth architecture](auth-architecture.md) — Replit OIDC for Soulful admins; username/password for HR users stored in hr_users table, both share the same session store.
+- [Replit-auth-web tsconfig](replit-auth-web-tsconfig.md) — lib needs env.d.ts with ImportMeta type to compile import.meta.env without vite/client dependency.

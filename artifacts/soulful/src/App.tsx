@@ -8,6 +8,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import NotFound from "@/pages/not-found";
 import MainLayout from "@/components/layout/MainLayout";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 // Lazy load pages for better performance
 const Home = lazy(() => import("@/pages/Home"));
@@ -18,6 +20,7 @@ const ForPractitioners = lazy(() => import("@/pages/ForPractitioners"));
 const Locations = lazy(() => import("@/pages/Locations"));
 const Join = lazy(() => import("@/pages/Join"));
 const EmployeePortal = lazy(() => import("@/pages/EmployeePortal"));
+const DashboardLogin = lazy(() => import("@/pages/DashboardLogin"));
 
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const DashboardBookings = lazy(() => import("@/pages/DashboardBookings"));
@@ -27,6 +30,7 @@ const DashboardSubscriptions = lazy(() => import("@/pages/DashboardSubscriptions
 const DashboardEmployees = lazy(() => import("@/pages/DashboardEmployees"));
 const DashboardGroupSessions = lazy(() => import("@/pages/DashboardGroupSessions"));
 const DashboardSocialCalendar = lazy(() => import("@/pages/DashboardSocialCalendar"));
+const DashboardHrUsers = lazy(() => import("@/pages/DashboardHrUsers"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -54,7 +58,7 @@ function Router() {
   return (
     <Suspense fallback={<LoadingFallback />}>
       <Switch>
-        {/* Main App Routes */}
+        {/* Public Routes */}
         <Route path="/">
           <MainLayout><Home /></MainLayout>
         </Route>
@@ -80,30 +84,56 @@ function Router() {
           <EmployeePortal />
         </Route>
 
-        {/* Dashboard Routes */}
+        {/* Login */}
+        <Route path="/dashboard/login">
+          <DashboardLogin />
+        </Route>
+
+        {/* Protected Dashboard Routes */}
         <Route path="/dashboard">
-          <DashboardLayout><Dashboard /></DashboardLayout>
+          <ProtectedRoute>
+            <DashboardLayout><Dashboard /></DashboardLayout>
+          </ProtectedRoute>
         </Route>
         <Route path="/dashboard/bookings">
-          <DashboardLayout><DashboardBookings /></DashboardLayout>
+          <ProtectedRoute>
+            <DashboardLayout><DashboardBookings /></DashboardLayout>
+          </ProtectedRoute>
         </Route>
         <Route path="/dashboard/practitioners">
-          <DashboardLayout><DashboardPractitioners /></DashboardLayout>
+          <ProtectedRoute requireAdmin>
+            <DashboardLayout><DashboardPractitioners /></DashboardLayout>
+          </ProtectedRoute>
         </Route>
         <Route path="/dashboard/companies">
-          <DashboardLayout><DashboardCompanies /></DashboardLayout>
+          <ProtectedRoute requireAdmin>
+            <DashboardLayout><DashboardCompanies /></DashboardLayout>
+          </ProtectedRoute>
         </Route>
         <Route path="/dashboard/employees">
-          <DashboardLayout><DashboardEmployees /></DashboardLayout>
+          <ProtectedRoute>
+            <DashboardLayout><DashboardEmployees /></DashboardLayout>
+          </ProtectedRoute>
         </Route>
         <Route path="/dashboard/group-sessions">
-          <DashboardLayout><DashboardGroupSessions /></DashboardLayout>
+          <ProtectedRoute>
+            <DashboardLayout><DashboardGroupSessions /></DashboardLayout>
+          </ProtectedRoute>
         </Route>
         <Route path="/dashboard/social-calendar">
-          <DashboardLayout><DashboardSocialCalendar /></DashboardLayout>
+          <ProtectedRoute>
+            <DashboardLayout><DashboardSocialCalendar /></DashboardLayout>
+          </ProtectedRoute>
         </Route>
         <Route path="/dashboard/subscriptions">
-          <DashboardLayout><DashboardSubscriptions /></DashboardLayout>
+          <ProtectedRoute requireAdmin>
+            <DashboardLayout><DashboardSubscriptions /></DashboardLayout>
+          </ProtectedRoute>
+        </Route>
+        <Route path="/dashboard/hr-users">
+          <ProtectedRoute requireAdmin>
+            <DashboardLayout><DashboardHrUsers /></DashboardLayout>
+          </ProtectedRoute>
         </Route>
 
         <Route component={NotFound} />
@@ -115,12 +145,14 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
+      <AuthProvider>
+        <TooltipProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router />
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
