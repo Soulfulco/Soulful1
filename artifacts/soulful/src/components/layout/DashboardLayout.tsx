@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Calendar, Users, Building2, CreditCard, HeartHandshake, UsersRound, CalendarDays, LogOut, UserCog, Heart } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Building2, CreditCard, HeartHandshake, UsersRound, CalendarDays, LogOut, UserCog, Heart, Inbox } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ const adminNavigation = [
   { name: "Employee Wellbeing", href: "/dashboard/employees", icon: HeartHandshake },
   { name: "Subscriptions", href: "/dashboard/subscriptions", icon: CreditCard },
   { name: "Team Wellbeing", href: "/dashboard/wellbeing", icon: Heart },
+  { name: "Session Proposals", href: "/dashboard/proposals", icon: Inbox },
   { name: "HR Portal Users", href: "/dashboard/hr-users", icon: UserCog },
 ];
 

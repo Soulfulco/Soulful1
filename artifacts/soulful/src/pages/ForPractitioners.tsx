@@ -137,6 +137,24 @@ export default function ForPractitioners() {
                 <p><strong className="text-foreground">Automated booking.</strong> Our built-in calendar system means less back-and-forth email scheduling.</p>
               </div>
             </div>
+
+            {/* Already listed CTA */}
+            <div className="mt-6 bg-secondary/20 border border-secondary/30 p-6 rounded-2xl">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Already a Soulful practitioner?</p>
+                  <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+                    Pitch a group session directly to corporate clients — no cold outreach needed. We'll match you to the right company and schedule it for you.
+                  </p>
+                  <Button asChild size="sm" className="mt-3 rounded-full" variant="default">
+                    <a href="/propose-session">Propose a session →</a>
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Right col: Form */}

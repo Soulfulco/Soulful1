@@ -14,6 +14,7 @@ import groupSessionsRouter from "./groupSessions";
 import socialCalendarRouter from "./socialCalendar";
 import hrAuthRouter from "./hrAuth";
 import wellbeingRouter from "./wellbeing";
+import proposalsRouter from "./proposals";
 
 const router: IRouter = Router();
 
@@ -33,5 +34,6 @@ router.use(groupSessionsRouter);
 router.use(socialCalendarRouter);
 router.use(hrAuthRouter);
 router.use(wellbeingRouter);
+router.use(proposalsRouter);
 
 export default router;

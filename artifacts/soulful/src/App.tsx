@@ -32,6 +32,8 @@ const DashboardGroupSessions = lazy(() => import("@/pages/DashboardGroupSessions
 const DashboardSocialCalendar = lazy(() => import("@/pages/DashboardSocialCalendar"));
 const DashboardHrUsers = lazy(() => import("@/pages/DashboardHrUsers"));
 const DashboardWellbeing = lazy(() => import("@/pages/DashboardWellbeing"));
+const DashboardProposals = lazy(() => import("@/pages/DashboardProposals"));
+const ProposeSession = lazy(() => import("@/pages/ProposeSession"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -140,6 +142,16 @@ function Router() {
           <ProtectedRoute>
             <DashboardLayout><DashboardWellbeing /></DashboardLayout>
           </ProtectedRoute>
+        </Route>
+        <Route path="/dashboard/proposals">
+          <ProtectedRoute requireAdmin>
+            <DashboardLayout><DashboardProposals /></DashboardLayout>
+          </ProtectedRoute>
+        </Route>
+
+        {/* Public practitioner proposal form */}
+        <Route path="/propose-session">
+          <ProposeSession />
         </Route>
 
         <Route component={NotFound} />
