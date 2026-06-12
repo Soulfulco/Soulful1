@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Calendar, Users, Building2, CreditCard, Leaf, HeartHandshake } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Building2, CreditCard, HeartHandshake } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
@@ -19,9 +19,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Sidebar */}
       <aside className="w-64 border-r bg-card flex-col hidden md:flex sticky top-0 h-screen">
         <div className="h-16 flex items-center px-6 border-b">
-          <Link href="/" className="flex items-center gap-2 text-primary hover:opacity-90 transition-opacity">
-            <Leaf className="h-5 w-5" />
-            <span className="font-serif text-xl font-bold tracking-tight">Soulful</span>
+          <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+            <img src="/images/logo.png" alt="Soulful" className="h-7 w-7 rounded-md object-cover" />
+            <span className="font-serif text-xl font-bold tracking-tight text-foreground">Soulful</span>
           </Link>
         </div>
         <div className="flex-1 py-6 px-4 flex flex-col gap-1 overflow-y-auto">
@@ -60,9 +60,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Main content */}
       <main className="flex-1 flex flex-col min-w-0">
         <header className="h-16 border-b bg-card flex items-center px-6 md:hidden sticky top-0 z-10">
-          <Link href="/" className="flex items-center gap-2 text-primary">
-            <Leaf className="h-5 w-5" />
-            <span className="font-serif text-xl font-bold">Soulful</span>
+          <Link href="/" className="flex items-center gap-2 hover:opacity-90">
+            <img src="/images/logo.png" alt="Soulful" className="h-7 w-7 rounded-md object-cover" />
+            <span className="font-serif text-xl font-bold text-foreground">Soulful</span>
           </Link>
         </header>
         <div className="flex-1 p-6 lg:p-8 max-w-6xl mx-auto w-full">

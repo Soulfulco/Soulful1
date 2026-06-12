@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Leaf, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
@@ -32,9 +32,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     <div className="min-h-screen flex flex-col bg-background">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-8">
-          <Link href="/" className="flex items-center gap-2 text-primary hover:opacity-90 transition-opacity">
-            <Leaf className="h-6 w-6" />
-            <span className="font-serif text-2xl font-bold tracking-tight">Soulful</span>
+          <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+            <img src="/images/logo.png" alt="Soulful" className="h-8 w-8 rounded-lg object-cover" />
+            <span className="font-serif text-2xl font-bold tracking-tight text-foreground">Soulful</span>
           </Link>
           
           <nav className="hidden md:flex items-center gap-8">
@@ -79,9 +79,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         <div className="container mx-auto py-12 px-4 md:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="flex flex-col gap-4 md:col-span-1">
-              <Link href="/" className="flex items-center gap-2 text-primary hover:opacity-90">
-                <Leaf className="h-5 w-5" />
-                <span className="font-serif text-xl font-bold">Soulful</span>
+              <Link href="/" className="flex items-center gap-2 hover:opacity-90">
+                <img src="/images/logo.png" alt="Soulful" className="h-7 w-7 rounded-md object-cover" />
+                <span className="font-serif text-xl font-bold text-foreground">Soulful</span>
               </Link>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 A sanctuary for corporate wellbeing. Connecting teams with vetted practitioners across the UK.
