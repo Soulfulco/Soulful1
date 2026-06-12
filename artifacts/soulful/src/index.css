@@ -76,58 +76,62 @@
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
 
-  /* Earthy cream/linen */
-  --background: 40 33% 97%;
-  --foreground: 20 20% 20%;
+  /* #fbf5ce — warm cream */
+  --background: 52 85% 90%;
+  --foreground: 91 18% 18%;
 
-  --border: 40 20% 90%;
+  /* #dae8bc — light sage border */
+  --border: 79 35% 78%;
 
-  --card: 0 0% 100%;
-  --card-foreground: 20 20% 20%;
-  --card-border: 40 20% 90%;
+  /* cards slightly lighter than background */
+  --card: 52 70% 95%;
+  --card-foreground: 91 18% 18%;
+  --card-border: 79 35% 83%;
 
-  --sidebar: 40 33% 97%;
-  --sidebar-foreground: 20 20% 20%;
-  --sidebar-border: 40 20% 90%;
-  --sidebar-primary: 153 18% 45%; /* Sage Green */
+  /* sidebar: light sage wash */
+  --sidebar: 79 30% 88%;
+  --sidebar-foreground: 91 18% 18%;
+  --sidebar-border: 79 30% 78%;
+  --sidebar-primary: 91 16% 45%; /* #94a683 darkened for sidebar */
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 40 20% 90%;
-  --sidebar-accent-foreground: 20 20% 20%;
-  --sidebar-ring: 153 18% 45%;
+  --sidebar-accent: 79 35% 82%;
+  --sidebar-accent-foreground: 91 18% 18%;
+  --sidebar-ring: 91 16% 58%;
 
-  --popover: 0 0% 100%;
-  --popover-foreground: 20 20% 20%;
-  --popover-border: 40 20% 90%;
+  --popover: 52 70% 96%;
+  --popover-foreground: 91 18% 18%;
+  --popover-border: 79 35% 78%;
 
-  /* Warm Sage Green */
-  --primary: 153 18% 45%;
+  /* #94a683 — sage green primary */
+  --primary: 91 16% 50%;
   --primary-foreground: 0 0% 100%;
 
-  /* Soft Terracotta */
-  --secondary: 15 45% 65%;
-  --secondary-foreground: 0 0% 100%;
+  /* #dae8bc — light sage secondary */
+  --secondary: 79 49% 82%;
+  --secondary-foreground: 91 18% 22%;
 
-  --muted: 40 20% 92%;
-  --muted-foreground: 20 10% 45%;
+  /* muted: blend of cream + light sage */
+  --muted: 79 25% 85%;
+  --muted-foreground: 91 12% 42%;
 
-  --accent: 40 20% 92%;
-  --accent-foreground: 20 20% 20%;
+  --accent: 79 35% 82%;
+  --accent-foreground: 91 18% 18%;
 
   --destructive: 0 60% 50%;
   --destructive-foreground: 0 0% 100%;
 
-  --input: 40 20% 85%;
-  --ring: 153 18% 45%;
-  
-  --chart-1: 153 18% 45%;
-  --chart-2: 15 45% 65%;
-  --chart-3: 40 50% 70%;
-  --chart-4: 200 20% 60%;
-  --chart-5: 330 20% 60%;
+  --input: 79 30% 80%;
+  --ring: 91 16% 58%;
+
+  --chart-1: 91 16% 58%;
+  --chart-2: 79 49% 82%;
+  --chart-3: 52 85% 90%;
+  --chart-4: 91 16% 40%;
+  --chart-5: 79 30% 65%;
 
   
   --app-font-sans: 'Plus Jakarta Sans', sans-serif;
-  --app-font-serif: 'The Seasons', serif;
+  --app-font-serif: 'Cormorant Garamond', serif;
   --app-font-mono: Menlo, monospace;
   --radius: 0.75rem; 
   --shadow-2xs: 0px 2px 0px 0px rgba(0,0,0, 0.02);
