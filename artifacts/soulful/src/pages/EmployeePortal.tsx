@@ -4,7 +4,7 @@ import { useGetEmployee, useListEmployeeBookings, getGetEmployeeQueryKey, getLis
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, User, LogOut, ArrowRight, CheckCircle2, Users, MapPin, Sparkles, Building2 } from "lucide-react";
+import { Calendar, Clock, User, LogOut, ArrowRight, CheckCircle2, Users, MapPin, Sparkles, Building2, CalendarDays, Download } from "lucide-react";
 import { format } from "date-fns";
 
 interface StoredEmployee {
@@ -28,10 +28,31 @@ interface GroupSession {
   status: string;
 }
 
+interface SocialEvent {
+  id: number;
+  title: string;
+  description: string | null;
+  event_type: string;
+  start_time: string;
+  end_time: string;
+  location: string;
+  location_url: string | null;
+  organiser_name: string;
+  max_attendees: number | null;
+  rsvp_count: number;
+  status: string;
+}
+
 const LOCATION_LABELS: Record<string, string> = {
   at_office: "At your office",
   virtual: "Virtual",
   practitioner_space: "Practitioner's studio",
+};
+
+const EVENT_TYPE_EMOJI: Record<string, string> = {
+  yoga: "🧘", meditation: "🌿", walk: "🚶", steps: "👟",
+  workshop: "📚", nutrition: "🥗", breathwork: "💨",
+  social: "☕", talk: "🎙️", other: "✨",
 };
 
 function AllowanceBar({ used, total }: { used: number; total: number }) {
@@ -63,10 +84,18 @@ export default function EmployeePortal() {
   const [, navigate] = useLocation();
   const [stored, setStored] = useState<StoredEmployee | null>(null);
   const [loaded, setLoaded] = useState(false);
+
+  // Group sessions
   const [groupSessions, setGroupSessions] = useState<GroupSession[]>([]);
   const [loadingGroup, setLoadingGroup] = useState(false);
   const [attending, setAttending] = useState<Set<number>>(new Set());
   const [signingUp, setSigningUp] = useState<number | null>(null);
+
+  // Social calendar
+  const [socialEvents, setSocialEvents] = useState<SocialEvent[]>([]);
+  const [loadingSocial, setLoadingSocial] = useState(false);
+  const [rsvpd, setRsvpd] = useState<Set<number>>(new Set());
+  const [rsvping, setRsvping] = useState<number | null>(null);
 
   useEffect(() => {
     const raw = localStorage.getItem("soulful_employee");
@@ -85,6 +114,7 @@ export default function EmployeePortal() {
     { query: { queryKey: getListEmployeeBookingsQueryKey(stored?.id ?? 0), enabled: !!stored?.id } }
   );
 
+  // Fetch group sessions
   useEffect(() => {
     if (!stored?.companyId) return;
     setLoadingGroup(true);
@@ -111,6 +141,35 @@ export default function EmployeePortal() {
       .finally(() => setLoadingGroup(false));
   }, [stored?.companyId, stored?.email]);
 
+  // Fetch social events
+  useEffect(() => {
+    if (!stored?.companyId) return;
+    setLoadingSocial(true);
+    fetch(`/api/social-events?companyId=${stored.companyId}`)
+      .then(r => r.json())
+      .then((data: SocialEvent[]) => {
+        const upcoming = data.filter(e => new Date(e.start_time) >= new Date() && e.status === "active");
+        setSocialEvents(upcoming);
+        // Check which ones this employee has RSVPed to
+        return Promise.all(
+          upcoming.map(e =>
+            fetch(`/api/social-events/${e.id}`)
+              .then(r => r.json())
+              .then(d => ({ id: e.id, rsvps: d.rsvps as { employee_email: string }[] }))
+          )
+        );
+      })
+      .then(results => {
+        const ids = results
+          .filter(r => r.rsvps?.some(rv => rv.employee_email === stored.email))
+          .map(r => r.id);
+        setRsvpd(new Set(ids));
+      })
+      .catch(() => {})
+      .finally(() => setLoadingSocial(false));
+  }, [stored?.companyId, stored?.email]);
+
+  // Group session handlers
   const handleSignUp = async (sessionId: number) => {
     if (!stored) return;
     setSigningUp(sessionId);
@@ -143,6 +202,56 @@ export default function EmployeePortal() {
       }
     } catch {}
     setSigningUp(null);
+  };
+
+  // Social calendar handlers
+  const handleRsvp = async (eventId: number) => {
+    if (!stored) return;
+    setRsvping(eventId);
+    try {
+      const res = await fetch(`/api/social-events/${eventId}/rsvp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeeId: stored.id, employeeName: stored.name, employeeEmail: stored.email }),
+      });
+      if (res.ok) {
+        setRsvpd(prev => new Set([...prev, eventId]));
+        setSocialEvents(prev => prev.map(e => e.id === eventId ? { ...e, rsvp_count: e.rsvp_count + 1 } : e));
+      }
+    } catch {}
+    setRsvping(null);
+  };
+
+  const handleCancelRsvp = async (eventId: number) => {
+    if (!stored) return;
+    setRsvping(eventId);
+    try {
+      const res = await fetch(`/api/social-events/${eventId}/rsvp`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeeEmail: stored.email }),
+      });
+      if (res.ok) {
+        setRsvpd(prev => { const n = new Set(prev); n.delete(eventId); return n; });
+        setSocialEvents(prev => prev.map(e => e.id === eventId ? { ...e, rsvp_count: Math.max(0, e.rsvp_count - 1) } : e));
+      }
+    } catch {}
+    setRsvping(null);
+  };
+
+  const downloadEventIcs = (eventId: number, title: string) => {
+    const a = document.createElement("a");
+    a.href = `/api/social-events/${eventId}/calendar.ics`;
+    a.download = `${title.replace(/\s+/g, "-").toLowerCase()}.ics`;
+    a.click();
+  };
+
+  const downloadAllIcs = () => {
+    if (!stored?.companyId) return;
+    const a = document.createElement("a");
+    a.href = `/api/social-events/company/${stored.companyId}/calendar.ics`;
+    a.download = "soulful-wellbeing-calendar.ics";
+    a.click();
   };
 
   const handleSignOut = () => {
@@ -224,14 +333,13 @@ export default function EmployeePortal() {
                   </div>
                 </div>
                 <AllowanceBar used={sessionsUsed} total={allowance} />
-                {remaining > 0 && (
+                {remaining > 0 ? (
                   <Button asChild size="sm" className="w-full rounded-full text-sm">
                     <Link href="/practitioners">
                       Book a 1:1 session <ArrowRight className="h-3.5 w-3.5 ml-1" />
                     </Link>
                   </Button>
-                )}
-                {remaining === 0 && (
+                ) : (
                   <p className="text-xs text-muted-foreground text-center">Allowance used — resets next month</p>
                 )}
               </CardContent>
@@ -245,21 +353,18 @@ export default function EmployeePortal() {
                     <Users className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium">Group sessions</p>
+                    <p className="text-sm font-medium">Practitioner group sessions</p>
                     <p className="text-xs text-muted-foreground">Yoga, meditation & more</p>
                   </div>
                 </div>
                 {loadingGroup ? (
                   <div className="h-8 bg-muted animate-pulse rounded" />
                 ) : groupSessions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No upcoming group sessions from your company yet.</p>
+                  <p className="text-sm text-muted-foreground">None scheduled yet.</p>
                 ) : (
                   <div className="space-y-1">
                     <p className="text-2xl font-serif font-bold">{groupSessions.length}</p>
-                    <p className="text-xs text-muted-foreground">upcoming session{groupSessions.length !== 1 ? "s" : ""} to sign up for</p>
-                    <p className="text-xs text-primary font-medium">
-                      {attending.size} already attending
-                    </p>
+                    <p className="text-xs text-muted-foreground">upcoming · {attending.size} you're attending</p>
                   </div>
                 )}
               </CardContent>
@@ -321,6 +426,102 @@ export default function EmployeePortal() {
           )}
         </section>
 
+        {/* ── WELLBEING SOCIAL CALENDAR ── */}
+        <section>
+          <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <CalendarDays className="h-4 w-4 text-primary" />
+              <div>
+                <h2 className="text-base font-semibold text-foreground">Wellbeing social calendar</h2>
+                <p className="text-xs text-muted-foreground">Company-organised events — opt in and save to your calendar</p>
+              </div>
+            </div>
+            {socialEvents.length > 0 && (
+              <Button variant="outline" size="sm" className="gap-1.5 text-xs rounded-full h-8" onClick={downloadAllIcs}>
+                <Download className="h-3.5 w-3.5" />
+                Add all to calendar
+              </Button>
+            )}
+          </div>
+
+          {loadingSocial ? (
+            <div className="space-y-3">
+              {[1, 2].map(i => <div key={i} className="h-20 bg-muted animate-pulse rounded-xl" />)}
+            </div>
+          ) : socialEvents.length === 0 ? (
+            <Card className="border-dashed border-2 border-muted shadow-none">
+              <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
+                <CalendarDays className="h-8 w-8 text-muted-foreground/40" />
+                <p className="text-sm text-muted-foreground">Your company hasn't added any upcoming social events yet.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {socialEvents.map(event => {
+                const isRsvpd = rsvpd.has(event.id);
+                const isFull = event.max_attendees !== null && event.rsvp_count >= event.max_attendees && !isRsvpd;
+                const emoji = EVENT_TYPE_EMOJI[event.event_type] ?? "✨";
+                return (
+                  <Card key={event.id} className={`border-none shadow-sm transition-all ${isRsvpd ? "bg-primary/5 ring-1 ring-primary/20" : "bg-card"}`}>
+                    <CardContent className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-4 px-5">
+                      <div className="flex items-start gap-3">
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-base ${isRsvpd ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                          {isRsvpd ? <CheckCircle2 className="h-4 w-4" /> : <span>{emoji}</span>}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-medium">{event.title}</p>
+                            {isRsvpd && <Badge className="text-xs bg-primary/15 text-primary border-none h-5 px-2">Going</Badge>}
+                            {isFull && <Badge variant="outline" className="text-xs h-5">Full</Badge>}
+                          </div>
+                          {event.description && (
+                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{event.description}</p>
+                          )}
+                          <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+                            <span>{format(new Date(event.start_time), "EEE d MMM, h:mm a")} – {format(new Date(event.end_time), "h:mm a")}</span>
+                            {event.location && (
+                              <span className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                {event.location_url
+                                  ? <a href={event.location_url} target="_blank" rel="noreferrer" className="underline">{event.location}</a>
+                                  : event.location
+                                }
+                              </span>
+                            )}
+                            <span className="text-muted-foreground/60">by {event.organiser_name}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0 sm:pl-2">
+                        {/* Calendar download */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 rounded-full text-muted-foreground hover:text-foreground"
+                          title="Add to calendar"
+                          onClick={() => downloadEventIcs(event.id, event.title)}
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                        </Button>
+                        {/* RSVP */}
+                        {isRsvpd ? (
+                          <Button variant="outline" size="sm" className="rounded-full text-xs h-8" disabled={rsvping === event.id} onClick={() => handleCancelRsvp(event.id)}>
+                            {rsvping === event.id ? "..." : "Can't make it"}
+                          </Button>
+                        ) : (
+                          <Button size="sm" className="rounded-full text-xs h-8" disabled={isFull || rsvping === event.id} onClick={() => handleRsvp(event.id)}>
+                            {rsvping === event.id ? "..." : isFull ? "Full" : "I'm going"}
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
         {/* ── SELF-FUNDED 1:1s ── */}
         <section>
           <div className="flex items-center gap-2 mb-4">
@@ -344,7 +545,7 @@ export default function EmployeePortal() {
           </Card>
         </section>
 
-        {/* ── UPCOMING BOOKED SESSIONS ── */}
+        {/* ── UPCOMING 1:1 BOOKINGS ── */}
         {(upcomingBookings.length > 0 || isLoadingBookings) && (
           <section>
             <div className="flex items-center gap-2 mb-4">

@@ -10,6 +10,7 @@ import dashboardRouter from "./dashboard";
 import locationsRouter from "./locations";
 import { employeesRouter, companyEmployeesRouter } from "./employees";
 import groupSessionsRouter from "./groupSessions";
+import socialCalendarRouter from "./socialCalendar";
 
 const router: IRouter = Router();
 
@@ -25,5 +26,6 @@ router.use(dashboardRouter);
 router.use(locationsRouter);
 router.use(employeesRouter);
 router.use(groupSessionsRouter);
+router.use(socialCalendarRouter);
 
 export default router;
