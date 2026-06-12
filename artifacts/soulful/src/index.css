@@ -125,10 +125,9 @@
   --chart-4: 200 20% 60%;
   --chart-5: 330 20% 60%;
 
-  @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
   
   --app-font-sans: 'Plus Jakarta Sans', sans-serif;
-  --app-font-serif: 'Fraunces', serif;
+  --app-font-serif: 'The Seasons', serif;
   --app-font-mono: Menlo, monospace;
   --radius: 0.75rem; 
   --shadow-2xs: 0px 2px 0px 0px rgba(0,0,0, 0.02);
