@@ -76,31 +76,31 @@
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
 
-  /* #fbf5ce — warm cream */
-  --background: 52 85% 90%;
+  /* neutral off-white background */
+  --background: 0 0% 97%;
   --foreground: 91 18% 18%;
 
   /* #dae8bc — light sage border */
-  --border: 79 35% 78%;
+  --border: 79 25% 83%;
 
-  /* cards slightly lighter than background */
-  --card: 52 70% 95%;
+  /* cards: white */
+  --card: 0 0% 100%;
   --card-foreground: 91 18% 18%;
-  --card-border: 79 35% 83%;
+  --card-border: 79 25% 86%;
 
   /* sidebar: light sage wash */
-  --sidebar: 79 30% 88%;
+  --sidebar: 79 25% 91%;
   --sidebar-foreground: 91 18% 18%;
-  --sidebar-border: 79 30% 78%;
-  --sidebar-primary: 91 16% 45%; /* #94a683 darkened for sidebar */
+  --sidebar-border: 79 25% 83%;
+  --sidebar-primary: 91 16% 45%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 79 35% 82%;
+  --sidebar-accent: 79 30% 86%;
   --sidebar-accent-foreground: 91 18% 18%;
   --sidebar-ring: 91 16% 58%;
 
-  --popover: 52 70% 96%;
+  --popover: 0 0% 100%;
   --popover-foreground: 91 18% 18%;
-  --popover-border: 79 35% 78%;
+  --popover-border: 79 25% 83%;
 
   /* #94a683 — sage green primary */
   --primary: 91 16% 50%;
@@ -110,17 +110,17 @@
   --secondary: 79 49% 82%;
   --secondary-foreground: 91 18% 22%;
 
-  /* muted: blend of cream + light sage */
-  --muted: 79 25% 85%;
-  --muted-foreground: 91 12% 42%;
+  /* muted: light sage */
+  --muted: 79 20% 91%;
+  --muted-foreground: 91 10% 45%;
 
-  --accent: 79 35% 82%;
+  --accent: 79 30% 88%;
   --accent-foreground: 91 18% 18%;
 
   --destructive: 0 60% 50%;
   --destructive-foreground: 0 0% 100%;
 
-  --input: 79 30% 80%;
+  --input: 79 20% 85%;
   --ring: 91 16% 58%;
 
   --chart-1: 91 16% 58%;
