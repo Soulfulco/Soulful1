@@ -25,6 +25,7 @@ const DashboardPractitioners = lazy(() => import("@/pages/DashboardPractitioners
 const DashboardCompanies = lazy(() => import("@/pages/DashboardCompanies"));
 const DashboardSubscriptions = lazy(() => import("@/pages/DashboardSubscriptions"));
 const DashboardEmployees = lazy(() => import("@/pages/DashboardEmployees"));
+const DashboardGroupSessions = lazy(() => import("@/pages/DashboardGroupSessions"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -93,6 +94,9 @@ function Router() {
         </Route>
         <Route path="/dashboard/employees">
           <DashboardLayout><DashboardEmployees /></DashboardLayout>
+        </Route>
+        <Route path="/dashboard/group-sessions">
+          <DashboardLayout><DashboardGroupSessions /></DashboardLayout>
         </Route>
         <Route path="/dashboard/subscriptions">
           <DashboardLayout><DashboardSubscriptions /></DashboardLayout>
