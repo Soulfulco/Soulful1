@@ -31,6 +31,7 @@ const DashboardEmployees = lazy(() => import("@/pages/DashboardEmployees"));
 const DashboardGroupSessions = lazy(() => import("@/pages/DashboardGroupSessions"));
 const DashboardSocialCalendar = lazy(() => import("@/pages/DashboardSocialCalendar"));
 const DashboardHrUsers = lazy(() => import("@/pages/DashboardHrUsers"));
+const DashboardWellbeing = lazy(() => import("@/pages/DashboardWellbeing"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -133,6 +134,11 @@ function Router() {
         <Route path="/dashboard/hr-users">
           <ProtectedRoute requireAdmin>
             <DashboardLayout><DashboardHrUsers /></DashboardLayout>
+          </ProtectedRoute>
+        </Route>
+        <Route path="/dashboard/wellbeing">
+          <ProtectedRoute>
+            <DashboardLayout><DashboardWellbeing /></DashboardLayout>
           </ProtectedRoute>
         </Route>
 

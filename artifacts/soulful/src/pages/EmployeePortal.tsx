@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, User, LogOut, ArrowRight, CheckCircle2, Users, MapPin, Sparkles, Building2, CalendarDays, Download } from "lucide-react";
 import { format } from "date-fns";
+import WellbeingSurvey from "@/components/wellbeing/WellbeingSurvey";
+import WellbeingProgress from "@/components/wellbeing/WellbeingProgress";
 
 interface StoredEmployee {
   id: number;
@@ -97,11 +99,28 @@ export default function EmployeePortal() {
   const [rsvpd, setRsvpd] = useState<Set<number>>(new Set());
   const [rsvping, setRsvping] = useState<number | null>(null);
 
+  // Wellbeing survey
+  const [surveyRequired, setSurveyRequired] = useState(false);
+  const [surveyType, setSurveyType] = useState<"initial" | "monthly">("initial");
+
   useEffect(() => {
     const raw = localStorage.getItem("soulful_employee");
     if (!raw) { navigate("/join"); return; }
-    try { setStored(JSON.parse(raw)); } catch { navigate("/join"); }
+    let parsed: StoredEmployee | null = null;
+    try { parsed = JSON.parse(raw); setStored(parsed); } catch { navigate("/join"); return; }
     setLoaded(true);
+    // Check survey status
+    if (parsed?.id) {
+      fetch(`/api/wellbeing/surveys/status?employeeId=${parsed.id}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.required) {
+            setSurveyType(data.type as "initial" | "monthly");
+            setSurveyRequired(true);
+          }
+        })
+        .catch(() => {});
+    }
   }, [navigate]);
 
   const { data: employee, isLoading: isLoadingEmployee } = useGetEmployee(
@@ -280,6 +299,16 @@ export default function EmployeePortal() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      {/* Wellbeing Survey Modal */}
+      {stored && (
+        <WellbeingSurvey
+          employeeId={stored.id}
+          type={surveyType}
+          open={surveyRequired}
+          onComplete={() => setSurveyRequired(false)}
+        />
+      )}
+
       {/* Header */}
       <header className="h-16 border-b bg-card/80 backdrop-blur sticky top-0 z-10 flex items-center justify-between px-6">
         <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
@@ -612,6 +641,10 @@ export default function EmployeePortal() {
             </div>
           </section>
         )}
+
+        {/* ── WELLBEING PROGRESS ── */}
+        {stored && <WellbeingProgress employeeId={stored.id} />}
+
       </main>
     </div>
   );

@@ -13,6 +13,7 @@ import { employeesRouter, companyEmployeesRouter } from "./employees";
 import groupSessionsRouter from "./groupSessions";
 import socialCalendarRouter from "./socialCalendar";
 import hrAuthRouter from "./hrAuth";
+import wellbeingRouter from "./wellbeing";
 
 const router: IRouter = Router();
 
@@ -31,5 +32,6 @@ router.use(employeesRouter);
 router.use(groupSessionsRouter);
 router.use(socialCalendarRouter);
 router.use(hrAuthRouter);
+router.use(wellbeingRouter);
 
 export default router;
