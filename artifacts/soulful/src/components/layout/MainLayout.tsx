@@ -6,13 +6,8 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
 
-  const isPractitioners = location.startsWith("/practitioners") && !location.startsWith("/for-practitioners");
-
   const NavLinks = () => (
     <>
-      <Link href="/practitioners" className={`text-sm font-medium transition-colors hover:text-primary ${isPractitioners ? "text-primary" : "text-muted-foreground"}`}>
-        Find a Practitioner
-      </Link>
       <Link href="/for-corporates" className={`text-sm font-medium transition-colors hover:text-primary ${location === "/for-corporates" ? "text-primary" : "text-muted-foreground"}`}>
         For Corporates
       </Link>
@@ -86,11 +81,10 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             </div>
             
             <div className="flex flex-col gap-3">
-              <h4 className="font-semibold font-serif text-foreground">Marketplace</h4>
-              <Link href="/practitioners" className="text-sm text-muted-foreground hover:text-primary transition-colors">Directory</Link>
-              <Link href="/locations" className="text-sm text-muted-foreground hover:text-primary transition-colors">Venues</Link>
+              <h4 className="font-semibold font-serif text-foreground">Platform</h4>
               <Link href="/for-corporates" className="text-sm text-muted-foreground hover:text-primary transition-colors">For Corporates</Link>
               <Link href="/for-practitioners" className="text-sm text-muted-foreground hover:text-primary transition-colors">For Practitioners</Link>
+              <Link href="/propose-session" className="text-sm text-muted-foreground hover:text-primary transition-colors">Propose a Session</Link>
             </div>
 
             <div className="flex flex-col gap-3">
