@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { practitionersTable, specialismsTable } from "@workspace/db";
-import { eq, ilike, or, sql } from "drizzle-orm";
+import { and, eq, ilike, or, sql } from "drizzle-orm";
 
 const router = Router();
 
@@ -12,17 +12,23 @@ function isAdmin(req: Express.Request): boolean {
 router.get("/practitioners", async (req, res) => {
   try {
     const { specialism, search } = req.query as { specialism?: string; search?: string };
+    // Non-admin (public) callers only ever see active practitioners; admins see all
+    // so they can manage hidden ones from the dashboard.
+    const activeOnly = !isAdmin(req);
     let query = db.select().from(practitionersTable).$dynamic();
+    const filters = [];
+    if (activeOnly) filters.push(eq(practitionersTable.isActive, true));
     if (specialism) {
-      query = query.where(eq(practitionersTable.specialism, specialism));
+      filters.push(eq(practitionersTable.specialism, specialism));
     } else if (search) {
-      query = query.where(
+      filters.push(
         or(
           ilike(practitionersTable.name, `%${search}%`),
           ilike(practitionersTable.specialism, `%${search}%`),
         ),
       );
     }
+    if (filters.length > 0) query = query.where(and(...filters));
     const practitioners = await query;
     res.json(
       practitioners.map((p) => ({
@@ -59,7 +65,8 @@ router.get("/practitioners/showcase", async (_req, res) => {
         specialism: practitionersTable.specialism,
         avatarUrl: practitionersTable.avatarUrl,
       })
-      .from(practitionersTable);
+      .from(practitionersTable)
+      .where(eq(practitionersTable.isActive, true));
     res.json(rows);
   } catch {
     res.status(500).json({ error: "Failed to list practitioner showcase" });
@@ -167,7 +174,8 @@ router.get("/practitioners/:id", async (req, res) => {
   try {
     const id = Number(req.params.id);
     const [p] = await db.select().from(practitionersTable).where(eq(practitionersTable.id, id));
-    if (!p) return res.status(404).json({ error: "Not found" });
+    // Hidden practitioners are only viewable by admins, not via direct ID lookup.
+    if (!p || (!p.isActive && !isAdmin(req))) return res.status(404).json({ error: "Not found" });
     res.json({ ...p, sessionRateGbp: Number(p.sessionRateGbp), averageRating: p.averageRating ? Number(p.averageRating) : null, createdAt: p.createdAt.toISOString() });
   } catch (err) {
     res.status(500).json({ error: "Failed to get practitioner" });
