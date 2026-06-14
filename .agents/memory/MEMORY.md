@@ -1,2 +1,4 @@
 - [Auth architecture](auth-architecture.md) — Replit OIDC for Soulful admins; username/password for HR users stored in hr_users table, both share the same session store.
 - [Replit-auth-web tsconfig](replit-auth-web-tsconfig.md) — lib needs env.d.ts with ImportMeta type to compile import.meta.env without vite/client dependency.
+- [iframe cookie sameSite](iframe-cookie-samesite.md) — auth cookies must be sameSite:"none"+secure:true; lax breaks login in the Replit preview iframe (login loop).
+- [object-storage React 19 override](object-storage-react19-override.md) — skip the skill's $react pnpm override; catalog already pins React 19 and $react fails (react not a root dep).

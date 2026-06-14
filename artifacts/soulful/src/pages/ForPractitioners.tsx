@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { CheckCircle2, User } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PhotoUpload } from "@/components/PhotoUpload";
 
 const SPECIALISMS = [
   "yoga", "meditation", "nutrition", "massage", "coaching", "breathwork", "sound healing"
@@ -37,6 +38,7 @@ export default function ForPractitioners() {
     sessionRateGbp: "",
     location: "",
     qualifications: "",
+    avatarUrl: "",
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -59,6 +61,7 @@ export default function ForPractitioners() {
         sessionRateGbp: parseInt(formData.sessionRateGbp, 10),
         location: formData.location,
         qualifications: formData.qualifications,
+        avatarUrl: formData.avatarUrl || undefined,
       }
     }, {
       onSuccess: () => {
@@ -252,6 +255,12 @@ export default function ForPractitioners() {
                       onChange={(e) => setFormData({...formData, bio: e.target.value})}
                       placeholder="Tell potential clients about your approach, experience, and what to expect in a session..."
                     />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label>Profile Photo</Label>
+                    <PhotoUpload value={formData.avatarUrl} onChange={(url) => setFormData({...formData, avatarUrl: url})} />
+                    <p className="text-xs text-muted-foreground">A friendly headshot helps clients connect with you (JPG or PNG, up to 5MB).</p>
                   </div>
 
                   <Button 

@@ -56,4 +56,6 @@ export * from './subscriptionPlanBillingCycle';
 export * from './subscriptionPlanPlanType';
 export * from './timeSlot';
 export * from './timeSlotInput';
+export * from './uploadUrlRequest';
+export * from './uploadUrlResponse';
 export * from './utilisation';

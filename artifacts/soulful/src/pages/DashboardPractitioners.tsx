@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { PhotoUpload } from "@/components/PhotoUpload";
 import { Plus } from "lucide-react";
 
 const SPECIALISMS = [
@@ -191,9 +192,9 @@ export default function DashboardPractitioners() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="avatar">Photo URL</Label>
-                <Input id="avatar" placeholder="https://..." value={form.avatarUrl} onChange={(e) => handleChange("avatarUrl", e.target.value)} />
-                <p className="text-xs text-muted-foreground">Paste a direct link to their headshot photo.</p>
+                <Label>Profile photo</Label>
+                <PhotoUpload value={form.avatarUrl} onChange={(url) => handleChange("avatarUrl", url)} />
+                <p className="text-xs text-muted-foreground">Upload a headshot (JPG or PNG, up to 5MB).</p>
               </div>
 
               <div className="flex justify-end gap-3 pt-2">

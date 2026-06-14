@@ -17,7 +17,14 @@ router.get("/companies", async (_req, res) => {
 router.post("/companies", async (req, res) => {
   try {
     const { name, email, industry, employeeCount, contactName, logoUrl } = req.body;
-    const [c] = await db.insert(companiesTable).values({ name, email, industry, employeeCount, contactName, logoUrl }).returning();
+    if (!name || !email || !industry) {
+      return res.status(400).json({ error: "name, email and industry are required" });
+    }
+    const count = Number(employeeCount);
+    if (!Number.isInteger(count) || count < 1) {
+      return res.status(400).json({ error: "employeeCount must be a positive whole number" });
+    }
+    const [c] = await db.insert(companiesTable).values({ name, email, industry, employeeCount: count, contactName, logoUrl }).returning();
     res.status(201).json({ ...c, createdAt: c.createdAt.toISOString() });
   } catch {
     res.status(500).json({ error: "Failed to create company" });
