@@ -38,6 +38,7 @@ const DashboardCalendarTemplates = lazy(() => import("@/pages/DashboardCalendarT
 const PractitionerRequests = lazy(() => import("@/pages/PractitionerRequests"));
 const DashboardContent = lazy(() => import("@/pages/DashboardContent"));
 const DashboardPlans = lazy(() => import("@/pages/DashboardPlans"));
+const DashboardSpecialisms = lazy(() => import("@/pages/DashboardSpecialisms"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -168,6 +169,12 @@ function Router() {
         <Route path="/dashboard/plans">
           <ProtectedRoute requireAdmin>
             <DashboardLayout><DashboardPlans /></DashboardLayout>
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/dashboard/specialisms">
+          <ProtectedRoute requireAdmin>
+            <DashboardLayout><DashboardSpecialisms /></DashboardLayout>
           </ProtectedRoute>
         </Route>
 

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useCreatePractitioner, useListSubscriptions, getListSubscriptionsQueryKey, useCreateStripeCheckout, useListCompanyShowcase, type CompanyShowcase } from "@workspace/api-client-react";
+import { useCreatePractitioner, useListSubscriptions, getListSubscriptionsQueryKey, useCreateStripeCheckout, useListCompanyShowcase, type CompanyShowcase, useListSpecialisms, getListSpecialismsQueryKey } from "@workspace/api-client-react";
 import { LogoMarquee } from "@/components/LogoMarquee";
 import { useSiteContent } from "@/hooks/useSiteContent";
 import { useLocation } from "wouter";
@@ -13,14 +13,15 @@ import { CheckCircle2, User } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PhotoUpload } from "@/components/PhotoUpload";
 
-const SPECIALISMS = [
-  "yoga", "meditation", "nutrition", "massage", "coaching", "breathwork", "sound healing"
-];
-
 export default function ForPractitioners() {
   const c = useSiteContent();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+
+  const { data: specialismsData } = useListSpecialisms({
+    query: { queryKey: getListSpecialismsQueryKey() }
+  });
+  const SPECIALISMS = (specialismsData ?? []).map((s) => s.name);
   
   const { data: plans, isLoading: plansLoading } = useListSubscriptions({
     query: { queryKey: getListSubscriptionsQueryKey() }

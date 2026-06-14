@@ -33,6 +33,7 @@ import type {
   CompanySubscriptionInput,
   CompanyUpdate,
   DashboardSummary,
+  DeleteSpecialism200,
   Employee,
   EmployeeBulkCreate,
   EmployeeBulkResult,
@@ -60,7 +61,9 @@ import type {
   PractitionerUpdate,
   Review,
   ReviewInput,
+  Specialism,
   SpecialismCount,
+  SpecialismInput,
   StripeCheckoutInput,
   StripePortalInput,
   StripeRedirect,
@@ -2959,6 +2962,296 @@ export const useCreateReview = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getCreateReviewMutationOptions(options));
+    }
+
+export const getListSpecialismsUrl = () => {
+
+
+
+
+  return `/api/specialisms`
+}
+
+/**
+ * @summary List all specialisms (public)
+ */
+export const listSpecialisms = async ( options?: RequestInit): Promise<Specialism[]> => {
+
+  return customFetch<Specialism[]>(getListSpecialismsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSpecialismsQueryKey = () => {
+    return [
+    `/api/specialisms`
+    ] as const;
+    }
+
+
+export const getListSpecialismsQueryOptions = <TData = Awaited<ReturnType<typeof listSpecialisms>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSpecialisms>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSpecialismsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSpecialisms>>> = ({ signal }) => listSpecialisms({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSpecialisms>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSpecialismsQueryResult = NonNullable<Awaited<ReturnType<typeof listSpecialisms>>>
+export type ListSpecialismsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all specialisms (public)
+ */
+
+export function useListSpecialisms<TData = Awaited<ReturnType<typeof listSpecialisms>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSpecialisms>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSpecialismsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateSpecialismUrl = () => {
+
+
+
+
+  return `/api/specialisms`
+}
+
+/**
+ * @summary Create a specialism (admin only)
+ */
+export const createSpecialism = async (specialismInput: SpecialismInput, options?: RequestInit): Promise<Specialism> => {
+
+  return customFetch<Specialism>(getCreateSpecialismUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      specialismInput,)
+  }
+);}
+
+
+
+
+export const getCreateSpecialismMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSpecialism>>, TError,{data: BodyType<SpecialismInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createSpecialism>>, TError,{data: BodyType<SpecialismInput>}, TContext> => {
+
+const mutationKey = ['createSpecialism'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSpecialism>>, {data: BodyType<SpecialismInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createSpecialism(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateSpecialismMutationResult = NonNullable<Awaited<ReturnType<typeof createSpecialism>>>
+    export type CreateSpecialismMutationBody = BodyType<SpecialismInput>
+    export type CreateSpecialismMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a specialism (admin only)
+ */
+export const useCreateSpecialism = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSpecialism>>, TError,{data: BodyType<SpecialismInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createSpecialism>>,
+        TError,
+        {data: BodyType<SpecialismInput>},
+        TContext
+      > => {
+      return useMutation(getCreateSpecialismMutationOptions(options));
+    }
+
+export const getUpdateSpecialismUrl = (id: number,) => {
+
+
+
+
+  return `/api/specialisms/${id}`
+}
+
+/**
+ * @summary Update a specialism (admin only)
+ */
+export const updateSpecialism = async (id: number,
+    specialismInput: SpecialismInput, options?: RequestInit): Promise<Specialism> => {
+
+  return customFetch<Specialism>(getUpdateSpecialismUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      specialismInput,)
+  }
+);}
+
+
+
+
+export const getUpdateSpecialismMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSpecialism>>, TError,{id: number;data: BodyType<SpecialismInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateSpecialism>>, TError,{id: number;data: BodyType<SpecialismInput>}, TContext> => {
+
+const mutationKey = ['updateSpecialism'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSpecialism>>, {id: number;data: BodyType<SpecialismInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateSpecialism(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateSpecialismMutationResult = NonNullable<Awaited<ReturnType<typeof updateSpecialism>>>
+    export type UpdateSpecialismMutationBody = BodyType<SpecialismInput>
+    export type UpdateSpecialismMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update a specialism (admin only)
+ */
+export const useUpdateSpecialism = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSpecialism>>, TError,{id: number;data: BodyType<SpecialismInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateSpecialism>>,
+        TError,
+        {id: number;data: BodyType<SpecialismInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateSpecialismMutationOptions(options));
+    }
+
+export const getDeleteSpecialismUrl = (id: number,) => {
+
+
+
+
+  return `/api/specialisms/${id}`
+}
+
+/**
+ * @summary Delete a specialism (admin only)
+ */
+export const deleteSpecialism = async (id: number, options?: RequestInit): Promise<DeleteSpecialism200> => {
+
+  return customFetch<DeleteSpecialism200>(getDeleteSpecialismUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteSpecialismMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSpecialism>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteSpecialism>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteSpecialism'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteSpecialism>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteSpecialism(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteSpecialismMutationResult = NonNullable<Awaited<ReturnType<typeof deleteSpecialism>>>
+
+    export type DeleteSpecialismMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete a specialism (admin only)
+ */
+export const useDeleteSpecialism = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSpecialism>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteSpecialism>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteSpecialismMutationOptions(options));
     }
 
 export const getGetDashboardSummaryUrl = () => {

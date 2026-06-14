@@ -658,6 +658,57 @@ export const CreateReviewBody = zod.object({
 
 
 /**
+ * @summary List all specialisms (public)
+ */
+export const ListSpecialismsResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "sortOrder": zod.number()
+})
+export const ListSpecialismsResponse = zod.array(ListSpecialismsResponseItem)
+
+
+/**
+ * @summary Create a specialism (admin only)
+ */
+export const CreateSpecialismBody = zod.object({
+  "name": zod.string(),
+  "sortOrder": zod.number().optional()
+})
+
+
+/**
+ * @summary Update a specialism (admin only)
+ */
+export const UpdateSpecialismParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateSpecialismBody = zod.object({
+  "name": zod.string(),
+  "sortOrder": zod.number().optional()
+})
+
+export const UpdateSpecialismResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "sortOrder": zod.number()
+})
+
+
+/**
+ * @summary Delete a specialism (admin only)
+ */
+export const DeleteSpecialismParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteSpecialismResponse = zod.object({
+  "success": zod.boolean().optional()
+})
+
+
+/**
  * @summary Platform-wide summary stats
  */
 export const GetDashboardSummaryResponse = zod.object({

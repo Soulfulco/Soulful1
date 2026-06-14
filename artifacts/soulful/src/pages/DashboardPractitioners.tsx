@@ -4,6 +4,8 @@ import {
   getListPractitionersQueryKey,
   useUpdatePractitioner,
   useCreatePractitioner,
+  useListSpecialisms,
+  getListSpecialismsQueryKey,
 } from "@workspace/api-client-react";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -18,21 +20,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { PhotoUpload } from "@/components/PhotoUpload";
 import { Plus } from "lucide-react";
-
-const SPECIALISMS = [
-  "Personal Training",
-  "Yoga",
-  "Massage Therapy",
-  "Nutrition",
-  "Life Coaching",
-  "Breathwork",
-  "Sound Healing",
-  "Meditation",
-  "Pilates",
-  "Physiotherapy",
-  "Counselling",
-  "Mindfulness",
-];
 
 const EMPTY_FORM = {
   name: "",
@@ -50,6 +37,11 @@ export default function DashboardPractitioners() {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+
+  const { data: specialisms } = useListSpecialisms({
+    query: { queryKey: getListSpecialismsQueryKey() }
+  });
+  const SPECIALISMS = (specialisms ?? []).map((s) => s.name);
 
   const updatePractitioner = useUpdatePractitioner();
   const createPractitioner = useCreatePractitioner();

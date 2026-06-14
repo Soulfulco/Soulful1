@@ -189,6 +189,17 @@ export interface PractitionerUpdate {
   isActive?: boolean;
 }
 
+export interface Specialism {
+  id: number;
+  name: string;
+  sortOrder: number;
+}
+
+export interface SpecialismInput {
+  name: string;
+  sortOrder?: number;
+}
+
 export type CompanySubscriptionStatus = typeof CompanySubscriptionStatus[keyof typeof CompanySubscriptionStatus];
 
 
@@ -585,6 +596,10 @@ export type ListStripeProductsWithPrices200 = {
 export type GetStripeSubscriptionStatusParams = {
 companyId?: number;
 practitionerId?: number;
+};
+
+export type DeleteSpecialism200 = {
+  success?: boolean;
 };
 
 export type GetUpcomingBookingsParams = {

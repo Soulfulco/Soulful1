@@ -10,6 +10,7 @@ const adminNavigation = [
   { name: "Group Sessions", href: "/dashboard/group-sessions", icon: UsersRound },
   { name: "Social Calendar", href: "/dashboard/social-calendar", icon: CalendarDays },
   { name: "Practitioners", href: "/dashboard/practitioners", icon: Users },
+  { name: "Specialisms", href: "/dashboard/specialisms", icon: Tag },
   { name: "Companies", href: "/dashboard/companies", icon: Building2 },
   { name: "Employee Wellbeing", href: "/dashboard/employees", icon: HeartHandshake },
   { name: "Subscriptions", href: "/dashboard/subscriptions", icon: CreditCard },

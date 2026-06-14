@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListPractitioners, getListPractitionersQueryKey } from "@workspace/api-client-react";
+import { useListPractitioners, getListPractitionersQueryKey, useListSpecialisms, getListSpecialismsQueryKey } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,13 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Search, Star, Filter } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-const SPECIALISMS = [
-  "yoga", "meditation", "nutrition", "massage", "coaching", "breathwork", "sound healing"
-];
-
 export default function Practitioners() {
   const [search, setSearch] = useState("");
   const [specialism, setSpecialism] = useState<string>("");
+
+  const { data: specialisms } = useListSpecialisms({
+    query: { queryKey: getListSpecialismsQueryKey() }
+  });
+  const SPECIALISMS = (specialisms ?? []).map((s) => s.name);
 
   const { data: practitioners, isLoading } = useListPractitioners(
     { search: search || undefined, specialism: specialism || undefined },

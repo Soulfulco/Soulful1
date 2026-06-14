@@ -786,6 +786,81 @@ paths:
               schema:
                 $ref: "#/components/schemas/Review"
 
+  # ── Specialisms ──────────────────────────────────────────────────────────────
+  /specialisms:
+    get:
+      operationId: listSpecialisms
+      tags: [specialisms]
+      summary: List all specialisms (public)
+      responses:
+        "200":
+          description: List of specialisms
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Specialism"
+    post:
+      operationId: createSpecialism
+      tags: [specialisms]
+      summary: Create a specialism (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpecialismInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Specialism"
+
+  /specialisms/{id}:
+    put:
+      operationId: updateSpecialism
+      tags: [specialisms]
+      summary: Update a specialism (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpecialismInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Specialism"
+    delete:
+      operationId: deleteSpecialism
+      tags: [specialisms]
+      summary: Delete a specialism (admin only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+
   # ── Dashboard ────────────────────────────────────────────────────────────────
   /dashboard/summary:
     get:
@@ -1328,6 +1403,22 @@ components:
         qualifications: { type: string }
         avatarUrl:     { type: string }
         isActive:      { type: boolean }
+
+    # ── Specialism ──────────────────────────────────────────────────────────
+    Specialism:
+      type: object
+      required: [id, name, sortOrder]
+      properties:
+        id:        { type: integer }
+        name:      { type: string }
+        sortOrder: { type: integer }
+
+    SpecialismInput:
+      type: object
+      required: [name]
+      properties:
+        name:      { type: string }
+        sortOrder: { type: integer }
 
     # ── Company ─────────────────────────────────────────────────────────────
     Company:

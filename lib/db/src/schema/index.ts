@@ -4,6 +4,7 @@ export * from "./timeslots";
 export * from "./bookings";
 export * from "./subscriptions";
 export * from "./reviews";
+export * from "./specialisms";
 export * from "./locations";
 export * from "./employees";
 export * from "./auth";
