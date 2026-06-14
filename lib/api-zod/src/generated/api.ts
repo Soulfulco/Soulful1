@@ -193,6 +193,216 @@ export const CreatePractitionerBody = zod.object({
 
 
 /**
+ * @summary Public list of upcoming events
+ */
+export const ListEventsQueryParams = zod.object({
+  "location": zod.coerce.string().optional(),
+  "search": zod.coerce.string().optional()
+})
+
+export const ListEventsResponseItem = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "description": zod.string(),
+  "category": zod.string().nullish(),
+  "city": zod.string(),
+  "venue": zod.string(),
+  "address": zod.string().nullish(),
+  "startsAt": zod.coerce.date(),
+  "endsAt": zod.coerce.date().nullish(),
+  "capacity": zod.number().nullish(),
+  "priceGbp": zod.number(),
+  "imageUrl": zod.string().nullish(),
+  "organizer": zod.string().nullish(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "registeredCount": zod.number(),
+  "spotsLeft": zod.number().nullish()
+})
+export const ListEventsResponse = zod.array(ListEventsResponseItem)
+
+
+/**
+ * @summary Admin — create an event
+ */
+export const CreateEventBody = zod.object({
+  "title": zod.string(),
+  "description": zod.string(),
+  "category": zod.string().optional(),
+  "city": zod.string(),
+  "venue": zod.string(),
+  "address": zod.string().optional(),
+  "startsAt": zod.coerce.date(),
+  "endsAt": zod.coerce.date().optional(),
+  "capacity": zod.number().nullish(),
+  "priceGbp": zod.number().optional(),
+  "imageUrl": zod.string().optional(),
+  "organizer": zod.string().optional(),
+  "isActive": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Admin — list all events (incl. inactive/past) with seat counts
+ */
+export const ListEventsForManagementResponseItem = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "description": zod.string(),
+  "category": zod.string().nullish(),
+  "city": zod.string(),
+  "venue": zod.string(),
+  "address": zod.string().nullish(),
+  "startsAt": zod.coerce.date(),
+  "endsAt": zod.coerce.date().nullish(),
+  "capacity": zod.number().nullish(),
+  "priceGbp": zod.number(),
+  "imageUrl": zod.string().nullish(),
+  "organizer": zod.string().nullish(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "registeredCount": zod.number(),
+  "spotsLeft": zod.number().nullish()
+})
+export const ListEventsForManagementResponse = zod.array(ListEventsForManagementResponseItem)
+
+
+/**
+ * @summary Distinct cities for upcoming events
+ */
+export const ListEventLocationsResponseItem = zod.string()
+export const ListEventLocationsResponse = zod.array(ListEventLocationsResponseItem)
+
+
+/**
+ * @summary Confirm a paid registration after Stripe redirect
+ */
+export const ConfirmEventRegistrationQueryParams = zod.object({
+  "session_id": zod.coerce.string()
+})
+
+export const ConfirmEventRegistrationResponse = zod.object({
+  "status": zod.string()
+})
+
+
+/**
+ * @summary Public single event
+ */
+export const GetEventParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetEventResponse = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "description": zod.string(),
+  "category": zod.string().nullish(),
+  "city": zod.string(),
+  "venue": zod.string(),
+  "address": zod.string().nullish(),
+  "startsAt": zod.coerce.date(),
+  "endsAt": zod.coerce.date().nullish(),
+  "capacity": zod.number().nullish(),
+  "priceGbp": zod.number(),
+  "imageUrl": zod.string().nullish(),
+  "organizer": zod.string().nullish(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "registeredCount": zod.number(),
+  "spotsLeft": zod.number().nullish()
+})
+
+
+/**
+ * @summary Admin — update an event
+ */
+export const UpdateEventParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateEventBody = zod.object({
+  "title": zod.string().optional(),
+  "description": zod.string().optional(),
+  "category": zod.string().optional(),
+  "city": zod.string().optional(),
+  "venue": zod.string().optional(),
+  "address": zod.string().optional(),
+  "startsAt": zod.coerce.date().optional(),
+  "endsAt": zod.coerce.date().optional(),
+  "capacity": zod.number().nullish(),
+  "priceGbp": zod.number().optional(),
+  "imageUrl": zod.string().optional(),
+  "organizer": zod.string().optional(),
+  "isActive": zod.boolean().optional()
+})
+
+export const UpdateEventResponse = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "description": zod.string(),
+  "category": zod.string().nullish(),
+  "city": zod.string(),
+  "venue": zod.string(),
+  "address": zod.string().nullish(),
+  "startsAt": zod.coerce.date(),
+  "endsAt": zod.coerce.date().nullish(),
+  "capacity": zod.number().nullish(),
+  "priceGbp": zod.number(),
+  "imageUrl": zod.string().nullish(),
+  "organizer": zod.string().nullish(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "registeredCount": zod.number(),
+  "spotsLeft": zod.number().nullish()
+})
+
+
+/**
+ * @summary Admin — delete an event
+ */
+export const DeleteEventParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteEventResponse = zod.object({
+  "success": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Public — register for an event (free) or start checkout (paid)
+ */
+export const RegisterForEventParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RegisterForEventBody = zod.object({
+  "name": zod.string(),
+  "email": zod.string()
+})
+
+
+/**
+ * @summary Admin — list registrations for an event
+ */
+export const ListEventRegistrationsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListEventRegistrationsResponseItem = zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "status": zod.string(),
+  "stripeSessionId": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+})
+export const ListEventRegistrationsResponse = zod.array(ListEventRegistrationsResponseItem)
+
+
+/**
  * @summary Admin — create many practitioners at once
  */
 export const BulkCreatePractitionersBody = zod.object({

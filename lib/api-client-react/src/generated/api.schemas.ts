@@ -178,6 +178,78 @@ export interface PractitionerInput {
   avatarUrl?: string;
 }
 
+export interface Event {
+  id: number;
+  title: string;
+  description: string;
+  category?: string | null;
+  city: string;
+  venue: string;
+  address?: string | null;
+  startsAt: string;
+  endsAt?: string | null;
+  capacity?: number | null;
+  priceGbp: number;
+  imageUrl?: string | null;
+  organizer?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  registeredCount: number;
+  spotsLeft?: number | null;
+}
+
+export interface EventInput {
+  title: string;
+  description: string;
+  category?: string;
+  city: string;
+  venue: string;
+  address?: string;
+  startsAt: string;
+  endsAt?: string;
+  capacity?: number | null;
+  priceGbp?: number;
+  imageUrl?: string;
+  organizer?: string;
+  isActive?: boolean;
+}
+
+export interface EventUpdate {
+  title?: string;
+  description?: string;
+  category?: string;
+  city?: string;
+  venue?: string;
+  address?: string;
+  startsAt?: string;
+  endsAt?: string;
+  capacity?: number | null;
+  priceGbp?: number;
+  imageUrl?: string;
+  organizer?: string;
+  isActive?: boolean;
+}
+
+export interface EventRegistrationInput {
+  name: string;
+  email: string;
+}
+
+export interface EventRegisterResult {
+  status: string;
+  checkoutUrl?: string | null;
+}
+
+export interface EventRegistration {
+  id: number;
+  eventId: number;
+  name: string;
+  email: string;
+  status: string;
+  stripeSessionId?: string | null;
+  createdAt: string;
+}
+
 export interface PractitionerBulkItem {
   name: string;
   email: string;
@@ -597,6 +669,23 @@ iss?: string;
 export type ListPractitionersParams = {
 specialism?: string;
 search?: string;
+};
+
+export type ListEventsParams = {
+location?: string;
+search?: string;
+};
+
+export type ConfirmEventRegistrationParams = {
+session_id: string;
+};
+
+export type ConfirmEventRegistration200 = {
+  status: string;
+};
+
+export type DeleteEvent200 = {
+  success?: boolean;
 };
 
 export type ListBookingsParams = {

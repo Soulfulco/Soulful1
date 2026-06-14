@@ -2,3 +2,4 @@
 - [drizzle-kit push TTY limitation](drizzle-kit-push-tty.md) — push can hang on rename-conflict prompt with no TTY; create new tables via psql SQL instead.
 - [Vite "Importing a module script failed"](vite-module-script-failed.md) — usually a transient dep-reoptimize/codegen artifact; restart web workflow before treating as a real bug.
 - [Specialisms stay in sync](specialisms-sync.md) — free-text specialism entry (bulk import) must auto-create missing rows in the managed `specialisms` table.
+- [Event registration integrity](event-registration-integrity.md) — pending paid reservations must count as held seats; partial unique index + row-lock txn prevent oversell/dupes; confirm just flips status.

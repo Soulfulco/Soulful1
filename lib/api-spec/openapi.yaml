@@ -299,6 +299,187 @@ paths:
               schema:
                 $ref: "#/components/schemas/Practitioner"
 
+  /events:
+    get:
+      operationId: listEvents
+      tags: [events]
+      summary: Public list of upcoming events
+      parameters:
+        - in: query
+          name: location
+          schema: { type: string }
+        - in: query
+          name: search
+          schema: { type: string }
+      responses:
+        "200":
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Event" }
+    post:
+      operationId: createEvent
+      tags: [events]
+      summary: Admin — create an event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+
+  /events/manage:
+    get:
+      operationId: listEventsForManagement
+      tags: [events]
+      summary: Admin — list all events (incl. inactive/past) with seat counts
+      responses:
+        "200":
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Event" }
+
+  /events/locations:
+    get:
+      operationId: listEventLocations
+      tags: [events]
+      summary: Distinct cities for upcoming events
+      responses:
+        "200":
+          description: List of city names
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: string }
+
+  /events/registration/confirm:
+    get:
+      operationId: confirmEventRegistration
+      tags: [events]
+      summary: Confirm a paid registration after Stripe redirect
+      parameters:
+        - in: query
+          name: session_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Registration status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string }
+
+  /events/{id}:
+    get:
+      operationId: getEvent
+      tags: [events]
+      summary: Public single event
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Event
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+    patch:
+      operationId: updateEvent
+      tags: [events]
+      summary: Admin — update an event
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventUpdate" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+    delete:
+      operationId: deleteEvent
+      tags: [events]
+      summary: Admin — delete an event
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+
+  /events/{id}/register:
+    post:
+      operationId: registerForEvent
+      tags: [events]
+      summary: Public — register for an event (free) or start checkout (paid)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventRegistrationInput" }
+      responses:
+        "201":
+          description: Registration result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventRegisterResult" }
+
+  /events/{id}/registrations:
+    get:
+      operationId: listEventRegistrations
+      tags: [events]
+      summary: Admin — list registrations for an event
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: List of registrations
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/EventRegistration" }
+
   /practitioners/bulk:
     post:
       operationId: bulkCreatePractitioners
@@ -1408,6 +1589,89 @@ components:
         location:      { type: string }
         qualifications: { type: string }
         avatarUrl:     { type: string }
+
+    Event:
+      type: object
+      required: [id, title, description, city, venue, startsAt, priceGbp, isActive, createdAt, registeredCount]
+      properties:
+        id:             { type: integer }
+        title:          { type: string }
+        description:    { type: string }
+        category:       { type: string, nullable: true }
+        city:           { type: string }
+        venue:          { type: string }
+        address:        { type: string, nullable: true }
+        startsAt:       { type: string, format: date-time }
+        endsAt:         { type: string, format: date-time, nullable: true }
+        capacity:       { type: integer, nullable: true }
+        priceGbp:       { type: number }
+        imageUrl:       { type: string, nullable: true }
+        organizer:      { type: string, nullable: true }
+        isActive:       { type: boolean }
+        createdAt:      { type: string, format: date-time }
+        registeredCount: { type: integer }
+        spotsLeft:      { type: integer, nullable: true }
+
+    EventInput:
+      type: object
+      required: [title, description, city, venue, startsAt]
+      properties:
+        title:       { type: string }
+        description: { type: string }
+        category:    { type: string }
+        city:        { type: string }
+        venue:       { type: string }
+        address:     { type: string }
+        startsAt:    { type: string, format: date-time }
+        endsAt:      { type: string, format: date-time }
+        capacity:    { type: integer, nullable: true }
+        priceGbp:    { type: number }
+        imageUrl:    { type: string }
+        organizer:   { type: string }
+        isActive:    { type: boolean }
+
+    EventUpdate:
+      type: object
+      properties:
+        title:       { type: string }
+        description: { type: string }
+        category:    { type: string }
+        city:        { type: string }
+        venue:       { type: string }
+        address:     { type: string }
+        startsAt:    { type: string, format: date-time }
+        endsAt:      { type: string, format: date-time }
+        capacity:    { type: integer, nullable: true }
+        priceGbp:    { type: number }
+        imageUrl:    { type: string }
+        organizer:   { type: string }
+        isActive:    { type: boolean }
+
+    EventRegistrationInput:
+      type: object
+      required: [name, email]
+      properties:
+        name:  { type: string }
+        email: { type: string }
+
+    EventRegisterResult:
+      type: object
+      required: [status]
+      properties:
+        status:      { type: string }
+        checkoutUrl: { type: string, nullable: true }
+
+    EventRegistration:
+      type: object
+      required: [id, eventId, name, email, status, createdAt]
+      properties:
+        id:              { type: integer }
+        eventId:         { type: integer }
+        name:            { type: string }
+        email:           { type: string }
+        status:          { type: string }
+        stripeSessionId: { type: string, nullable: true }
+        createdAt:       { type: string, format: date-time }
 
     PractitionerBulkItem:
       type: object

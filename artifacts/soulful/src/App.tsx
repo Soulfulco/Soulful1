@@ -14,6 +14,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 // Lazy load pages for better performance
 const Home = lazy(() => import("@/pages/Home"));
 const Practitioners = lazy(() => import("@/pages/Practitioners"));
+const Events = lazy(() => import("@/pages/Events"));
 const PractitionerProfile = lazy(() => import("@/pages/PractitionerProfile"));
 const ForCorporates = lazy(() => import("@/pages/ForCorporates"));
 const ForPractitioners = lazy(() => import("@/pages/ForPractitioners"));
@@ -39,6 +40,7 @@ const PractitionerRequests = lazy(() => import("@/pages/PractitionerRequests"));
 const DashboardContent = lazy(() => import("@/pages/DashboardContent"));
 const DashboardPlans = lazy(() => import("@/pages/DashboardPlans"));
 const DashboardSpecialisms = lazy(() => import("@/pages/DashboardSpecialisms"));
+const DashboardEvents = lazy(() => import("@/pages/DashboardEvents"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -75,6 +77,9 @@ function Router() {
         </Route>
         <Route path="/practitioners/:id">
           {(params) => <MainLayout><PractitionerProfile id={params.id!} /></MainLayout>}
+        </Route>
+        <Route path="/events">
+          <MainLayout><Events /></MainLayout>
         </Route>
         <Route path="/for-corporates">
           <MainLayout><ForCorporates /></MainLayout>
@@ -175,6 +180,12 @@ function Router() {
         <Route path="/dashboard/specialisms">
           <ProtectedRoute requireAdmin>
             <DashboardLayout><DashboardSpecialisms /></DashboardLayout>
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/dashboard/events">
+          <ProtectedRoute requireAdmin>
+            <DashboardLayout><DashboardEvents /></DashboardLayout>
           </ProtectedRoute>
         </Route>
 

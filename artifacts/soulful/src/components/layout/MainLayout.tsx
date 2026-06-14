@@ -14,6 +14,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       <Link href="/for-practitioners" className={`text-sm font-medium transition-colors hover:text-primary ${location === "/for-practitioners" ? "text-primary" : "text-muted-foreground"}`}>
         For Practitioners
       </Link>
+      <Link href="/events" className={`text-sm font-medium transition-colors hover:text-primary ${location === "/events" ? "text-primary" : "text-muted-foreground"}`}>
+        Events
+      </Link>
       <Link href="/dashboard" className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary">
         Admin
       </Link>

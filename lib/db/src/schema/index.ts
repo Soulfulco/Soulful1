@@ -7,4 +7,5 @@ export * from "./reviews";
 export * from "./specialisms";
 export * from "./locations";
 export * from "./employees";
+export * from "./events";
 export * from "./auth";

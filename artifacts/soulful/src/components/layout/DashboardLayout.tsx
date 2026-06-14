@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Calendar, Users, Building2, CreditCard, HeartHandshake, UsersRound, CalendarDays, LogOut, UserCog, Heart, Inbox, BookOpen, PencilLine, Tag } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Building2, CreditCard, HeartHandshake, UsersRound, CalendarDays, LogOut, UserCog, Heart, Inbox, BookOpen, PencilLine, Tag, Ticket } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ const adminNavigation = [
   { name: "Bookings", href: "/dashboard/bookings", icon: Calendar },
   { name: "Group Sessions", href: "/dashboard/group-sessions", icon: UsersRound },
   { name: "Social Calendar", href: "/dashboard/social-calendar", icon: CalendarDays },
+  { name: "Events", href: "/dashboard/events", icon: Ticket },
   { name: "Practitioners", href: "/dashboard/practitioners", icon: Users },
   { name: "Specialisms", href: "/dashboard/specialisms", icon: Tag },
   { name: "Companies", href: "/dashboard/companies", icon: Building2 },
