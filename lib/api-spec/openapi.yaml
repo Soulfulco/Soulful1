@@ -299,6 +299,21 @@ paths:
               schema:
                 $ref: "#/components/schemas/Practitioner"
 
+  /practitioners/showcase:
+    get:
+      operationId: listPractitionerShowcase
+      tags: [practitioners]
+      summary: Public list of practitioners for marketing display (safe fields only)
+      responses:
+        "200":
+          description: List of practitioner showcase items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PractitionerShowcase"
+
   /practitioners/{id}:
     get:
       operationId: getPractitioner
@@ -393,6 +408,21 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Company"
+
+  /companies/showcase:
+    get:
+      operationId: listCompanyShowcase
+      tags: [companies]
+      summary: Public list of companies for marketing display (safe fields only)
+      responses:
+        "200":
+          description: List of company showcase items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CompanyShowcase"
 
   /companies/{id}:
     get:
@@ -1265,6 +1295,15 @@ components:
         totalReviews:  { type: integer }
         createdAt:     { type: string }
 
+    PractitionerShowcase:
+      type: object
+      required: [id, name, specialism, avatarUrl]
+      properties:
+        id:            { type: integer }
+        name:          { type: string }
+        specialism:    { type: string }
+        avatarUrl:     { type: ["string", "null"] }
+
     PractitionerInput:
       type: object
       required: [name, email, specialism, bio, sessionRateGbp]
@@ -1305,6 +1344,14 @@ components:
         contactName:      { type: ["string", "null"] }
         totalBookings:    { type: integer }
         createdAt:        { type: string }
+
+    CompanyShowcase:
+      type: object
+      required: [id, name, logoUrl]
+      properties:
+        id:               { type: integer }
+        name:             { type: string }
+        logoUrl:          { type: ["string", "null"] }
 
     CompanyInput:
       type: object

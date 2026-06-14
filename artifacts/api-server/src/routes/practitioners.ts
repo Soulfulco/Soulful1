@@ -46,6 +46,22 @@ router.post("/practitioners", async (req, res) => {
   }
 });
 
+router.get("/practitioners/showcase", async (_req, res) => {
+  try {
+    const rows = await db
+      .select({
+        id: practitionersTable.id,
+        name: practitionersTable.name,
+        specialism: practitionersTable.specialism,
+        avatarUrl: practitionersTable.avatarUrl,
+      })
+      .from(practitionersTable);
+    res.json(rows);
+  } catch {
+    res.status(500).json({ error: "Failed to list practitioner showcase" });
+  }
+});
+
 router.get("/practitioners/:id", async (req, res) => {
   try {
     const id = Number(req.params.id);

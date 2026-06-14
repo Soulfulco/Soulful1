@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useCreatePractitioner, useListSubscriptions, getListSubscriptionsQueryKey, useCreateStripeCheckout } from "@workspace/api-client-react";
+import { useCreatePractitioner, useListSubscriptions, getListSubscriptionsQueryKey, useCreateStripeCheckout, useListCompanyShowcase, type CompanyShowcase } from "@workspace/api-client-react";
+import { LogoMarquee } from "@/components/LogoMarquee";
 import { useSiteContent } from "@/hooks/useSiteContent";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -26,7 +27,10 @@ export default function ForPractitioners() {
   });
   
   const practitionerPlans = plans?.filter(p => p.planType === 'practitioner') || [];
-  
+
+  const { data: companies } = useListCompanyShowcase();
+  const partnerCompanies = companies || [];
+
   const createPractitioner = useCreatePractitioner();
   const startCheckout = useCreateStripeCheckout();
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
@@ -108,6 +112,19 @@ export default function ForPractitioners() {
           </p>
         </div>
       </div>
+
+      {partnerCompanies.length > 0 && (
+        <div className="bg-background py-10 border-b border-secondary/10">
+          <p className="text-center text-sm font-medium text-muted-foreground uppercase tracking-widest mb-6">
+            Companies we work with
+          </p>
+          <LogoMarquee
+            items={partnerCompanies.map(co => (
+              <CompanyChip key={co.id} company={co} />
+            ))}
+          />
+        </div>
+      )}
 
       <div className="container mx-auto px-4 max-w-6xl mt-16">
         <div className="grid lg:grid-cols-2 gap-16">
@@ -296,6 +313,37 @@ export default function ForPractitioners() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function initialsOf(name: string) {
+  return name
+    .trim()
+    .split(/\s+/)
+    .map(w => w[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+function CompanyChip({ company }: { company: CompanyShowcase }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-card px-5 py-3 shadow-sm">
+      {company.logoUrl ? (
+        <img
+          src={company.logoUrl}
+          alt={company.name}
+          className="h-9 w-9 rounded-lg object-contain"
+        />
+      ) : (
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary/10 text-secondary font-serif text-sm font-bold">
+          {initialsOf(company.name)}
+        </div>
+      )}
+      <span className="font-serif text-lg text-foreground whitespace-nowrap">
+        {company.name}
+      </span>
     </div>
   );
 }

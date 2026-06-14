@@ -28,6 +28,7 @@ import type {
   Company,
   CompanyInput,
   CompanyPublic,
+  CompanyShowcase,
   CompanySubscription,
   CompanySubscriptionInput,
   CompanyUpdate,
@@ -53,6 +54,7 @@ import type {
   MobileTokenExchangeSuccess,
   Practitioner,
   PractitionerInput,
+  PractitionerShowcase,
   PractitionerSubscription,
   PractitionerSubscriptionInput,
   PractitionerUpdate,
@@ -1012,6 +1014,83 @@ export const useCreatePractitioner = <TError = ErrorType<unknown>,
       return useMutation(getCreatePractitionerMutationOptions(options));
     }
 
+export const getListPractitionerShowcaseUrl = () => {
+
+
+
+
+  return `/api/practitioners/showcase`
+}
+
+/**
+ * @summary Public list of practitioners for marketing display (safe fields only)
+ */
+export const listPractitionerShowcase = async ( options?: RequestInit): Promise<PractitionerShowcase[]> => {
+
+  return customFetch<PractitionerShowcase[]>(getListPractitionerShowcaseUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPractitionerShowcaseQueryKey = () => {
+    return [
+    `/api/practitioners/showcase`
+    ] as const;
+    }
+
+
+export const getListPractitionerShowcaseQueryOptions = <TData = Awaited<ReturnType<typeof listPractitionerShowcase>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPractitionerShowcase>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPractitionerShowcaseQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPractitionerShowcase>>> = ({ signal }) => listPractitionerShowcase({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPractitionerShowcase>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPractitionerShowcaseQueryResult = NonNullable<Awaited<ReturnType<typeof listPractitionerShowcase>>>
+export type ListPractitionerShowcaseQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Public list of practitioners for marketing display (safe fields only)
+ */
+
+export function useListPractitionerShowcase<TData = Awaited<ReturnType<typeof listPractitionerShowcase>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPractitionerShowcase>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPractitionerShowcaseQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getGetPractitionerUrl = (id: number,) => {
 
 
@@ -1385,6 +1464,83 @@ export const useCreateCompany = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getCreateCompanyMutationOptions(options));
     }
+
+export const getListCompanyShowcaseUrl = () => {
+
+
+
+
+  return `/api/companies/showcase`
+}
+
+/**
+ * @summary Public list of companies for marketing display (safe fields only)
+ */
+export const listCompanyShowcase = async ( options?: RequestInit): Promise<CompanyShowcase[]> => {
+
+  return customFetch<CompanyShowcase[]>(getListCompanyShowcaseUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCompanyShowcaseQueryKey = () => {
+    return [
+    `/api/companies/showcase`
+    ] as const;
+    }
+
+
+export const getListCompanyShowcaseQueryOptions = <TData = Awaited<ReturnType<typeof listCompanyShowcase>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCompanyShowcase>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCompanyShowcaseQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCompanyShowcase>>> = ({ signal }) => listCompanyShowcase({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCompanyShowcase>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCompanyShowcaseQueryResult = NonNullable<Awaited<ReturnType<typeof listCompanyShowcase>>>
+export type ListCompanyShowcaseQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Public list of companies for marketing display (safe fields only)
+ */
+
+export function useListCompanyShowcase<TData = Awaited<ReturnType<typeof listCompanyShowcase>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCompanyShowcase>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCompanyShowcaseQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetCompanyUrl = (id: number,) => {
 

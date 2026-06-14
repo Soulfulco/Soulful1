@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useCreateCompany, useListSubscriptions, getListSubscriptionsQueryKey, useCreateStripeCheckout } from "@workspace/api-client-react";
+import { useCreateCompany, useListSubscriptions, getListSubscriptionsQueryKey, useCreateStripeCheckout, useListPractitionerShowcase, type PractitionerShowcase } from "@workspace/api-client-react";
+import { LogoMarquee } from "@/components/LogoMarquee";
 import { useSiteContent } from "@/hooks/useSiteContent";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +31,9 @@ export default function ForCorporates() {
   });
 
   const corporatePlans = plans?.filter(p => p.planType === "corporate") || [];
+
+  const { data: practitioners } = useListPractitionerShowcase();
+  const networkPractitioners = practitioners || [];
 
   const createCompany = useCreateCompany();
   const startCheckout = useCreateStripeCheckout();
@@ -103,6 +107,19 @@ export default function ForCorporates() {
           </p>
         </div>
       </div>
+
+      {networkPractitioners.length > 0 && (
+        <div className="bg-background py-10 border-b">
+          <p className="text-center text-sm font-medium text-muted-foreground uppercase tracking-widest mb-6">
+            Practitioners your team gets access to
+          </p>
+          <LogoMarquee
+            items={networkPractitioners.map(p => (
+              <PractitionerChip key={p.id} practitioner={p} />
+            ))}
+          />
+        </div>
+      )}
 
       <div className="container mx-auto px-4 max-w-6xl mt-16 space-y-20">
 
@@ -412,6 +429,42 @@ export default function ForCorporates() {
             </Card>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function initialsOf(name: string) {
+  return name
+    .trim()
+    .split(/\s+/)
+    .map(w => w[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+function PractitionerChip({ practitioner }: { practitioner: PractitionerShowcase }) {
+  return (
+    <div className="flex items-center gap-3 rounded-full border border-border/60 bg-card px-4 py-2.5 shadow-sm">
+      {practitioner.avatarUrl ? (
+        <img
+          src={practitioner.avatarUrl}
+          alt={practitioner.name}
+          className="h-10 w-10 rounded-full object-cover"
+        />
+      ) : (
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-serif text-sm font-semibold">
+          {initialsOf(practitioner.name)}
+        </div>
+      )}
+      <div className="pr-1">
+        <p className="text-sm font-medium text-foreground whitespace-nowrap leading-tight">
+          {practitioner.name}
+        </p>
+        <p className="text-xs text-muted-foreground whitespace-nowrap leading-tight capitalize">
+          {practitioner.specialism}
+        </p>
       </div>
     </div>
   );

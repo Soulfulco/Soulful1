@@ -31,6 +31,21 @@ router.post("/companies", async (req, res) => {
   }
 });
 
+router.get("/companies/showcase", async (_req, res) => {
+  try {
+    const rows = await db
+      .select({
+        id: companiesTable.id,
+        name: companiesTable.name,
+        logoUrl: companiesTable.logoUrl,
+      })
+      .from(companiesTable);
+    res.json(rows);
+  } catch {
+    res.status(500).json({ error: "Failed to list company showcase" });
+  }
+});
+
 router.get("/companies/:id", async (req, res) => {
   try {
     const id = Number(req.params.id);

@@ -1,2 +1,3 @@
 - [Soulful API auth model](soulful-auth-model.md) — HR ids are `hr:<id>` (company_id via hr_users), admins are non-hr OIDC; company-scoped writes need an authz guard.
 - [Stripe (stripe-replit-sync) gotchas](stripe-replit-sync.md) — connector key is `secret`; externalize lib in esbuild; pre-create stripe enum; deterministic reconcile.
+- [Public showcase endpoints](soulful-public-showcase-endpoints.md) — `GET /companies`+`/practitioners` are public & leak PII; public pages must use field-projected `/showcase` endpoints (register before `/:id`).

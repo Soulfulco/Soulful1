@@ -193,6 +193,18 @@ export const CreatePractitionerBody = zod.object({
 
 
 /**
+ * @summary Public list of practitioners for marketing display (safe fields only)
+ */
+export const ListPractitionerShowcaseResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "specialism": zod.string(),
+  "avatarUrl": zod.string().nullable()
+})
+export const ListPractitionerShowcaseResponse = zod.array(ListPractitionerShowcaseResponseItem)
+
+
+/**
  * @summary Get a practitioner by ID
  */
 export const GetPractitionerParams = zod.object({
@@ -301,6 +313,17 @@ export const CreateCompanyBody = zod.object({
   "contactName": zod.string(),
   "logoUrl": zod.string().optional()
 })
+
+
+/**
+ * @summary Public list of companies for marketing display (safe fields only)
+ */
+export const ListCompanyShowcaseResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "logoUrl": zod.string().nullable()
+})
+export const ListCompanyShowcaseResponse = zod.array(ListCompanyShowcaseResponseItem)
 
 
 /**

@@ -302,3 +302,27 @@
     inset: -1px;
   }
 }
+
+@keyframes soulful-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: soulful-marquee var(--marquee-duration, 40s) linear infinite;
+  will-change: transform;
+}
+
+.marquee-group:hover .animate-marquee {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee {
+    animation: none;
+  }
+}

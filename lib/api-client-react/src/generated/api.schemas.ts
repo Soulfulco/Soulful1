@@ -159,6 +159,14 @@ export interface Practitioner {
   createdAt: string;
 }
 
+export interface PractitionerShowcase {
+  id: number;
+  name: string;
+  specialism: string;
+  /** @nullable */
+  avatarUrl: string | null;
+}
+
 export interface PractitionerInput {
   name: string;
   email: string;
@@ -203,6 +211,13 @@ export interface Company {
   contactName?: string | null;
   totalBookings?: number;
   createdAt: string;
+}
+
+export interface CompanyShowcase {
+  id: number;
+  name: string;
+  /** @nullable */
+  logoUrl: string | null;
 }
 
 export interface CompanyInput {
