@@ -18,6 +18,7 @@ export const practitionersTable = pgTable("practitioners", {
   qualifications: text("qualifications"),
   averageRating: numeric("average_rating", { precision: 3, scale: 2 }),
   totalReviews: integer("total_reviews").notNull().default(0),
+  stripeCustomerId: text("stripe_customer_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

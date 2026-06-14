@@ -17,6 +17,8 @@ export const subscriptionPlansTable = pgTable("subscription_plans", {
   features: text("features").array().notNull(),
   planType: planTypeEnum("plan_type").notNull(),
   maxBookings: integer("max_bookings"),
+  stripeProductId: text("stripe_product_id"),
+  stripePriceId: text("stripe_price_id"),
 });
 
 export const companySubscriptionsTable = pgTable("company_subscriptions", {

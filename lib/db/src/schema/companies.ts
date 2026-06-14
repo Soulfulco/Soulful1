@@ -15,6 +15,7 @@ export const companiesTable = pgTable("companies", {
   contactName: text("contact_name"),
   totalBookings: integer("total_bookings").notNull().default(0),
   inviteCode: text("invite_code").unique(),
+  stripeCustomerId: text("stripe_customer_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
