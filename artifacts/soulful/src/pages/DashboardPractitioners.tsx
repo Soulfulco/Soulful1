@@ -19,7 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { PhotoUpload } from "@/components/PhotoUpload";
-import { Plus } from "lucide-react";
+import { Plus, Pencil } from "lucide-react";
 
 const EMPTY_FORM = {
   name: "",
@@ -36,6 +36,7 @@ const EMPTY_FORM = {
 export default function DashboardPractitioners() {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
 
   const { data: specialisms } = useListSpecialisms({
@@ -50,6 +51,38 @@ export default function DashboardPractitioners() {
     {},
     { query: { queryKey: getListPractitionersQueryKey() } }
   );
+
+  const isEditing = editingId !== null;
+
+  const openAdd = () => {
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setOpen(true);
+  };
+
+  const openEdit = (p: NonNullable<typeof practitioners>[number]) => {
+    setEditingId(p.id);
+    setForm({
+      name: p.name ?? "",
+      email: p.email ?? "",
+      specialism: p.specialism ?? "",
+      bio: p.bio ?? "",
+      sessionRateGbp: p.sessionRateGbp != null ? String(p.sessionRateGbp) : "",
+      location: p.location ?? "",
+      qualifications: p.qualifications ?? "",
+      avatarUrl: p.avatarUrl ?? "",
+      subscriptionStatus: (p.subscriptionStatus ?? "trial") as "active" | "inactive" | "trial",
+    });
+    setOpen(true);
+  };
+
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (!next) {
+      setEditingId(null);
+      setForm(EMPTY_FORM);
+    }
+  };
 
   const handleToggleActive = (id: number, currentStatus: boolean) => {
     updatePractitioner.mutate(
@@ -69,10 +102,42 @@ export default function DashboardPractitioners() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.email || !form.specialism || !form.bio || !form.sessionRateGbp) {
+    const requiredOk = isEditing
+      ? form.name && form.specialism && form.bio && form.sessionRateGbp
+      : form.name && form.email && form.specialism && form.bio && form.sessionRateGbp;
+    if (!requiredOk) {
       toast({ title: "Missing fields", description: "Please fill in all required fields.", variant: "destructive" });
       return;
     }
+
+    if (isEditing && editingId !== null) {
+      updatePractitioner.mutate(
+        {
+          id: editingId,
+          data: {
+            name: form.name,
+            specialism: form.specialism,
+            bio: form.bio,
+            sessionRateGbp: Number(form.sessionRateGbp),
+            location: form.location,
+            qualifications: form.qualifications,
+            avatarUrl: form.avatarUrl,
+          },
+        },
+        {
+          onSuccess: () => {
+            toast({ title: "Practitioner updated", description: `${form.name}'s details have been saved.` });
+            handleOpenChange(false);
+            refetch();
+          },
+          onError: () => {
+            toast({ title: "Error", description: "Could not save changes. Please try again.", variant: "destructive" });
+          },
+        }
+      );
+      return;
+    }
+
     createPractitioner.mutate(
       {
         data: {
@@ -91,8 +156,7 @@ export default function DashboardPractitioners() {
       {
         onSuccess: () => {
           toast({ title: "Practitioner added", description: `${form.name} is now in the directory.` });
-          setForm(EMPTY_FORM);
-          setOpen(false);
+          handleOpenChange(false);
           refetch();
         },
         onError: () => {
@@ -110,16 +174,16 @@ export default function DashboardPractitioners() {
           <p className="text-muted-foreground text-sm">Manage practitioner profiles and directory visibility.</p>
         </div>
 
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
-            <Button className="gap-2">
+            <Button className="gap-2" onClick={openAdd}>
               <Plus className="h-4 w-4" />
               Add Practitioner
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="font-serif text-xl">Add New Practitioner</DialogTitle>
+              <DialogTitle className="font-serif text-xl">{isEditing ? "Edit Practitioner" : "Add New Practitioner"}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4 pt-2">
               <div className="grid grid-cols-2 gap-4">
@@ -128,8 +192,9 @@ export default function DashboardPractitioners() {
                   <Input id="name" placeholder="e.g. Hannah Smith" value={form.name} onChange={(e) => handleChange("name", e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="email">Email <span className="text-destructive">*</span></Label>
-                  <Input id="email" type="email" placeholder="hannah@example.com" value={form.email} onChange={(e) => handleChange("email", e.target.value)} />
+                  <Label htmlFor="email">Email {!isEditing && <span className="text-destructive">*</span>}</Label>
+                  <Input id="email" type="email" placeholder="hannah@example.com" value={form.email} onChange={(e) => handleChange("email", e.target.value)} disabled={isEditing} />
+                  {isEditing && <p className="text-xs text-muted-foreground">Email can't be changed.</p>}
                 </div>
               </div>
 
@@ -163,19 +228,21 @@ export default function DashboardPractitioners() {
                   <Label htmlFor="location">Location</Label>
                   <Input id="location" placeholder="e.g. London, SE1" value={form.location} onChange={(e) => handleChange("location", e.target.value)} />
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Subscription Status</Label>
-                  <Select value={form.subscriptionStatus} onValueChange={(v) => handleChange("subscriptionStatus", v)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="trial">Trial</SelectItem>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {!isEditing && (
+                  <div className="space-y-1.5">
+                    <Label>Subscription Status</Label>
+                    <Select value={form.subscriptionStatus} onValueChange={(v) => handleChange("subscriptionStatus", v)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="trial">Trial</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -190,9 +257,11 @@ export default function DashboardPractitioners() {
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
-                <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                <Button type="submit" disabled={createPractitioner.isPending}>
-                  {createPractitioner.isPending ? "Adding..." : "Add Practitioner"}
+                <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>Cancel</Button>
+                <Button type="submit" disabled={isEditing ? updatePractitioner.isPending : createPractitioner.isPending}>
+                  {isEditing
+                    ? (updatePractitioner.isPending ? "Saving..." : "Save Changes")
+                    : (createPractitioner.isPending ? "Adding..." : "Add Practitioner")}
                 </Button>
               </div>
             </form>
@@ -209,7 +278,8 @@ export default function DashboardPractitioners() {
                 <TableHead>Specialism</TableHead>
                 <TableHead>Rate</TableHead>
                 <TableHead>Subscription</TableHead>
-                <TableHead className="text-right">Directory Status</TableHead>
+                <TableHead>Directory Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -220,7 +290,8 @@ export default function DashboardPractitioners() {
                     <TableCell><div className="h-6 bg-muted animate-pulse rounded w-24" /></TableCell>
                     <TableCell><div className="h-6 bg-muted animate-pulse rounded w-16" /></TableCell>
                     <TableCell><div className="h-6 bg-muted animate-pulse rounded w-20" /></TableCell>
-                    <TableCell><div className="h-6 bg-muted animate-pulse rounded w-12 ml-auto" /></TableCell>
+                    <TableCell><div className="h-6 bg-muted animate-pulse rounded w-12" /></TableCell>
+                    <TableCell><div className="h-6 bg-muted animate-pulse rounded w-16 ml-auto" /></TableCell>
                   </TableRow>
                 ))
               ) : practitioners?.length ? (
@@ -256,23 +327,29 @@ export default function DashboardPractitioners() {
                         {practitioner.subscriptionStatus}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <span className="text-xs text-muted-foreground w-12 text-right">
-                          {practitioner.isActive ? "Active" : "Hidden"}
-                        </span>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
                         <Switch
                           checked={practitioner.isActive}
                           onCheckedChange={() => handleToggleActive(practitioner.id, practitioner.isActive)}
                           disabled={updatePractitioner.isPending}
                         />
+                        <span className="text-xs text-muted-foreground w-12">
+                          {practitioner.isActive ? "Active" : "Hidden"}
+                        </span>
                       </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="outline" size="sm" className="gap-1.5" onClick={() => openEdit(practitioner)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                     No practitioners found. Add one above.
                   </TableCell>
                 </TableRow>
