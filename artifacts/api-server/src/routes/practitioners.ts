@@ -184,6 +184,7 @@ router.get("/practitioners/:id", async (req, res) => {
 
 router.patch("/practitioners/:id", async (req, res) => {
   try {
+    if (!isAdmin(req)) return res.status(401).json({ error: "Not authorised" });
     const id = Number(req.params.id);
     const { name, bio, specialism, sessionRateGbp, location, qualifications, avatarUrl, isActive } = req.body;
     const updates: Record<string, unknown> = {};
