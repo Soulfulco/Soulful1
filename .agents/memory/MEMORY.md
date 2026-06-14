@@ -1,4 +1,2 @@
-- [Auth architecture](auth-architecture.md) — Replit OIDC for Soulful admins; username/password for HR users stored in hr_users table, both share the same session store.
-- [Replit-auth-web tsconfig](replit-auth-web-tsconfig.md) — lib needs env.d.ts with ImportMeta type to compile import.meta.env without vite/client dependency.
-- [iframe cookie sameSite](iframe-cookie-samesite.md) — auth cookies must be sameSite:"none"+secure:true; lax breaks login in the Replit preview iframe (login loop).
-- [object-storage React 19 override](object-storage-react19-override.md) — skip the skill's $react pnpm override; catalog already pins React 19 and $react fails (react not a root dep).
+- [Soulful API auth model](soulful-auth-model.md) — HR ids are `hr:<id>` (company_id via hr_users), admins are non-hr OIDC; company-scoped writes need an authz guard.
+- [Stripe (stripe-replit-sync) gotchas](stripe-replit-sync.md) — connector key is `secret`; externalize lib in esbuild; pre-create stripe enum; deterministic reconcile.

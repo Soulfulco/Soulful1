@@ -33,14 +33,18 @@ import type {
   CompanyUpdate,
   DashboardSummary,
   Employee,
+  EmployeeBulkCreate,
+  EmployeeBulkResult,
   EmployeeCreate,
   EmployeeLogin,
   ErrorEnvelope,
+  GetStripeSubscriptionStatusParams,
   GetUpcomingBookingsParams,
   HandleBrowserLoginCallbackParams,
   HealthStatus,
   ListBookingsParams,
   ListPractitionersParams,
+  ListStripeProductsWithPrices200,
   Location,
   LocationInput,
   LocationUpdate,
@@ -55,6 +59,10 @@ import type {
   Review,
   ReviewInput,
   SpecialismCount,
+  StripeCheckoutInput,
+  StripePortalInput,
+  StripeRedirect,
+  StripeSubscriptionStatus,
   SubscriptionPlan,
   TimeSlot,
   TimeSlotInput,
@@ -2423,6 +2431,309 @@ export const useCreatePractitionerSubscription = <TError = ErrorType<unknown>,
       return useMutation(getCreatePractitionerSubscriptionMutationOptions(options));
     }
 
+export const getListStripeProductsWithPricesUrl = () => {
+
+
+
+
+  return `/api/stripe/products-with-prices`
+}
+
+/**
+ * @summary List Stripe products with their prices (synced from Stripe)
+ */
+export const listStripeProductsWithPrices = async ( options?: RequestInit): Promise<ListStripeProductsWithPrices200> => {
+
+  return customFetch<ListStripeProductsWithPrices200>(getListStripeProductsWithPricesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListStripeProductsWithPricesQueryKey = () => {
+    return [
+    `/api/stripe/products-with-prices`
+    ] as const;
+    }
+
+
+export const getListStripeProductsWithPricesQueryOptions = <TData = Awaited<ReturnType<typeof listStripeProductsWithPrices>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listStripeProductsWithPrices>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListStripeProductsWithPricesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listStripeProductsWithPrices>>> = ({ signal }) => listStripeProductsWithPrices({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listStripeProductsWithPrices>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListStripeProductsWithPricesQueryResult = NonNullable<Awaited<ReturnType<typeof listStripeProductsWithPrices>>>
+export type ListStripeProductsWithPricesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List Stripe products with their prices (synced from Stripe)
+ */
+
+export function useListStripeProductsWithPrices<TData = Awaited<ReturnType<typeof listStripeProductsWithPrices>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listStripeProductsWithPrices>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListStripeProductsWithPricesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateStripeCheckoutUrl = () => {
+
+
+
+
+  return `/api/stripe/checkout`
+}
+
+/**
+ * @summary Start a Stripe Checkout subscription for a company or practitioner
+ */
+export const createStripeCheckout = async (stripeCheckoutInput: StripeCheckoutInput, options?: RequestInit): Promise<StripeRedirect> => {
+
+  return customFetch<StripeRedirect>(getCreateStripeCheckoutUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      stripeCheckoutInput,)
+  }
+);}
+
+
+
+
+export const getCreateStripeCheckoutMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStripeCheckout>>, TError,{data: BodyType<StripeCheckoutInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createStripeCheckout>>, TError,{data: BodyType<StripeCheckoutInput>}, TContext> => {
+
+const mutationKey = ['createStripeCheckout'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createStripeCheckout>>, {data: BodyType<StripeCheckoutInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createStripeCheckout(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateStripeCheckoutMutationResult = NonNullable<Awaited<ReturnType<typeof createStripeCheckout>>>
+    export type CreateStripeCheckoutMutationBody = BodyType<StripeCheckoutInput>
+    export type CreateStripeCheckoutMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Start a Stripe Checkout subscription for a company or practitioner
+ */
+export const useCreateStripeCheckout = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStripeCheckout>>, TError,{data: BodyType<StripeCheckoutInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createStripeCheckout>>,
+        TError,
+        {data: BodyType<StripeCheckoutInput>},
+        TContext
+      > => {
+      return useMutation(getCreateStripeCheckoutMutationOptions(options));
+    }
+
+export const getCreateStripePortalUrl = () => {
+
+
+
+
+  return `/api/stripe/portal`
+}
+
+/**
+ * @summary Open the Stripe billing portal for a company or practitioner
+ */
+export const createStripePortal = async (stripePortalInput: StripePortalInput, options?: RequestInit): Promise<StripeRedirect> => {
+
+  return customFetch<StripeRedirect>(getCreateStripePortalUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      stripePortalInput,)
+  }
+);}
+
+
+
+
+export const getCreateStripePortalMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStripePortal>>, TError,{data: BodyType<StripePortalInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createStripePortal>>, TError,{data: BodyType<StripePortalInput>}, TContext> => {
+
+const mutationKey = ['createStripePortal'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createStripePortal>>, {data: BodyType<StripePortalInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createStripePortal(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateStripePortalMutationResult = NonNullable<Awaited<ReturnType<typeof createStripePortal>>>
+    export type CreateStripePortalMutationBody = BodyType<StripePortalInput>
+    export type CreateStripePortalMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Open the Stripe billing portal for a company or practitioner
+ */
+export const useCreateStripePortal = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStripePortal>>, TError,{data: BodyType<StripePortalInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createStripePortal>>,
+        TError,
+        {data: BodyType<StripePortalInput>},
+        TContext
+      > => {
+      return useMutation(getCreateStripePortalMutationOptions(options));
+    }
+
+export const getGetStripeSubscriptionStatusUrl = (params?: GetStripeSubscriptionStatusParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/stripe/subscription?${stringifiedParams}` : `/api/stripe/subscription`
+}
+
+/**
+ * @summary Get the app-side subscription status for a company or practitioner
+ */
+export const getStripeSubscriptionStatus = async (params?: GetStripeSubscriptionStatusParams, options?: RequestInit): Promise<StripeSubscriptionStatus> => {
+
+  return customFetch<StripeSubscriptionStatus>(getGetStripeSubscriptionStatusUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStripeSubscriptionStatusQueryKey = (params?: GetStripeSubscriptionStatusParams,) => {
+    return [
+    `/api/stripe/subscription`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetStripeSubscriptionStatusQueryOptions = <TData = Awaited<ReturnType<typeof getStripeSubscriptionStatus>>, TError = ErrorType<unknown>>(params?: GetStripeSubscriptionStatusParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStripeSubscriptionStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStripeSubscriptionStatusQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStripeSubscriptionStatus>>> = ({ signal }) => getStripeSubscriptionStatus(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStripeSubscriptionStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetStripeSubscriptionStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getStripeSubscriptionStatus>>>
+export type GetStripeSubscriptionStatusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the app-side subscription status for a company or practitioner
+ */
+
+export function useGetStripeSubscriptionStatus<TData = Awaited<ReturnType<typeof getStripeSubscriptionStatus>>, TError = ErrorType<unknown>>(
+ params?: GetStripeSubscriptionStatusParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStripeSubscriptionStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetStripeSubscriptionStatusQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getCreateReviewUrl = () => {
 
 
@@ -3181,6 +3492,78 @@ export function useListCompanyEmployees<TData = Awaited<ReturnType<typeof listCo
 
 
 
+
+export const getBulkCreateEmployeesUrl = (id: number,) => {
+
+
+
+
+  return `/api/companies/${id}/employees/bulk`
+}
+
+/**
+ * @summary Create many employees for a company at once (HR view)
+ */
+export const bulkCreateEmployees = async (id: number,
+    employeeBulkCreate: EmployeeBulkCreate, options?: RequestInit): Promise<EmployeeBulkResult> => {
+
+  return customFetch<EmployeeBulkResult>(getBulkCreateEmployeesUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      employeeBulkCreate,)
+  }
+);}
+
+
+
+
+export const getBulkCreateEmployeesMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkCreateEmployees>>, TError,{id: number;data: BodyType<EmployeeBulkCreate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkCreateEmployees>>, TError,{id: number;data: BodyType<EmployeeBulkCreate>}, TContext> => {
+
+const mutationKey = ['bulkCreateEmployees'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkCreateEmployees>>, {id: number;data: BodyType<EmployeeBulkCreate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  bulkCreateEmployees(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkCreateEmployeesMutationResult = NonNullable<Awaited<ReturnType<typeof bulkCreateEmployees>>>
+    export type BulkCreateEmployeesMutationBody = BodyType<EmployeeBulkCreate>
+    export type BulkCreateEmployeesMutationError = ErrorType<void>
+
+    /**
+ * @summary Create many employees for a company at once (HR view)
+ */
+export const useBulkCreateEmployees = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkCreateEmployees>>, TError,{id: number;data: BodyType<EmployeeBulkCreate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bulkCreateEmployees>>,
+        TError,
+        {id: number;data: BodyType<EmployeeBulkCreate>},
+        TContext
+      > => {
+      return useMutation(getBulkCreateEmployeesMutationOptions(options));
+    }
 
 export const getGetCompanyUtilisationUrl = (id: number,) => {
 

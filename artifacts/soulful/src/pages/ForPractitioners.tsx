@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useCreatePractitioner, useListSubscriptions, getListSubscriptionsQueryKey } from "@workspace/api-client-react";
+import { useCreatePractitioner, useListSubscriptions, getListSubscriptionsQueryKey, useCreateStripeCheckout } from "@workspace/api-client-react";
 import { useSiteContent } from "@/hooks/useSiteContent";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +28,7 @@ export default function ForPractitioners() {
   const practitionerPlans = plans?.filter(p => p.planType === 'practitioner') || [];
   
   const createPractitioner = useCreatePractitioner();
+  const startCheckout = useCreateStripeCheckout();
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
   
   const [formData, setFormData] = useState({
@@ -64,9 +65,28 @@ export default function ForPractitioners() {
         avatarUrl: formData.avatarUrl || undefined,
       }
     }, {
-      onSuccess: () => {
-        toast({ title: "Application submitted", description: "Your practitioner profile is pending review." });
-        setLocation("/dashboard");
+      onSuccess: (practitioner) => {
+        startCheckout.mutate({
+          data: {
+            planId: selectedPlanId,
+            practitionerId: practitioner.id,
+            successPath: "/dashboard",
+            cancelPath: "/for-practitioners",
+          },
+        }, {
+          onSuccess: (session) => {
+            if (session.url) {
+              window.location.href = session.url;
+            } else {
+              toast({ title: "Application submitted", description: "Your profile is pending review. Set up billing from your dashboard." });
+              setLocation("/dashboard");
+            }
+          },
+          onError: () => {
+            toast({ title: "Application submitted", description: "Your profile was created, but we couldn't open checkout. You can set up billing from your dashboard.", variant: "destructive" });
+            setLocation("/dashboard");
+          },
+        });
       },
       onError: () => {
         toast({ title: "Submission failed", description: "Please check your details and try again.", variant: "destructive" });
@@ -266,9 +286,9 @@ export default function ForPractitioners() {
                   <Button 
                     type="submit" 
                     className="w-full h-12 rounded-full text-base mt-4 bg-secondary hover:bg-secondary/90 text-secondary-foreground" 
-                    disabled={createPractitioner.isPending || !selectedPlanId}
+                    disabled={createPractitioner.isPending || startCheckout.isPending || !selectedPlanId}
                   >
-                    {createPractitioner.isPending ? "Submitting..." : selectedPlanId ? "Submit Application" : "Select a plan first"}
+                    {createPractitioner.isPending || startCheckout.isPending ? "Submitting..." : selectedPlanId ? "Submit Application" : "Select a plan first"}
                   </Button>
                 </form>
               </CardContent>

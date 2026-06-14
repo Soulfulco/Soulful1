@@ -1,7 +1,30 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import { employeesTable, companiesTable, bookingsTable } from "@workspace/db/schema";
 import { eq, and, sql } from "drizzle-orm";
+
+// Authorize a write to a company's employees:
+// - must be authenticated
+// - Soulful admins (non "hr:" ids) may write to any company
+// - HR users (id "hr:<id>") may only write to their own company
+// Returns true if authorized; otherwise writes the error response and returns false.
+async function authorizeCompanyWrite(req: Request, res: Response, companyId: number): Promise<boolean> {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Not authenticated" });
+    return false;
+  }
+  const uid = req.user.id;
+  if (uid.startsWith("hr:")) {
+    const hrId = parseInt(uid.slice(3));
+    const result = await db.execute(sql`SELECT company_id FROM hr_users WHERE id = ${hrId} AND is_active = true`);
+    const row = result.rows[0] as { company_id?: number } | undefined;
+    if (!row || row.company_id !== companyId) {
+      res.status(403).json({ error: "Forbidden" });
+      return false;
+    }
+  }
+  return true;
+}
 
 // ── /employees/* ──────────────────────────────────────────────────────────────
 export const employeesRouter = Router();
@@ -108,6 +131,62 @@ companyEmployeesRouter.get("/companies/:id/employees", async (req, res) => {
     return res.json(employees);
   } catch {
     return res.status(500).json({ error: "Failed to fetch employees" });
+  }
+});
+
+// POST /companies/:id/employees/bulk — create many employees at once (HR view)
+companyEmployeesRouter.post("/companies/:id/employees/bulk", async (req, res) => {
+  try {
+    const companyId = parseInt(req.params.id);
+    if (Number.isNaN(companyId)) {
+      return res.status(400).json({ error: "Invalid company id" });
+    }
+    if (!(await authorizeCompanyWrite(req, res, companyId))) return;
+    const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, companyId)).limit(1);
+    if (!company) return res.status(404).json({ error: "Company not found" });
+
+    const rows = Array.isArray(req.body?.employees) ? req.body.employees : null;
+    if (!rows || rows.length === 0) {
+      return res.status(400).json({ error: "employees must be a non-empty array" });
+    }
+
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const existing = await db
+      .select({ email: employeesTable.email })
+      .from(employeesTable)
+      .where(eq(employeesTable.companyId, companyId));
+    const seen = new Set(existing.map(e => e.email.toLowerCase()));
+
+    const toInsert: { name: string; email: string; companyId: number; sessionAllowancePerMonth: number }[] = [];
+    const invalid: { row: number; reason: string }[] = [];
+
+    rows.forEach((raw: unknown, i: number) => {
+      const r = raw as { name?: unknown; email?: unknown; sessionAllowancePerMonth?: unknown };
+      const name = typeof r.name === "string" ? r.name.trim() : "";
+      const email = typeof r.email === "string" ? r.email.trim() : "";
+      if (!name || !email) return invalid.push({ row: i + 1, reason: "missing name or email" });
+      if (!emailRe.test(email)) return invalid.push({ row: i + 1, reason: "invalid email" });
+      const key = email.toLowerCase();
+      if (seen.has(key)) return; // skip duplicate (existing or earlier in batch)
+      seen.add(key);
+      const allowance = Number(r.sessionAllowancePerMonth);
+      toInsert.push({
+        name,
+        email,
+        companyId,
+        sessionAllowancePerMonth: Number.isInteger(allowance) && allowance > 0 ? allowance : 2,
+      });
+    });
+
+    const created = toInsert.length > 0 ? await db.insert(employeesTable).values(toInsert).returning() : [];
+    return res.status(201).json({
+      created: created.length,
+      skipped: rows.length - created.length - invalid.length,
+      invalid,
+      employees: created,
+    });
+  } catch {
+    return res.status(500).json({ error: "Failed to import employees" });
   }
 });
 

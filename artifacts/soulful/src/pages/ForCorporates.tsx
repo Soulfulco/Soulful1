@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useCreateCompany, useListSubscriptions, getListSubscriptionsQueryKey } from "@workspace/api-client-react";
+import { useCreateCompany, useListSubscriptions, getListSubscriptionsQueryKey, useCreateStripeCheckout } from "@workspace/api-client-react";
 import { useSiteContent } from "@/hooks/useSiteContent";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +32,7 @@ export default function ForCorporates() {
   const corporatePlans = plans?.filter(p => p.planType === "corporate") || [];
 
   const createCompany = useCreateCompany();
+  const startCheckout = useCreateStripeCheckout();
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
 
   const [formData, setFormData] = useState({
@@ -57,9 +58,28 @@ export default function ForCorporates() {
         contactName: formData.contactName,
       }
     }, {
-      onSuccess: () => {
-        toast({ title: "Company registered", description: "Welcome to Soulful! You can now access your dashboard." });
-        setLocation("/dashboard");
+      onSuccess: (company) => {
+        startCheckout.mutate({
+          data: {
+            planId: selectedPlanId,
+            companyId: company.id,
+            successPath: "/dashboard",
+            cancelPath: "/for-corporates",
+          },
+        }, {
+          onSuccess: (session) => {
+            if (session.url) {
+              window.location.href = session.url;
+            } else {
+              toast({ title: "Company registered", description: "Welcome to Soulful! Set up billing from your dashboard." });
+              setLocation("/dashboard");
+            }
+          },
+          onError: () => {
+            toast({ title: "Company registered", description: "Your account was created, but we couldn't open checkout. You can set up billing from your dashboard.", variant: "destructive" });
+            setLocation("/dashboard");
+          },
+        });
       },
       onError: () => {
         toast({ title: "Registration failed", description: "Please check your details and try again.", variant: "destructive" });
@@ -383,9 +403,9 @@ export default function ForCorporates() {
                   <Button
                     type="submit"
                     className="w-full h-12 rounded-full text-base mt-4"
-                    disabled={createCompany.isPending || !selectedPlanId}
+                    disabled={createCompany.isPending || startCheckout.isPending || !selectedPlanId}
                   >
-                    {createCompany.isPending ? "Creating account..." : selectedPlanId ? "Complete Registration" : "Select a plan first"}
+                    {createCompany.isPending || startCheckout.isPending ? "Creating account..." : selectedPlanId ? "Complete Registration" : "Select a plan first"}
                   </Button>
                 </form>
               </CardContent>

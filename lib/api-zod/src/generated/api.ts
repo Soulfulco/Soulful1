@@ -559,6 +559,70 @@ export const CreatePractitionerSubscriptionBody = zod.object({
 
 
 /**
+ * @summary List Stripe products with their prices (synced from Stripe)
+ */
+export const ListStripeProductsWithPricesResponse = zod.object({
+  "data": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "description": zod.string().nullish(),
+  "metadata": zod.record(zod.string(), zod.unknown()).nullish(),
+  "prices": zod.array(zod.object({
+  "id": zod.string(),
+  "unitAmount": zod.number().nullable().describe('Amount in the smallest currency unit (e.g. pence).'),
+  "currency": zod.string(),
+  "recurring": zod.record(zod.string(), zod.unknown()).nullish()
+}))
+}))
+})
+
+
+/**
+ * @summary Start a Stripe Checkout subscription for a company or practitioner
+ */
+export const CreateStripeCheckoutBody = zod.object({
+  "planId": zod.number().describe('The app subscription_plans id.'),
+  "companyId": zod.number().optional().describe('Provide for a corporate subscription.'),
+  "practitionerId": zod.number().optional().describe('Provide for a practitioner listing subscription.'),
+  "successPath": zod.string().optional().describe('Path to return to on success (default \/dashboard).'),
+  "cancelPath": zod.string().optional().describe('Path to return to on cancel (default \/).')
+})
+
+export const CreateStripeCheckoutResponse = zod.object({
+  "url": zod.string().nullable().describe('The Stripe-hosted URL to redirect the user to.')
+})
+
+
+/**
+ * @summary Open the Stripe billing portal for a company or practitioner
+ */
+export const CreateStripePortalBody = zod.object({
+  "companyId": zod.number().optional(),
+  "practitionerId": zod.number().optional(),
+  "returnPath": zod.string().optional()
+})
+
+export const CreateStripePortalResponse = zod.object({
+  "url": zod.string().nullable().describe('The Stripe-hosted URL to redirect the user to.')
+})
+
+
+/**
+ * @summary Get the app-side subscription status for a company or practitioner
+ */
+export const GetStripeSubscriptionStatusQueryParams = zod.object({
+  "companyId": zod.coerce.number().optional(),
+  "practitionerId": zod.coerce.number().optional()
+})
+
+export const GetStripeSubscriptionStatusResponse = zod.object({
+  "subscriptionStatus": zod.string().nullish().describe('The app-side status on the company\/practitioner record.'),
+  "planId": zod.number().nullish(),
+  "status": zod.string().nullish().describe('The status of the linked subscription row.')
+})
+
+
+/**
  * @summary Submit a review for a practitioner
  */
 export const CreateReviewBody = zod.object({
@@ -740,6 +804,24 @@ export const ListCompanyEmployeesResponseItem = zod.object({
   "createdAt": zod.coerce.date()
 })
 export const ListCompanyEmployeesResponse = zod.array(ListCompanyEmployeesResponseItem)
+
+
+/**
+ * @summary Create many employees for a company at once (HR view)
+ */
+export const BulkCreateEmployeesParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const bulkCreateEmployeesBodyEmployeesItemSessionAllowancePerMonthDefault = 2;
+
+export const BulkCreateEmployeesBody = zod.object({
+  "employees": zod.array(zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "sessionAllowancePerMonth": zod.number().default(bulkCreateEmployeesBodyEmployeesItemSessionAllowancePerMonthDefault)
+}))
+})
 
 
 /**

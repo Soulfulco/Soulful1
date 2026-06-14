@@ -5,6 +5,58 @@
  * Soulful Corporate Wellbeing Platform API
  * OpenAPI spec version: 0.1.0
  */
+export type StripePriceRecurring = { [key: string]: unknown } | null;
+
+export interface StripePrice {
+  id: string;
+  /** Amount in the smallest currency unit (e.g. pence). */
+  unitAmount: number | null;
+  currency: string;
+  recurring?: StripePriceRecurring;
+}
+
+export type StripeProductMetadata = { [key: string]: unknown } | null;
+
+export interface StripeProduct {
+  id: string;
+  name: string;
+  description?: string | null;
+  metadata?: StripeProductMetadata;
+  prices: StripePrice[];
+}
+
+export interface StripeCheckoutInput {
+  /** The app subscription_plans id. */
+  planId: number;
+  /** Provide for a corporate subscription. */
+  companyId?: number;
+  /** Provide for a practitioner listing subscription. */
+  practitionerId?: number;
+  /** Path to return to on success (default /dashboard). */
+  successPath?: string;
+  /** Path to return to on cancel (default /). */
+  cancelPath?: string;
+}
+
+export interface StripePortalInput {
+  companyId?: number;
+  practitionerId?: number;
+  returnPath?: string;
+}
+
+export interface StripeRedirect {
+  /** The Stripe-hosted URL to redirect the user to. */
+  url: string | null;
+}
+
+export interface StripeSubscriptionStatus {
+  /** The app-side status on the company/practitioner record. */
+  subscriptionStatus?: string | null;
+  planId?: number | null;
+  /** The status of the linked subscription row. */
+  status?: string | null;
+}
+
 export interface UploadUrlRequest {
   /**
      * Original file name.
@@ -438,6 +490,28 @@ export interface EmployeeLogin {
   companyId: number;
 }
 
+export interface EmployeeBulkItem {
+  name: string;
+  email: string;
+  sessionAllowancePerMonth?: number;
+}
+
+export interface EmployeeBulkCreate {
+  employees: EmployeeBulkItem[];
+}
+
+export interface EmployeeBulkInvalid {
+  row: number;
+  reason: string;
+}
+
+export interface EmployeeBulkResult {
+  created: number;
+  skipped: number;
+  invalid: EmployeeBulkInvalid[];
+  employees: Employee[];
+}
+
 export interface CompanyPublic {
   id: number;
   name: string;
@@ -488,6 +562,15 @@ export const ListBookingsStatus = {
   completed: 'completed',
   cancelled: 'cancelled',
 } as const;
+
+export type ListStripeProductsWithPrices200 = {
+  data: StripeProduct[];
+};
+
+export type GetStripeSubscriptionStatusParams = {
+companyId?: number;
+practitionerId?: number;
+};
 
 export type GetUpcomingBookingsParams = {
 companyId?: number;

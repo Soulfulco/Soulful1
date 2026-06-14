@@ -3,11 +3,20 @@ import {
   useListCompanies, getListCompaniesQueryKey,
   useListCompanyEmployees, getListCompanyEmployeesQueryKey,
   useGetCompanyUtilisation, getGetCompanyUtilisationQueryKey,
+  useRegisterEmployee, useBulkCreateEmployees,
 } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+} from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, TrendingUp, Calendar, Copy, CheckCheck } from "lucide-react";
+import { Users, TrendingUp, Calendar, Copy, CheckCheck, UserPlus, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const INVITE_CODES: Record<string, string> = {
@@ -34,8 +43,179 @@ function UtilisationBar({ value }: { value: number }) {
   );
 }
 
+type ParsedRow = { name: string; email: string; sessionAllowancePerMonth?: number };
+
+function parseEmployeeList(raw: string): ParsedRow[] {
+  const rows: ParsedRow[] = [];
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const parts = trimmed.split(/[,\t;]/).map(p => p.trim());
+    const lower = parts.map(p => p.toLowerCase());
+    // Skip an obvious header row
+    if (lower.includes("name") && lower.includes("email")) continue;
+    let name = "";
+    let email = "";
+    let allowance: number | undefined;
+    const emailIdx = parts.findIndex(p => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p));
+    if (emailIdx === -1) continue;
+    email = parts[emailIdx];
+    name = parts.filter((_, i) => i !== emailIdx).find(p => p && !/^\d+$/.test(p)) || "";
+    const allowancePart = parts.find((p, i) => i !== emailIdx && /^\d+$/.test(p));
+    if (allowancePart) allowance = parseInt(allowancePart);
+    if (!name || !email) continue;
+    rows.push({ name, email, ...(allowance ? { sessionAllowancePerMonth: allowance } : {}) });
+  }
+  return rows;
+}
+
+function AddEmployeeDialog({ companyId, onDone }: { companyId: number; onDone: () => void }) {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [allowance, setAllowance] = useState("2");
+  const register = useRegisterEmployee();
+
+  const submit = () => {
+    if (!name.trim() || !email.trim()) {
+      toast({ title: "Missing details", description: "Name and email are required.", variant: "destructive" });
+      return;
+    }
+    register.mutate(
+      { data: { name: name.trim(), email: email.trim(), companyId, sessionAllowancePerMonth: parseInt(allowance) || 2 } },
+      {
+        onSuccess: () => {
+          toast({ title: "Employee added", description: `${name.trim()} can now book sessions.` });
+          setName(""); setEmail(""); setAllowance("2");
+          setOpen(false);
+          onDone();
+        },
+        onError: () => toast({ title: "Could not add employee", description: "Please try again.", variant: "destructive" }),
+      }
+    );
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" className="gap-2"><UserPlus className="h-4 w-4" /> Add employee</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="font-serif">Add an employee</DialogTitle>
+          <DialogDescription>Create a single employee account for this company.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label htmlFor="emp-name">Full name</Label>
+            <Input id="emp-name" value={name} onChange={e => setName(e.target.value)} placeholder="Jane Smith" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="emp-email">Work email</Label>
+            <Input id="emp-email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="jane@company.com" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="emp-allowance">Monthly session allowance</Label>
+            <Input id="emp-allowance" type="number" min="1" value={allowance} onChange={e => setAllowance(e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button onClick={submit} disabled={register.isPending}>
+            {register.isPending ? "Adding…" : "Add employee"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ImportEmployeesDialog({ companyId, onDone }: { companyId: number; onDone: () => void }) {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const bulk = useBulkCreateEmployees();
+
+  const parsed = parseEmployeeList(text);
+
+  const onFile = async (file: File | undefined) => {
+    if (!file) return;
+    const content = await file.text();
+    setText(prev => (prev.trim() ? prev + "\n" : "") + content);
+  };
+
+  const submit = () => {
+    if (parsed.length === 0) {
+      toast({ title: "Nothing to import", description: "Add at least one valid name and email.", variant: "destructive" });
+      return;
+    }
+    bulk.mutate(
+      { id: companyId, data: { employees: parsed } },
+      {
+        onSuccess: (result) => {
+          const parts = [`${result.created} added`];
+          if (result.skipped) parts.push(`${result.skipped} skipped (duplicates)`);
+          if (result.invalid?.length) parts.push(`${result.invalid.length} invalid`);
+          toast({ title: "Import complete", description: parts.join(", ") + "." });
+          setText("");
+          setOpen(false);
+          onDone();
+        },
+        onError: () => toast({ title: "Import failed", description: "Please check your list and try again.", variant: "destructive" }),
+      }
+    );
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button className="gap-2"><Upload className="h-4 w-4" /> Import list</Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="font-serif">Import a list of employees</DialogTitle>
+          <DialogDescription>
+            Paste contacts (one per line) or upload a CSV. Format: <span className="font-mono">Name, email, allowance</span> — allowance is optional (defaults to 2).
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <Textarea
+            rows={8}
+            value={text}
+            onChange={e => setText(e.target.value)}
+            placeholder={"Jane Smith, jane@company.com, 3\nTom Lee, tom@company.com\nPriya Patel, priya@company.com, 2"}
+            className="font-mono text-sm"
+          />
+          <div className="flex items-center justify-between">
+            <label className="text-sm text-primary cursor-pointer hover:underline">
+              Upload CSV
+              <input
+                type="file"
+                accept=".csv,text/csv,text/plain"
+                className="hidden"
+                onChange={e => { onFile(e.target.files?.[0]); e.target.value = ""; }}
+              />
+            </label>
+            <span className="text-xs text-muted-foreground">
+              {parsed.length} valid {parsed.length === 1 ? "contact" : "contacts"} detected
+            </span>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button onClick={submit} disabled={bulk.isPending || parsed.length === 0}>
+            {bulk.isPending ? "Importing…" : `Import ${parsed.length || ""}`.trim()}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function DashboardEmployees() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [copiedCode, setCopiedCode] = useState("");
   const [selectedCompanyId, setSelectedCompanyId] = useState<number>(1);
 
@@ -54,6 +234,11 @@ export default function DashboardEmployees() {
   const selectedCompany = companies?.find(c => c.id === selectedCompanyId);
   const inviteCode = selectedCompany ? INVITE_CODES[selectedCompany.name] || "" : "";
 
+  const refreshEmployees = () => {
+    queryClient.invalidateQueries({ queryKey: getListCompanyEmployeesQueryKey(selectedCompanyId) });
+    queryClient.invalidateQueries({ queryKey: getGetCompanyUtilisationQueryKey(selectedCompanyId) });
+  };
+
   const copyInviteLink = () => {
     const url = `${window.location.origin}/join`;
     navigator.clipboard.writeText(`${url} — Code: ${inviteCode}`);
@@ -69,19 +254,23 @@ export default function DashboardEmployees() {
           <h1 className="text-3xl font-serif text-foreground mb-1">Employee Wellbeing</h1>
           <p className="text-muted-foreground">Monitor usage and manage employee access by company.</p>
         </div>
-        <Select
-          value={String(selectedCompanyId)}
-          onValueChange={v => setSelectedCompanyId(Number(v))}
-        >
-          <SelectTrigger className="w-56">
-            <SelectValue placeholder="Select company" />
-          </SelectTrigger>
-          <SelectContent>
-            {companies?.map(c => (
-              <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select
+            value={String(selectedCompanyId)}
+            onValueChange={v => setSelectedCompanyId(Number(v))}
+          >
+            <SelectTrigger className="w-56">
+              <SelectValue placeholder="Select company" />
+            </SelectTrigger>
+            <SelectContent>
+              {companies?.map(c => (
+                <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <AddEmployeeDialog companyId={selectedCompanyId} onDone={refreshEmployees} />
+          <ImportEmployeesDialog companyId={selectedCompanyId} onDone={refreshEmployees} />
+        </div>
       </div>
 
       {/* Stats */}
@@ -173,7 +362,7 @@ export default function DashboardEmployees() {
             <div className="py-12 text-center text-muted-foreground">
               <Users className="h-10 w-10 mx-auto mb-3 opacity-30" />
               <p>No employees registered yet.</p>
-              <p className="text-sm mt-1">Share the invite code above to get started.</p>
+              <p className="text-sm mt-1">Use “Add employee” or “Import list” above to get started.</p>
             </div>
           ) : (
             <div className="divide-y">

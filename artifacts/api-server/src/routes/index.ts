@@ -18,6 +18,7 @@ import proposalsRouter from "./proposals";
 import calendarTemplatesRouter from "./calendarTemplates";
 import siteContentRouter from "./siteContent";
 import storageRouter from "./storage";
+import stripeRouter from "./stripe";
 
 const router: IRouter = Router();
 
@@ -41,5 +42,6 @@ router.use(proposalsRouter);
 router.use(calendarTemplatesRouter);
 router.use(siteContentRouter);
 router.use(storageRouter);
+router.use(stripeRouter);
 
 export default router;
