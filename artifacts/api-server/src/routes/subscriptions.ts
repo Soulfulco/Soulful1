@@ -20,6 +20,39 @@ router.get("/subscriptions", async (_req, res) => {
   }
 });
 
+router.put("/subscriptions/:id", async (req, res) => {
+  try {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Not authenticated" });
+    if (req.user.id.startsWith("hr:")) return res.status(403).json({ error: "Forbidden" });
+
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid plan id" });
+
+    const { name, priceGbp, description, features } = req.body;
+    const updates: Record<string, unknown> = {};
+    if (typeof name === "string") updates.name = name;
+    if (priceGbp !== undefined && priceGbp !== null && priceGbp !== "")
+      updates.priceGbp = String(priceGbp);
+    if (typeof description === "string") updates.description = description;
+    if (Array.isArray(features))
+      updates.features = features.map((f) => String(f)).filter((f) => f.trim() !== "");
+
+    if (Object.keys(updates).length === 0)
+      return res.status(400).json({ error: "No valid fields to update" });
+
+    const [plan] = await db
+      .update(subscriptionPlansTable)
+      .set(updates)
+      .where(eq(subscriptionPlansTable.id, id))
+      .returning();
+
+    if (!plan) return res.status(404).json({ error: "Plan not found" });
+    res.json({ ...plan, priceGbp: Number(plan.priceGbp) });
+  } catch {
+    res.status(500).json({ error: "Failed to update plan" });
+  }
+});
+
 router.get("/subscriptions/company", async (_req, res) => {
   try {
     const subs = await db.select().from(companySubscriptionsTable);
