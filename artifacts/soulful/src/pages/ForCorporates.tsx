@@ -8,18 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CheckCircle2, XCircle, Building2, Info, Dumbbell, Leaf, Brain, HandHeart, Utensils, Mic2, Wind, Music, TrendingUp } from "lucide-react";
-
-const SESSION_RATES = [
-  { discipline: "Personal Training", icon: Dumbbell, corporateRate: 75, marketRange: "£80–£150" },
-  { discipline: "Yoga", icon: Leaf, corporateRate: 65, marketRange: "£70–£120" },
-  { discipline: "Executive Coaching", icon: Mic2, corporateRate: 95, marketRange: "£100–£250" },
-  { discipline: "Massage Therapy", icon: HandHeart, corporateRate: 75, marketRange: "£80–£120" },
-  { discipline: "Nutrition Coaching", icon: Utensils, corporateRate: 70, marketRange: "£75–£150" },
-  { discipline: "Meditation", icon: Brain, corporateRate: 60, marketRange: "£60–£100" },
-  { discipline: "Breathwork", icon: Wind, corporateRate: 60, marketRange: "£60–£120" },
-  { discipline: "Sound Healing", icon: Music, corporateRate: 65, marketRange: "£65–£130" },
-];
+import { CheckCircle2, XCircle, Building2, Info, TrendingUp } from "lucide-react";
 
 export default function ForCorporates() {
   const c = useSiteContent();
@@ -218,34 +207,6 @@ export default function ForCorporates() {
                 Regular PT sessions, yoga, and coaching keep stress, burnout, and absenteeism low. The EAP is still there for crises. Soulful is the reason crises happen less often.
               </p>
             </div>
-          </div>
-        </div>
-
-        {/* Session rates by discipline */}
-        <div>
-          <div className="text-center mb-10">
-            <h2 className="text-3xl font-serif mb-3">Corporate session rates</h2>
-            <p className="text-muted-foreground max-w-xl mx-auto">
-              Soulful negotiates a corporate rate with every practitioner. Your employees book at these rates — not public market prices.
-            </p>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {SESSION_RATES.map(({ discipline, icon: Icon, corporateRate, marketRange }) => (
-              <Card key={discipline} className="border-none shadow-sm bg-card text-center hover:shadow-md transition-shadow">
-                <CardContent className="pt-6 pb-5">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                    <Icon className="h-5 w-5 text-primary" />
-                  </div>
-                  <p className="text-xs text-muted-foreground mb-1">{discipline}</p>
-                  <p className="text-2xl font-serif font-bold text-foreground">£{corporateRate}</p>
-                  <p className="text-xs text-muted-foreground mt-1">per session</p>
-                  <div className="mt-3 pt-3 border-t border-border/50">
-                    <p className="text-xs text-muted-foreground">Market rate</p>
-                    <p className="text-xs font-medium text-muted-foreground line-through">{marketRange}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
           </div>
         </div>
 
