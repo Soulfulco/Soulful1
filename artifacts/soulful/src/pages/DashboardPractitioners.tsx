@@ -4,8 +4,11 @@ import {
   getListPractitionersQueryKey,
   useUpdatePractitioner,
   useCreatePractitioner,
+  useBulkCreatePractitioners,
   useListSpecialisms,
   getListSpecialismsQueryKey,
+  type PractitionerBulkItem,
+  type PractitionerBulkResult,
 } from "@workspace/api-client-react";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -19,7 +22,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { PhotoUpload } from "@/components/PhotoUpload";
-import { Plus, Pencil } from "lucide-react";
+import { Plus, Pencil, Upload, FileSpreadsheet } from "lucide-react";
 
 const EMPTY_FORM = {
   name: "",
@@ -33,11 +36,104 @@ const EMPTY_FORM = {
   subscriptionStatus: "trial" as "active" | "inactive" | "trial",
 };
 
+const HEADER_MAP: Record<string, keyof PractitionerBulkItem> = {
+  name: "name",
+  fullname: "name",
+  email: "email",
+  emailaddress: "email",
+  specialism: "specialism",
+  discipline: "specialism",
+  specialty: "specialism",
+  sessionrategbp: "sessionRateGbp",
+  sessionrate: "sessionRateGbp",
+  rate: "sessionRateGbp",
+  price: "sessionRateGbp",
+  bio: "bio",
+  biography: "bio",
+  location: "location",
+  city: "location",
+  qualifications: "qualifications",
+  qualification: "qualifications",
+  quals: "qualifications",
+};
+
+const POSITIONAL: (keyof PractitionerBulkItem)[] = [
+  "name",
+  "email",
+  "specialism",
+  "sessionRateGbp",
+  "bio",
+  "location",
+  "qualifications",
+];
+
+const normalizeHeader = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+function splitRow(line: string, delim: string): string[] {
+  if (delim === "\t") return line.split("\t").map((c) => c.trim());
+  const out: string[] = [];
+  let cur = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (ch === "," && !inQuotes) {
+      out.push(cur.trim());
+      cur = "";
+    } else {
+      cur += ch;
+    }
+  }
+  out.push(cur.trim());
+  return out;
+}
+
+function parseBulkInput(text: string): PractitionerBulkItem[] {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (lines.length === 0) return [];
+
+  const delim = lines[0].includes("\t") ? "\t" : ",";
+  const firstCells = splitRow(lines[0], delim).map(normalizeHeader);
+  const hasHeader = firstCells.some((c) => HEADER_MAP[c] !== undefined);
+
+  const columns: (keyof PractitionerBulkItem | null)[] = hasHeader
+    ? firstCells.map((c) => HEADER_MAP[c] ?? null)
+    : POSITIONAL;
+  const dataLines = hasHeader ? lines.slice(1) : lines;
+
+  return dataLines.map((line) => {
+    const cells = splitRow(line, delim);
+    const row: Record<string, string> = {};
+    columns.forEach((field, idx) => {
+      if (field && cells[idx] !== undefined) row[field] = cells[idx].trim();
+    });
+    const item: PractitionerBulkItem = {
+      name: row.name ?? "",
+      email: row.email ?? "",
+      specialism: row.specialism ?? "",
+      sessionRateGbp: Number(String(row.sessionRateGbp ?? "").replace(/[£,\s]/g, "")) || 0,
+    };
+    if (row.bio) item.bio = row.bio;
+    if (row.location) item.location = row.location;
+    if (row.qualifications) item.qualifications = row.qualifications;
+    return item;
+  });
+}
+
 export default function DashboardPractitioners() {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState("");
+  const [bulkResult, setBulkResult] = useState<PractitionerBulkResult | null>(null);
 
   const { data: specialisms } = useListSpecialisms({
     query: { queryKey: getListSpecialismsQueryKey() }
@@ -46,6 +142,9 @@ export default function DashboardPractitioners() {
 
   const updatePractitioner = useUpdatePractitioner();
   const createPractitioner = useCreatePractitioner();
+  const bulkCreate = useBulkCreatePractitioners();
+
+  const parsedBulk = parseBulkInput(bulkText);
 
   const { data: practitioners, isLoading, refetch } = useListPractitioners(
     {},
@@ -166,6 +265,44 @@ export default function DashboardPractitioners() {
     );
   };
 
+  const handleBulkOpenChange = (next: boolean) => {
+    setBulkOpen(next);
+    if (!next) {
+      setBulkText("");
+      setBulkResult(null);
+    }
+  };
+
+  const handleBulkFile = (file: File | undefined) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setBulkText(String(reader.result ?? ""));
+    reader.readAsText(file);
+  };
+
+  const handleBulkSubmit = () => {
+    if (parsedBulk.length === 0) {
+      toast({ title: "Nothing to import", description: "Paste rows or upload a CSV first.", variant: "destructive" });
+      return;
+    }
+    bulkCreate.mutate(
+      { data: { practitioners: parsedBulk } },
+      {
+        onSuccess: (result) => {
+          setBulkResult(result);
+          toast({
+            title: "Import complete",
+            description: `${result.created} added, ${result.skipped} skipped, ${result.invalid.length} invalid.`,
+          });
+          refetch();
+        },
+        onError: () => {
+          toast({ title: "Import failed", description: "Could not import practitioners. Please try again.", variant: "destructive" });
+        },
+      }
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -173,6 +310,111 @@ export default function DashboardPractitioners() {
           <h1 className="text-2xl font-serif text-foreground">Practitioners Directory</h1>
           <p className="text-muted-foreground text-sm">Manage practitioner profiles and directory visibility.</p>
         </div>
+
+        <div className="flex items-center gap-2">
+        <Dialog open={bulkOpen} onOpenChange={handleBulkOpenChange}>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="gap-2">
+              <FileSpreadsheet className="h-4 w-4" />
+              Bulk Import
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="font-serif text-xl">Bulk Import Practitioners</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div className="rounded-md bg-muted/50 p-3 text-sm text-muted-foreground space-y-1">
+                <p>Paste rows from a spreadsheet, or upload a CSV file. The first row can be a header.</p>
+                <p>
+                  Columns: <span className="font-medium text-foreground">name, email, specialism, sessionRateGbp</span> (required),
+                  then <span className="font-medium text-foreground">bio, location, qualifications</span> (optional).
+                </p>
+                <p>Duplicate emails (already in the directory or repeated in the file) are skipped automatically.</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="bulk-file" className="flex items-center gap-2">
+                  <Upload className="h-4 w-4" /> Upload CSV
+                </Label>
+                <Input
+                  id="bulk-file"
+                  type="file"
+                  accept=".csv,text/csv,text/plain"
+                  onChange={(e) => handleBulkFile(e.target.files?.[0])}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="bulk-text">Or paste rows</Label>
+                <Textarea
+                  id="bulk-text"
+                  rows={8}
+                  className="font-mono text-xs"
+                  placeholder={"name,email,specialism,sessionRateGbp,location\nHannah Smith,hannah@example.com,Yoga,75,London\nTom Lee,tom@example.com,Massage,60,Bristol"}
+                  value={bulkText}
+                  onChange={(e) => setBulkText(e.target.value)}
+                />
+              </div>
+
+              {parsedBulk.length > 0 && !bulkResult && (
+                <div className="rounded-md border border-border overflow-hidden">
+                  <div className="bg-muted/50 px-3 py-2 text-sm font-medium">{parsedBulk.length} row{parsedBulk.length === 1 ? "" : "s"} ready to import</div>
+                  <div className="max-h-48 overflow-y-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Specialism</TableHead>
+                          <TableHead className="text-right">Rate</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {parsedBulk.slice(0, 50).map((r, i) => (
+                          <TableRow key={i}>
+                            <TableCell>{r.name || <span className="text-destructive">—</span>}</TableCell>
+                            <TableCell>{r.email || <span className="text-destructive">—</span>}</TableCell>
+                            <TableCell>{r.specialism || <span className="text-destructive">—</span>}</TableCell>
+                            <TableCell className="text-right">{r.sessionRateGbp ? `£${r.sessionRateGbp}` : <span className="text-destructive">—</span>}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+
+              {bulkResult && (
+                <div className="rounded-md border border-border p-3 text-sm space-y-2">
+                  <div className="flex gap-4">
+                    <span className="text-green-600 font-medium">{bulkResult.created} added</span>
+                    <span className="text-muted-foreground">{bulkResult.skipped} skipped (duplicates)</span>
+                    <span className="text-destructive">{bulkResult.invalid.length} invalid</span>
+                  </div>
+                  {bulkResult.invalid.length > 0 && (
+                    <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-0.5 max-h-32 overflow-y-auto">
+                      {bulkResult.invalid.map((iv) => (
+                        <li key={iv.row}>Row {iv.row}: {iv.reason}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => handleBulkOpenChange(false)}>
+                  {bulkResult ? "Close" : "Cancel"}
+                </Button>
+                {!bulkResult && (
+                  <Button onClick={handleBulkSubmit} disabled={parsedBulk.length === 0 || bulkCreate.isPending}>
+                    {bulkCreate.isPending ? "Importing…" : `Import ${parsedBulk.length || ""}`.trim()}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <Dialog open={open} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
@@ -267,6 +509,7 @@ export default function DashboardPractitioners() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <Card className="border-none shadow-sm overflow-hidden bg-card">

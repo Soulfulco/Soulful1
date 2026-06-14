@@ -1,3 +1,4 @@
 - [Soulful public showcase endpoints](soulful-public-showcase-endpoints.md) — public list endpoints leak PII; use field-projected /showcase routes for marketing pages.
 - [drizzle-kit push TTY limitation](drizzle-kit-push-tty.md) — push can hang on rename-conflict prompt with no TTY; create new tables via psql SQL instead.
 - [Vite "Importing a module script failed"](vite-module-script-failed.md) — usually a transient dep-reoptimize/codegen artifact; restart web workflow before treating as a real bug.
+- [Specialisms stay in sync](specialisms-sync.md) — free-text specialism entry (bulk import) must auto-create missing rows in the managed `specialisms` table.

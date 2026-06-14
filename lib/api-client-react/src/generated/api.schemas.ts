@@ -178,6 +178,32 @@ export interface PractitionerInput {
   avatarUrl?: string;
 }
 
+export interface PractitionerBulkItem {
+  name: string;
+  email: string;
+  specialism: string;
+  sessionRateGbp: number;
+  bio?: string;
+  location?: string;
+  qualifications?: string;
+}
+
+export interface PractitionerBulkCreate {
+  practitioners: PractitionerBulkItem[];
+}
+
+export interface PractitionerBulkInvalid {
+  row: number;
+  reason: string;
+}
+
+export interface PractitionerBulkResult {
+  created: number;
+  skipped: number;
+  invalid: PractitionerBulkInvalid[];
+  practitioners: Practitioner[];
+}
+
 export interface PractitionerUpdate {
   name?: string;
   bio?: string;

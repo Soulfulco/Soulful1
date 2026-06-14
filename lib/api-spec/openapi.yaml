@@ -299,6 +299,23 @@ paths:
               schema:
                 $ref: "#/components/schemas/Practitioner"
 
+  /practitioners/bulk:
+    post:
+      operationId: bulkCreatePractitioners
+      tags: [practitioners]
+      summary: Admin — create many practitioners at once
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PractitionerBulkCreate" }
+      responses:
+        "201":
+          description: Import result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PractitionerBulkResult" }
+
   /practitioners/showcase:
     get:
       operationId: listPractitionerShowcase
@@ -1391,6 +1408,46 @@ components:
         location:      { type: string }
         qualifications: { type: string }
         avatarUrl:     { type: string }
+
+    PractitionerBulkItem:
+      type: object
+      required: [name, email, specialism, sessionRateGbp]
+      properties:
+        name:           { type: string }
+        email:          { type: string }
+        specialism:     { type: string }
+        sessionRateGbp: { type: number }
+        bio:            { type: string }
+        location:       { type: string }
+        qualifications: { type: string }
+
+    PractitionerBulkCreate:
+      type: object
+      required: [practitioners]
+      properties:
+        practitioners:
+          type: array
+          items: { $ref: "#/components/schemas/PractitionerBulkItem" }
+
+    PractitionerBulkInvalid:
+      type: object
+      required: [row, reason]
+      properties:
+        row:    { type: integer }
+        reason: { type: string }
+
+    PractitionerBulkResult:
+      type: object
+      required: [created, skipped, invalid, practitioners]
+      properties:
+        created: { type: integer }
+        skipped: { type: integer }
+        invalid:
+          type: array
+          items: { $ref: "#/components/schemas/PractitionerBulkInvalid" }
+        practitioners:
+          type: array
+          items: { $ref: "#/components/schemas/Practitioner" }
 
     PractitionerUpdate:
       type: object

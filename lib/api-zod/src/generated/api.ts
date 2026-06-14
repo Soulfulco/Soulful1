@@ -193,6 +193,22 @@ export const CreatePractitionerBody = zod.object({
 
 
 /**
+ * @summary Admin — create many practitioners at once
+ */
+export const BulkCreatePractitionersBody = zod.object({
+  "practitioners": zod.array(zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "specialism": zod.string(),
+  "sessionRateGbp": zod.number(),
+  "bio": zod.string().optional(),
+  "location": zod.string().optional(),
+  "qualifications": zod.string().optional()
+}))
+})
+
+
+/**
  * @summary Public list of practitioners for marketing display (safe fields only)
  */
 export const ListPractitionerShowcaseResponseItem = zod.object({

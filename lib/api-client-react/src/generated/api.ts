@@ -54,6 +54,8 @@ import type {
   MobileTokenExchangeRequest,
   MobileTokenExchangeSuccess,
   Practitioner,
+  PractitionerBulkCreate,
+  PractitionerBulkResult,
   PractitionerInput,
   PractitionerShowcase,
   PractitionerSubscription,
@@ -1015,6 +1017,77 @@ export const useCreatePractitioner = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getCreatePractitionerMutationOptions(options));
+    }
+
+export const getBulkCreatePractitionersUrl = () => {
+
+
+
+
+  return `/api/practitioners/bulk`
+}
+
+/**
+ * @summary Admin — create many practitioners at once
+ */
+export const bulkCreatePractitioners = async (practitionerBulkCreate: PractitionerBulkCreate, options?: RequestInit): Promise<PractitionerBulkResult> => {
+
+  return customFetch<PractitionerBulkResult>(getBulkCreatePractitionersUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      practitionerBulkCreate,)
+  }
+);}
+
+
+
+
+export const getBulkCreatePractitionersMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkCreatePractitioners>>, TError,{data: BodyType<PractitionerBulkCreate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkCreatePractitioners>>, TError,{data: BodyType<PractitionerBulkCreate>}, TContext> => {
+
+const mutationKey = ['bulkCreatePractitioners'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkCreatePractitioners>>, {data: BodyType<PractitionerBulkCreate>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  bulkCreatePractitioners(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkCreatePractitionersMutationResult = NonNullable<Awaited<ReturnType<typeof bulkCreatePractitioners>>>
+    export type BulkCreatePractitionersMutationBody = BodyType<PractitionerBulkCreate>
+    export type BulkCreatePractitionersMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Admin — create many practitioners at once
+ */
+export const useBulkCreatePractitioners = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkCreatePractitioners>>, TError,{data: BodyType<PractitionerBulkCreate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bulkCreatePractitioners>>,
+        TError,
+        {data: BodyType<PractitionerBulkCreate>},
+        TContext
+      > => {
+      return useMutation(getBulkCreatePractitionersMutationOptions(options));
     }
 
 export const getListPractitionerShowcaseUrl = () => {
