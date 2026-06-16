@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { rateSummary } from "@/lib/utils";
 import {
   useListPractitioners,
   getListPractitionersQueryKey,
@@ -29,7 +30,8 @@ const EMPTY_FORM = {
   email: "",
   specialism: "",
   bio: "",
-  sessionRateGbp: "",
+  inPersonRateGbp: "",
+  onlineRateGbp: "",
   location: "",
   qualifications: "",
   avatarUrl: "",
@@ -48,6 +50,12 @@ const HEADER_MAP: Record<string, keyof PractitionerBulkItem> = {
   sessionrate: "sessionRateGbp",
   rate: "sessionRateGbp",
   price: "sessionRateGbp",
+  inpersonrategbp: "inPersonRateGbp",
+  inpersonrate: "inPersonRateGbp",
+  inperson: "inPersonRateGbp",
+  onlinerategbp: "onlineRateGbp",
+  onlinerate: "onlineRateGbp",
+  online: "onlineRateGbp",
   bio: "bio",
   biography: "bio",
   location: "location",
@@ -113,12 +121,17 @@ function parseBulkInput(text: string): PractitionerBulkItem[] {
     columns.forEach((field, idx) => {
       if (field && cells[idx] !== undefined) row[field] = cells[idx].trim();
     });
+    const inPerson = Number(String(row.inPersonRateGbp ?? "").replace(/[£,\s]/g, "")) || 0;
+    const online = Number(String(row.onlineRateGbp ?? "").replace(/[£,\s]/g, "")) || 0;
+    const session = Number(String(row.sessionRateGbp ?? "").replace(/[£,\s]/g, "")) || 0;
     const item: PractitionerBulkItem = {
       name: row.name ?? "",
       email: row.email ?? "",
       specialism: row.specialism ?? "",
-      sessionRateGbp: Number(String(row.sessionRateGbp ?? "").replace(/[£,\s]/g, "")) || 0,
+      sessionRateGbp: session || inPerson || online,
     };
+    if (inPerson) item.inPersonRateGbp = inPerson;
+    if (online) item.onlineRateGbp = online;
     if (row.bio) item.bio = row.bio;
     if (row.location) item.location = row.location;
     if (row.qualifications) item.qualifications = row.qualifications;
@@ -166,7 +179,8 @@ export default function DashboardPractitioners() {
       email: p.email ?? "",
       specialism: p.specialism ?? "",
       bio: p.bio ?? "",
-      sessionRateGbp: p.sessionRateGbp != null ? String(p.sessionRateGbp) : "",
+      inPersonRateGbp: p.inPersonRateGbp != null ? String(p.inPersonRateGbp) : "",
+      onlineRateGbp: p.onlineRateGbp != null ? String(p.onlineRateGbp) : "",
       location: p.location ?? "",
       qualifications: p.qualifications ?? "",
       avatarUrl: p.avatarUrl ?? "",
@@ -201,13 +215,20 @@ export default function DashboardPractitioners() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const requiredOk = isEditing
-      ? form.name && form.specialism && form.bio && form.sessionRateGbp
-      : form.name && form.email && form.specialism && form.bio && form.sessionRateGbp;
-    if (!requiredOk) {
+    const inPersonRate = form.inPersonRateGbp ? Number(form.inPersonRateGbp) : undefined;
+    const onlineRate = form.onlineRateGbp ? Number(form.onlineRateGbp) : undefined;
+    const baseRequired = isEditing
+      ? form.name && form.specialism && form.bio
+      : form.name && form.email && form.specialism && form.bio;
+    if (!baseRequired) {
       toast({ title: "Missing fields", description: "Please fill in all required fields.", variant: "destructive" });
       return;
     }
+    if (!inPersonRate && !onlineRate) {
+      toast({ title: "Add a rate", description: "Enter an in-person rate, an online rate, or both.", variant: "destructive" });
+      return;
+    }
+    const baseRate = (inPersonRate ?? onlineRate)!;
 
     if (isEditing && editingId !== null) {
       updatePractitioner.mutate(
@@ -217,7 +238,10 @@ export default function DashboardPractitioners() {
             name: form.name,
             specialism: form.specialism,
             bio: form.bio,
-            sessionRateGbp: Number(form.sessionRateGbp),
+            // Send null (not undefined) for a cleared rate so the API clears it;
+            // the base sessionRateGbp is derived server-side from these two.
+            inPersonRateGbp: inPersonRate ?? null,
+            onlineRateGbp: onlineRate ?? null,
             location: form.location,
             qualifications: form.qualifications,
             avatarUrl: form.avatarUrl,
@@ -244,7 +268,9 @@ export default function DashboardPractitioners() {
           email: form.email,
           specialism: form.specialism,
           bio: form.bio,
-          sessionRateGbp: Number(form.sessionRateGbp),
+          sessionRateGbp: baseRate,
+          inPersonRateGbp: inPersonRate,
+          onlineRateGbp: onlineRate,
           location: form.location || undefined,
           qualifications: form.qualifications || undefined,
           avatarUrl: form.avatarUrl || undefined,
@@ -327,7 +353,7 @@ export default function DashboardPractitioners() {
               <div className="rounded-md bg-muted/50 p-3 text-sm text-muted-foreground space-y-1">
                 <p>Paste rows from a spreadsheet, or upload a CSV file. The first row can be a header.</p>
                 <p>
-                  Columns: <span className="font-medium text-foreground">name, email, specialism, sessionRateGbp</span> (required),
+                  Columns: <span className="font-medium text-foreground">name, email, specialism</span> (required) plus <span className="font-medium text-foreground">inPersonRateGbp and/or onlineRateGbp</span> (at least one rate),
                   then <span className="font-medium text-foreground">bio, location, qualifications</span> (optional).
                 </p>
                 <p>Duplicate emails (already in the directory or repeated in the file) are skipped automatically.</p>
@@ -351,7 +377,7 @@ export default function DashboardPractitioners() {
                   id="bulk-text"
                   rows={8}
                   className="font-mono text-xs"
-                  placeholder={"name,email,specialism,sessionRateGbp,location\nHannah Smith,hannah@example.com,Yoga,75,London\nTom Lee,tom@example.com,Massage,60,Bristol"}
+                  placeholder={"name,email,specialism,inPersonRateGbp,onlineRateGbp,location\nHannah Smith,hannah@example.com,Yoga,75,60,London\nTom Lee,tom@example.com,Massage,80,,Bristol"}
                   value={bulkText}
                   onChange={(e) => setBulkText(e.target.value)}
                 />
@@ -455,8 +481,12 @@ export default function DashboardPractitioners() {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="rate">Session Rate (£) <span className="text-destructive">*</span></Label>
-                  <Input id="rate" type="number" min="0" step="5" placeholder="75" value={form.sessionRateGbp} onChange={(e) => handleChange("sessionRateGbp", e.target.value)} />
+                  <Label htmlFor="inPersonRate">In-person Rate (£)</Label>
+                  <Input id="inPersonRate" type="number" min="0" step="5" placeholder="75" value={form.inPersonRateGbp} onChange={(e) => handleChange("inPersonRateGbp", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="onlineRate">Online Rate (£)</Label>
+                  <Input id="onlineRate" type="number" min="0" step="5" placeholder="60" value={form.onlineRateGbp} onChange={(e) => handleChange("onlineRateGbp", e.target.value)} />
                 </div>
               </div>
 
@@ -559,7 +589,7 @@ export default function DashboardPractitioners() {
                       <span className="capitalize text-sm">{practitioner.specialism}</span>
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm font-medium">£{practitioner.sessionRateGbp}</span>
+                      <span className="text-sm font-medium">{rateSummary(practitioner)}</span>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={

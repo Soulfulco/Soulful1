@@ -5,6 +5,34 @@ import { and, eq, ilike, or, sql } from "drizzle-orm";
 import { isAdmin } from "../lib/roles";
 import { hashPassword } from "./practitionerAuth";
 
+type PractitionerRow = typeof practitionersTable.$inferSelect;
+
+/**
+ * Shape a practitioner DB row into a safe public DTO. Never spread the raw row
+ * into responses: it carries secrets (passwordHash, googleRefreshToken, etc.)
+ * that must not be exposed on public or admin practitioner endpoints.
+ */
+export function serializePractitioner(p: PractitionerRow) {
+  return {
+    id: p.id,
+    name: p.name,
+    email: p.email,
+    specialism: p.specialism,
+    bio: p.bio,
+    sessionRateGbp: Number(p.sessionRateGbp),
+    inPersonRateGbp: p.inPersonRateGbp != null ? Number(p.inPersonRateGbp) : null,
+    onlineRateGbp: p.onlineRateGbp != null ? Number(p.onlineRateGbp) : null,
+    isActive: p.isActive,
+    subscriptionStatus: p.subscriptionStatus,
+    avatarUrl: p.avatarUrl,
+    location: p.location,
+    qualifications: p.qualifications,
+    averageRating: p.averageRating != null ? Number(p.averageRating) : null,
+    totalReviews: p.totalReviews,
+    createdAt: p.createdAt.toISOString(),
+  };
+}
+
 const router = Router();
 
 router.get("/practitioners", async (req, res) => {
@@ -28,14 +56,7 @@ router.get("/practitioners", async (req, res) => {
     }
     if (filters.length > 0) query = query.where(and(...filters));
     const practitioners = await query;
-    res.json(
-      practitioners.map((p) => ({
-        ...p,
-        sessionRateGbp: Number(p.sessionRateGbp),
-        averageRating: p.averageRating ? Number(p.averageRating) : null,
-        createdAt: p.createdAt.toISOString(),
-      })),
-    );
+    res.json(practitioners.map(serializePractitioner));
   } catch (err) {
     res.status(500).json({ error: "Failed to list practitioners" });
   }
@@ -43,7 +64,7 @@ router.get("/practitioners", async (req, res) => {
 
 router.post("/practitioners", async (req, res) => {
   try {
-    const { name, email, specialism, bio, sessionRateGbp, location, qualifications, avatarUrl, password } = req.body;
+    const { name, email, specialism, bio, sessionRateGbp, inPersonRateGbp, onlineRateGbp, location, qualifications, avatarUrl, password } = req.body;
     let passwordHash: string | undefined;
     if (password !== undefined && password !== null && password !== "") {
       if (typeof password !== "string" || password.length < 8) {
@@ -52,11 +73,31 @@ router.post("/practitioners", async (req, res) => {
       passwordHash = hashPassword(password);
     }
     const normalizedEmail = typeof email === "string" ? email.toLowerCase().trim() : email;
+    // At least one of in-person / online rate must be set; the base
+    // sessionRateGbp is always derived from them so the three never drift.
+    const inPerson = inPersonRateGbp != null && Number.isFinite(Number(inPersonRateGbp)) && Number(inPersonRateGbp) > 0 ? Number(inPersonRateGbp) : null;
+    const online = onlineRateGbp != null && Number.isFinite(Number(onlineRateGbp)) && Number(onlineRateGbp) > 0 ? Number(onlineRateGbp) : null;
+    const baseRate = inPerson ?? online ?? (Number.isFinite(Number(sessionRateGbp)) && Number(sessionRateGbp) > 0 ? Number(sessionRateGbp) : null);
+    if (baseRate == null) {
+      return res.status(400).json({ error: "At least one of in-person or online rate is required" });
+    }
     const [p] = await db
       .insert(practitionersTable)
-      .values({ name, email: normalizedEmail, specialism, bio, sessionRateGbp: String(sessionRateGbp), location, qualifications, avatarUrl, passwordHash })
+      .values({
+        name,
+        email: normalizedEmail,
+        specialism,
+        bio,
+        sessionRateGbp: String(baseRate),
+        inPersonRateGbp: inPerson != null ? String(inPerson) : null,
+        onlineRateGbp: online != null ? String(online) : null,
+        location,
+        qualifications,
+        avatarUrl,
+        passwordHash,
+      })
       .returning();
-    res.status(201).json({ ...p, sessionRateGbp: Number(p.sessionRateGbp), averageRating: null, createdAt: p.createdAt.toISOString() });
+    res.status(201).json(serializePractitioner(p));
   } catch (err) {
     res.status(500).json({ error: "Failed to create practitioner" });
   }
@@ -98,6 +139,8 @@ router.post("/practitioners/bulk", async (req, res) => {
       specialism: string;
       bio: string;
       sessionRateGbp: string;
+      inPersonRateGbp: string | null;
+      onlineRateGbp: string | null;
       location: string | null;
       qualifications: string | null;
     }[] = [];
@@ -110,6 +153,8 @@ router.post("/practitioners/bulk", async (req, res) => {
         specialism?: unknown;
         bio?: unknown;
         sessionRateGbp?: unknown;
+        inPersonRateGbp?: unknown;
+        onlineRateGbp?: unknown;
         location?: unknown;
         qualifications?: unknown;
       };
@@ -120,13 +165,20 @@ router.post("/practitioners/bulk", async (req, res) => {
       const location = typeof r.location === "string" && r.location.trim() ? r.location.trim() : null;
       const qualifications = typeof r.qualifications === "string" && r.qualifications.trim() ? r.qualifications.trim() : null;
       const rate = Number(r.sessionRateGbp);
+      const inPersonRate = Number(r.inPersonRateGbp);
+      const onlineRate = Number(r.onlineRateGbp);
+      const inPerson = Number.isFinite(inPersonRate) && inPersonRate > 0 ? inPersonRate : null;
+      const online = Number.isFinite(onlineRate) && onlineRate > 0 ? onlineRate : null;
+      // Base rate is derived from the mode rates, falling back to an explicit
+      // sessionRateGbp column for back-compat with older CSVs.
+      const baseRate = inPerson ?? online ?? (Number.isFinite(rate) && rate > 0 ? rate : null);
 
       if (!name || !email || !specialism) {
         return invalid.push({ row: i + 1, reason: "missing name, email or specialism" });
       }
       if (!emailRe.test(email)) return invalid.push({ row: i + 1, reason: "invalid email" });
-      if (!Number.isFinite(rate) || rate <= 0) {
-        return invalid.push({ row: i + 1, reason: "invalid session rate" });
+      if (baseRate == null) {
+        return invalid.push({ row: i + 1, reason: "at least one of in-person or online rate is required" });
       }
       const key = email.toLowerCase();
       if (seen.has(key)) return; // skip duplicate (existing or earlier in batch)
@@ -137,7 +189,9 @@ router.post("/practitioners/bulk", async (req, res) => {
         email,
         specialism,
         bio,
-        sessionRateGbp: String(rate),
+        sessionRateGbp: String(baseRate),
+        inPersonRateGbp: inPerson != null ? String(inPerson) : null,
+        onlineRateGbp: online != null ? String(online) : null,
         location,
         qualifications,
       });
@@ -164,12 +218,7 @@ router.post("/practitioners/bulk", async (req, res) => {
       created: created.length,
       skipped: rows.length - created.length - invalid.length,
       invalid,
-      practitioners: created.map((p) => ({
-        ...p,
-        sessionRateGbp: Number(p.sessionRateGbp),
-        averageRating: null,
-        createdAt: p.createdAt.toISOString(),
-      })),
+      practitioners: created.map(serializePractitioner),
     });
   } catch {
     return res.status(500).json({ error: "Failed to import practitioners" });
@@ -182,7 +231,7 @@ router.get("/practitioners/:id", async (req, res) => {
     const [p] = await db.select().from(practitionersTable).where(eq(practitionersTable.id, id));
     // Hidden practitioners are only viewable by admins, not via direct ID lookup.
     if (!p || (!p.isActive && !isAdmin(req))) return res.status(404).json({ error: "Not found" });
-    res.json({ ...p, sessionRateGbp: Number(p.sessionRateGbp), averageRating: p.averageRating ? Number(p.averageRating) : null, createdAt: p.createdAt.toISOString() });
+    res.json(serializePractitioner(p));
   } catch (err) {
     res.status(500).json({ error: "Failed to get practitioner" });
   }
@@ -192,19 +241,42 @@ router.patch("/practitioners/:id", async (req, res) => {
   try {
     if (!isAdmin(req)) return res.status(401).json({ error: "Not authorised" });
     const id = Number(req.params.id);
-    const { name, bio, specialism, sessionRateGbp, location, qualifications, avatarUrl, isActive } = req.body;
+    const { name, bio, specialism, inPersonRateGbp, onlineRateGbp, location, qualifications, avatarUrl, isActive } = req.body;
     const updates: Record<string, unknown> = {};
     if (name !== undefined) updates.name = name;
     if (bio !== undefined) updates.bio = bio;
     if (specialism !== undefined) updates.specialism = specialism;
-    if (sessionRateGbp !== undefined) updates.sessionRateGbp = String(sessionRateGbp);
     if (location !== undefined) updates.location = location;
     if (qualifications !== undefined) updates.qualifications = qualifications;
     if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
     if (isActive !== undefined) updates.isActive = isActive;
+
+    // If either mode rate is being changed, recompute the derived base rate from
+    // the merged (new ?? existing) values so the three rates never drift, and
+    // reject clearing both.
+    if (inPersonRateGbp !== undefined || onlineRateGbp !== undefined) {
+      const [current] = await db.select().from(practitionersTable).where(eq(practitionersTable.id, id));
+      if (!current) return res.status(404).json({ error: "Not found" });
+      const toRate = (v: unknown, fallback: number | null): number | null => {
+        if (v === undefined) return fallback;
+        if (v === null) return null;
+        const n = Number(v);
+        return Number.isFinite(n) && n > 0 ? n : null;
+      };
+      const inPerson = toRate(inPersonRateGbp, current.inPersonRateGbp != null ? Number(current.inPersonRateGbp) : null);
+      const online = toRate(onlineRateGbp, current.onlineRateGbp != null ? Number(current.onlineRateGbp) : null);
+      const baseRate = inPerson ?? online;
+      if (baseRate == null) {
+        return res.status(400).json({ error: "At least one of in-person or online rate is required" });
+      }
+      updates.inPersonRateGbp = inPerson != null ? String(inPerson) : null;
+      updates.onlineRateGbp = online != null ? String(online) : null;
+      updates.sessionRateGbp = String(baseRate);
+    }
+
     const [p] = await db.update(practitionersTable).set(updates).where(eq(practitionersTable.id, id)).returning();
     if (!p) return res.status(404).json({ error: "Not found" });
-    res.json({ ...p, sessionRateGbp: Number(p.sessionRateGbp), averageRating: p.averageRating ? Number(p.averageRating) : null, createdAt: p.createdAt.toISOString() });
+    res.json(serializePractitioner(p));
   } catch (err) {
     res.status(500).json({ error: "Failed to update practitioner" });
   }

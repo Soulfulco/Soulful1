@@ -14,6 +14,10 @@ export interface Practitioner {
   specialism: string;
   bio: string;
   sessionRateGbp: number;
+  /** @nullable */
+  inPersonRateGbp?: number | null;
+  /** @nullable */
+  onlineRateGbp?: number | null;
   isActive: boolean;
   subscriptionStatus: PractitionerSubscriptionStatus;
   /** @nullable */

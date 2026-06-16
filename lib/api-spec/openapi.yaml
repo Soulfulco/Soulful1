@@ -1559,6 +1559,8 @@ components:
         specialism:    { type: string }
         bio:           { type: string }
         sessionRateGbp: { type: number }
+        inPersonRateGbp: { type: ["number", "null"] }
+        onlineRateGbp:  { type: ["number", "null"] }
         isActive:      { type: boolean }
         subscriptionStatus: { type: string, enum: [active, inactive, trial] }
         avatarUrl:     { type: ["string", "null"] }
@@ -1586,6 +1588,8 @@ components:
         specialism:    { type: string }
         bio:           { type: string }
         sessionRateGbp: { type: number }
+        inPersonRateGbp: { type: number }
+        onlineRateGbp:  { type: number }
         location:      { type: string }
         qualifications: { type: string }
         avatarUrl:     { type: string }
@@ -1682,6 +1686,8 @@ components:
         email:          { type: string }
         specialism:     { type: string }
         sessionRateGbp: { type: number }
+        inPersonRateGbp: { type: number }
+        onlineRateGbp:  { type: number }
         bio:            { type: string }
         location:       { type: string }
         qualifications: { type: string }
@@ -1720,7 +1726,8 @@ components:
         name:          { type: string }
         bio:           { type: string }
         specialism:    { type: string }
-        sessionRateGbp: { type: number }
+        inPersonRateGbp: { type: ["number", "null"] }
+        onlineRateGbp:  { type: ["number", "null"] }
         location:      { type: string }
         qualifications: { type: string }
         avatarUrl:     { type: string }

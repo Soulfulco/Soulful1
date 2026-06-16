@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { rateSummary } from "@/lib/utils";
 import { useListPractitioners, getListPractitionersQueryKey, useListSpecialisms, getListSpecialismsQueryKey } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
@@ -106,7 +107,7 @@ export default function Practitioners() {
                       </div>
                       <p className="text-muted-foreground text-sm line-clamp-2 mb-4">{practitioner.bio}</p>
                       <div className="flex items-center justify-between mt-auto pt-4 border-t border-border/50">
-                        <span className="font-medium text-foreground">£{practitioner.sessionRateGbp} <span className="text-muted-foreground font-normal text-sm">/ session</span></span>
+                        <span className="font-medium text-foreground text-sm">{rateSummary(practitioner)}</span>
                         <Button variant="ghost" size="sm" className="text-primary hover:bg-primary/10 hover:text-primary">
                           View profile
                         </Button>

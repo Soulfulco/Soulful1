@@ -11,6 +11,8 @@ export interface PractitionerBulkItem {
   email: string;
   specialism: string;
   sessionRateGbp: number;
+  inPersonRateGbp?: number;
+  onlineRateGbp?: number;
   bio?: string;
   location?: string;
   qualifications?: string;

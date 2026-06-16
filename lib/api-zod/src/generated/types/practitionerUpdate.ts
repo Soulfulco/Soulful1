@@ -10,7 +10,10 @@ export interface PractitionerUpdate {
   name?: string;
   bio?: string;
   specialism?: string;
-  sessionRateGbp?: number;
+  /** @nullable */
+  inPersonRateGbp?: number | null;
+  /** @nullable */
+  onlineRateGbp?: number | null;
   location?: string;
   qualifications?: string;
   avatarUrl?: string;

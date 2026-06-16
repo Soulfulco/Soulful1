@@ -1,4 +1,5 @@
 import { useListPractitioners, getListPractitionersQueryKey } from "@workspace/api-client-react";
+import { rateSummary } from "@/lib/utils";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -162,7 +163,7 @@ export default function Home() {
                       </div>
                       <p className="text-muted-foreground text-sm line-clamp-2 mb-4">{practitioner.bio}</p>
                       <div className="flex items-center justify-between mt-auto pt-4 border-t border-border/50">
-                        <span className="font-medium">£{practitioner.sessionRateGbp} <span className="text-muted-foreground font-normal text-sm">/ session</span></span>
+                        <span className="font-medium text-sm">{rateSummary(practitioner)}</span>
                         <span className="text-primary text-sm font-medium flex items-center">
                           Book <ArrowRight className="h-4 w-4 ml-1 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
                         </span>

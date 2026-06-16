@@ -1,3 +1,5 @@
 - [Multi-role session gating](role-session-gating.md) — Soulful sessions are id-prefixed (`hr:`, `pract:`, admin=neither); never gate admin with inverse `startsWith("hr:")` checks.
 - [lib/db schema rebuild](db-schema-rebuild.md) — after schema edits, runtime works but consumer tsc needs lib/db .d.ts rebuilt (tsc --build lib/db/tsconfig.json).
 - [Google Calendar sync](google-calendar-sync.md) — Soulful uses custom per-practitioner Google OAuth (not the single-account Replit connector); two-way busy-pull + booking-push, best-effort.
+- [Practitioner rates](soulful-practitioner-rates.md) — inPerson/online rates are the source of truth; sessionRateGbp is derived server-side (`inPerson ?? online`); clear via explicit null.
+- [serializePractitioner DTO](soulful-public-showcase-endpoints.md) — all practitioner responses must use the DTO helper, never spread `...row` (leaks passwordHash/google tokens).

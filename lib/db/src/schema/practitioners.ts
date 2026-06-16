@@ -12,6 +12,8 @@ export const practitionersTable = pgTable("practitioners", {
   specialism: text("specialism").notNull(),
   bio: text("bio").notNull(),
   sessionRateGbp: numeric("session_rate_gbp", { precision: 10, scale: 2 }).notNull(),
+  inPersonRateGbp: numeric("in_person_rate_gbp", { precision: 10, scale: 2 }),
+  onlineRateGbp: numeric("online_rate_gbp", { precision: 10, scale: 2 }),
   isActive: boolean("is_active").notNull().default(true),
   subscriptionStatus: subscriptionStatusEnum("subscription_status").notNull().default("trial"),
   avatarUrl: text("avatar_url"),

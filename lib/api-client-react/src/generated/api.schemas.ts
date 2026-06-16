@@ -145,6 +145,10 @@ export interface Practitioner {
   specialism: string;
   bio: string;
   sessionRateGbp: number;
+  /** @nullable */
+  inPersonRateGbp?: number | null;
+  /** @nullable */
+  onlineRateGbp?: number | null;
   isActive: boolean;
   subscriptionStatus: PractitionerSubscriptionStatus;
   /** @nullable */
@@ -173,6 +177,8 @@ export interface PractitionerInput {
   specialism: string;
   bio: string;
   sessionRateGbp: number;
+  inPersonRateGbp?: number;
+  onlineRateGbp?: number;
   location?: string;
   qualifications?: string;
   avatarUrl?: string;
@@ -256,6 +262,8 @@ export interface PractitionerBulkItem {
   email: string;
   specialism: string;
   sessionRateGbp: number;
+  inPersonRateGbp?: number;
+  onlineRateGbp?: number;
   bio?: string;
   location?: string;
   qualifications?: string;
@@ -281,7 +289,10 @@ export interface PractitionerUpdate {
   name?: string;
   bio?: string;
   specialism?: string;
-  sessionRateGbp?: number;
+  /** @nullable */
+  inPersonRateGbp?: number | null;
+  /** @nullable */
+  onlineRateGbp?: number | null;
   location?: string;
   qualifications?: string;
   avatarUrl?: string;

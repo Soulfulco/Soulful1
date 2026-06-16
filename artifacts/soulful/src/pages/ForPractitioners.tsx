@@ -41,7 +41,8 @@ export default function ForPractitioners() {
     email: "",
     specialism: "",
     bio: "",
-    sessionRateGbp: "",
+    inPersonRateGbp: "",
+    onlineRateGbp: "",
     location: "",
     qualifications: "",
     avatarUrl: "",
@@ -62,6 +63,12 @@ export default function ForPractitioners() {
       toast({ title: "Choose a password", description: "Your portal password must be at least 8 characters.", variant: "destructive" });
       return;
     }
+    const inPersonRate = formData.inPersonRateGbp ? parseInt(formData.inPersonRateGbp, 10) : undefined;
+    const onlineRate = formData.onlineRateGbp ? parseInt(formData.onlineRateGbp, 10) : undefined;
+    if (!inPersonRate && !onlineRate) {
+      toast({ title: "Add a rate", description: "Enter an in-person rate, an online rate, or both.", variant: "destructive" });
+      return;
+    }
 
     createPractitioner.mutate({
       data: {
@@ -69,7 +76,9 @@ export default function ForPractitioners() {
         email: formData.email,
         specialism: formData.specialism,
         bio: formData.bio,
-        sessionRateGbp: parseInt(formData.sessionRateGbp, 10),
+        sessionRateGbp: (inPersonRate ?? onlineRate)!,
+        inPersonRateGbp: inPersonRate,
+        onlineRateGbp: onlineRate,
         location: formData.location,
         qualifications: formData.qualifications,
         avatarUrl: formData.avatarUrl || undefined,
@@ -270,15 +279,25 @@ export default function ForPractitioners() {
                       </Select>
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="sessionRateGbp">Session Rate (£)</Label>
+                      <Label htmlFor="inPersonRateGbp">In-person Rate (£)</Label>
                       <Input 
-                        id="sessionRateGbp" 
+                        id="inPersonRateGbp" 
                         type="number" 
-                        required
                         min="1"
                         className="bg-background h-11"
-                        value={formData.sessionRateGbp}
-                        onChange={(e) => setFormData({...formData, sessionRateGbp: e.target.value})}
+                        value={formData.inPersonRateGbp}
+                        onChange={(e) => setFormData({...formData, inPersonRateGbp: e.target.value})}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="onlineRateGbp">Online Rate (£)</Label>
+                      <Input 
+                        id="onlineRateGbp" 
+                        type="number" 
+                        min="1"
+                        className="bg-background h-11"
+                        value={formData.onlineRateGbp}
+                        onChange={(e) => setFormData({...formData, onlineRateGbp: e.target.value})}
                       />
                     </div>
                   </div>

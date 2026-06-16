@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { practitionerRates, rateSummary } from "@/lib/utils";
 import { 
   useGetPractitioner, getGetPractitionerQueryKey, 
   useListPractitionerSlots, getListPractitionerSlotsQueryKey,
@@ -193,8 +194,15 @@ export default function PractitionerProfile({ id }: { id: string }) {
           <div className="lg:col-span-1 space-y-6">
             <Card className="rounded-3xl border shadow-sm sticky top-24 overflow-hidden">
               <div className="bg-primary p-6 text-primary-foreground text-center">
-                <div className="text-3xl font-serif mb-1">£{practitioner.sessionRateGbp}</div>
-                <div className="text-primary-foreground/80 text-sm">per 60 minute session</div>
+                <div className="flex items-center justify-center gap-4 flex-wrap">
+                  {practitionerRates(practitioner).map((r) => (
+                    <div key={r.label}>
+                      <div className="text-3xl font-serif mb-1">£{r.value}</div>
+                      <div className="text-primary-foreground/80 text-sm">{r.label}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-primary-foreground/80 text-sm mt-2">per 60 minute session</div>
               </div>
               
               <CardContent className="p-6">
@@ -267,7 +275,7 @@ export default function PractitionerProfile({ id }: { id: string }) {
                         </div>
                         <div>
                           <div className="font-medium">{practitioner.name}</div>
-                          <div className="text-xs text-muted-foreground capitalize">{practitioner.specialism} • £{practitioner.sessionRateGbp}</div>
+                          <div className="text-xs text-muted-foreground capitalize">{practitioner.specialism} • {rateSummary(practitioner)}</div>
                         </div>
                       </div>
 

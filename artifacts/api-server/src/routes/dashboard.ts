@@ -110,6 +110,8 @@ router.get("/dashboard/popular-practitioners", async (_req, res) => {
       .map((p) => ({
         ...p!,
         sessionRateGbp: Number(p!.sessionRateGbp),
+        inPersonRateGbp: p!.inPersonRateGbp != null ? Number(p!.inPersonRateGbp) : null,
+        onlineRateGbp: p!.onlineRateGbp != null ? Number(p!.onlineRateGbp) : null,
         averageRating: p!.averageRating ? Number(p!.averageRating) : null,
         createdAt: p!.createdAt.toISOString(),
       }));
@@ -122,6 +124,8 @@ router.get("/dashboard/popular-practitioners", async (_req, res) => {
         .map((p) => ({
           ...p,
           sessionRateGbp: Number(p.sessionRateGbp),
+          inPersonRateGbp: p.inPersonRateGbp != null ? Number(p.inPersonRateGbp) : null,
+          onlineRateGbp: p.onlineRateGbp != null ? Number(p.onlineRateGbp) : null,
           averageRating: p.averageRating ? Number(p.averageRating) : null,
           createdAt: p.createdAt.toISOString(),
         }));

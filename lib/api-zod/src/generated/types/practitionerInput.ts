@@ -12,6 +12,8 @@ export interface PractitionerInput {
   specialism: string;
   bio: string;
   sessionRateGbp: number;
+  inPersonRateGbp?: number;
+  onlineRateGbp?: number;
   location?: string;
   qualifications?: string;
   avatarUrl?: string;

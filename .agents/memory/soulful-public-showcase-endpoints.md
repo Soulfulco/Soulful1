@@ -9,6 +9,13 @@ The existing `GET /companies` and `GET /practitioners` endpoints are public (no 
 return full rows via `db.select()` — including PII/business data (company `email`,
 `contactName`, `employeeCount`; practitioner `email`, `bio`, `sessionRateGbp`).
 
+NOTE: `GET /practitioners` (+ `:id`, create/patch/bulk) now route through a
+`serializePractitioner()` DTO helper that whitelists only schema fields, so they no
+longer leak `passwordHash` / `googleRefreshToken` / `googleEmail` / `stripeCustomerId`.
+They still return `email` and `bio`, so the showcase rule below still applies for
+truly anonymous marketing pages. Any new practitioner response MUST use the helper —
+never spread `...row`.
+
 **Rule:** When a public/anonymous-facing page (e.g. ForCorporates, ForPractitioners marketing
 banners) needs a list of entities, add a dedicated `/.../showcase` endpoint that selects only
 display-safe columns, and consume that via its generated hook. Do NOT reuse the full list
