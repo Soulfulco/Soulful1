@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, AlertCircle, Plus, Trash2, CalendarClock, LogOut } from "lucide-react";
+import { Loader2, AlertCircle, Plus, Trash2, CalendarClock, LogOut, CheckCircle2, RefreshCw } from "lucide-react";
 
 type Slot = {
   id: number;
@@ -39,6 +39,65 @@ export default function PractitionerPortal() {
   const [sessionType, setSessionType] = useState("1-on-1");
   const [adding, setAdding] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const [google, setGoogle] = useState<{ connected: boolean; email: string | null } | null>(null);
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const [googleMsg, setGoogleMsg] = useState<string | null>(null);
+
+  const loadGoogle = useCallback(async () => {
+    try {
+      const res = await fetch("/api/practitioner/me", { credentials: "include" });
+      if (!res.ok) return;
+      const data = (await res.json()) as { googleConnected?: boolean; googleEmail?: string | null };
+      setGoogle({ connected: Boolean(data.googleConnected), email: data.googleEmail ?? null });
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    loadGoogle();
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("google");
+    if (status) {
+      if (status === "connected") setGoogleMsg("Google Calendar connected.");
+      else if (status === "noaccess") setGoogleMsg("Google didn't grant calendar access. Please try again and allow all permissions.");
+      else setGoogleMsg("Couldn't connect Google Calendar. Please try again.");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [loadGoogle]);
+
+  async function handleGoogleSync() {
+    setGoogleBusy(true);
+    setGoogleMsg(null);
+    try {
+      const res = await fetch("/api/practitioner/google/sync", { method: "POST", credentials: "include" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Sync failed");
+      setGoogleMsg(`Synced. ${data.busyBlocks ?? 0} busy period(s) imported.`);
+      await load();
+    } catch (err) {
+      setGoogleMsg(err instanceof Error ? err.message : "Sync failed");
+    } finally {
+      setGoogleBusy(false);
+    }
+  }
+
+  async function handleGoogleDisconnect() {
+    setGoogleBusy(true);
+    setGoogleMsg(null);
+    try {
+      const res = await fetch("/api/practitioner/google/disconnect", { method: "POST", credentials: "include" });
+      if (!res.ok) throw new Error("Failed to disconnect");
+      setGoogle({ connected: false, email: null });
+      setGoogleMsg("Google Calendar disconnected.");
+      await load();
+    } catch (err) {
+      setGoogleMsg(err instanceof Error ? err.message : "Failed to disconnect");
+    } finally {
+      setGoogleBusy(false);
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -134,6 +193,48 @@ export default function PractitionerPortal() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <CalendarClock className="h-5 w-5" /> Google Calendar
+            </CardTitle>
+            <CardDescription>
+              Connect your calendar to block out busy times automatically and add confirmed
+              Soulful bookings to your schedule.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {google?.connected ? (
+              <>
+                <div className="flex items-center gap-2 text-sm">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <span>
+                    Connected{google.email ? ` as ${google.email}` : ""}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" onClick={handleGoogleSync} disabled={googleBusy}>
+                    {googleBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                    Sync now
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={handleGoogleDisconnect} disabled={googleBusy}>
+                    Disconnect
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <Button asChild>
+                <a href="/api/practitioner/google/connect">Connect Google Calendar</a>
+              </Button>
+            )}
+            {googleMsg && (
+              <Alert>
+                <AlertDescription>{googleMsg}</AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">

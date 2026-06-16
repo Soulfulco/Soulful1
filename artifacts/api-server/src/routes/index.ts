@@ -22,6 +22,7 @@ import siteContentRouter from "./siteContent";
 import storageRouter from "./storage";
 import stripeRouter from "./stripe";
 import eventsRouter from "./events";
+import googleCalendarRouter from "./googleCalendar";
 
 const router: IRouter = Router();
 
@@ -49,5 +50,6 @@ router.use(siteContentRouter);
 router.use(storageRouter);
 router.use(stripeRouter);
 router.use(eventsRouter);
+router.use(googleCalendarRouter);
 
 export default router;

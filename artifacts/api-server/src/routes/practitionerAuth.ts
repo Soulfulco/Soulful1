@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import crypto from "crypto";
 import { createSession, clearSession, getSessionId, SESSION_COOKIE, SESSION_TTL } from "../lib/auth";
 import { isAdmin, practitionerId } from "../lib/roles";
+import { isSameOrigin } from "../lib/csrf";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -88,6 +89,8 @@ router.get("/practitioner/me", async (req, res) => {
     specialism: p.specialism,
     avatarUrl: p.avatarUrl,
     isActive: p.isActive,
+    googleConnected: Boolean(p.googleRefreshToken),
+    googleEmail: p.googleEmail ?? null,
   });
 });
 
@@ -117,6 +120,7 @@ router.get("/practitioner/availability", async (req, res) => {
 router.post("/practitioner/availability", async (req, res) => {
   const id = practitionerId(req);
   if (!id) return res.status(401).json({ error: "Not authenticated" });
+  if (!isSameOrigin(req)) return res.status(403).json({ error: "Invalid request origin" });
   try {
     const { startTime, endTime, sessionType } = req.body ?? {};
     const start = new Date(startTime);
@@ -142,6 +146,7 @@ router.post("/practitioner/availability", async (req, res) => {
 router.delete("/practitioner/availability/:slotId", async (req, res) => {
   const id = practitionerId(req);
   if (!id) return res.status(401).json({ error: "Not authenticated" });
+  if (!isSameOrigin(req)) return res.status(403).json({ error: "Invalid request origin" });
   try {
     const slotId = Number(req.params.slotId);
     if (!slotId || Number.isNaN(slotId)) return res.status(400).json({ error: "Invalid slot id" });

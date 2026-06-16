@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { timeSlotsTable } from "@workspace/db";
+import { timeSlotsTable, googleBusyBlocksTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 const router = Router();
@@ -9,12 +9,21 @@ router.get("/practitioners/:id/availability", async (req, res) => {
   try {
     const id = Number(req.params.id);
     const slots = await db.select().from(timeSlotsTable).where(eq(timeSlotsTable.practitionerId, id));
+    const busy = await db
+      .select()
+      .from(googleBusyBlocksTable)
+      .where(eq(googleBusyBlocksTable.practitionerId, id));
+    // Hide slots that overlap a Google "busy" interval so they can't be booked.
+    const overlapsBusy = (start: Date, end: Date) =>
+      busy.some((b) => start < b.endTime && end > b.startTime);
     res.json(
-      slots.map((s) => ({
-        ...s,
-        startTime: s.startTime.toISOString(),
-        endTime: s.endTime.toISOString(),
-      })),
+      slots
+        .filter((s) => s.isBooked || !overlapsBusy(s.startTime, s.endTime))
+        .map((s) => ({
+          ...s,
+          startTime: s.startTime.toISOString(),
+          endTime: s.endTime.toISOString(),
+        })),
     );
   } catch {
     res.status(500).json({ error: "Failed to get availability" });

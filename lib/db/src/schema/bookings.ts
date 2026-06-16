@@ -17,6 +17,7 @@ export const bookingsTable = pgTable("bookings", {
   employeeName: text("employee_name").notNull(),
   employeeEmail: text("employee_email").notNull(),
   notes: text("notes"),
+  googleEventId: text("google_event_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
