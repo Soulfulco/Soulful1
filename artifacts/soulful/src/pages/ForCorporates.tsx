@@ -92,7 +92,7 @@ export default function ForCorporates() {
             {c("corp_hero_headline", "Invest in the soul of your company.")}
           </h1>
           <p className="text-xl text-muted-foreground">
-            {c("corp_hero_body", "Give your team access to the UK's top wellbeing practitioners — personal trainers, yoga instructors, therapists, coaches, and more — at negotiated corporate rates.")}
+            {c("corp_hero_body", "Give your team access to the UK's top wellbeing practitioners — personal trainers, yoga instructors, therapists, coaches, and more — all in one place.")}
           </p>
         </div>
       </div>
@@ -120,11 +120,8 @@ export default function ForCorporates() {
               <p className="font-medium text-foreground">How Soulful billing works</p>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 Your subscription covers <strong className="text-foreground">platform access and a monthly session allowance</strong> — the timetable, booking system, employee portal, and HR dashboard.
-                Each plan includes a set number of sessions per month at Soulful's negotiated corporate rates.
+                Each plan includes a set number of sessions per month.
                 Sessions beyond your included allowance are billed at the same per-session rate.
-                <br /><br />
-                Practitioners publicly charge £60–£250/session. Because Soulful delivers guaranteed volume,
-                we negotiate wholesale rates and pass the saving directly to you.
               </p>
             </div>
           </div>
