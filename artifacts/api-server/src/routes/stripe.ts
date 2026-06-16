@@ -10,6 +10,7 @@ import {
 import { eq, sql } from "drizzle-orm";
 import { getUncachableStripeClient } from "../stripeClient";
 import { logger } from "../lib/logger";
+import { isAdmin } from "../lib/roles";
 
 const router = Router();
 
@@ -164,6 +165,7 @@ router.post("/stripe/portal", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ error: "Not authenticated" });
     const { companyId, practitionerId, returnPath } = req.body ?? {};
     const isHr = req.user.id.startsWith("hr:");
+    if (!isHr && !isAdmin(req)) return res.status(403).json({ error: "Forbidden" });
 
     let targetCompanyId = companyId ? Number(companyId) : null;
     let targetPractitionerId = practitionerId ? Number(practitionerId) : null;
@@ -218,6 +220,7 @@ router.get("/stripe/subscription", async (req, res) => {
   try {
     if (!req.isAuthenticated()) return res.status(401).json({ error: "Not authenticated" });
     const isHr = req.user.id.startsWith("hr:");
+    if (!isHr && !isAdmin(req)) return res.status(403).json({ error: "Forbidden" });
 
     let companyId = req.query.companyId ? Number(req.query.companyId) : null;
     let practitionerId = req.query.practitionerId ? Number(req.query.practitionerId) : null;

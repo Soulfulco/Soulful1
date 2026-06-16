@@ -2,12 +2,10 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { specialismsTable } from "@workspace/db";
 import { asc, eq, ilike } from "drizzle-orm";
+import { isAdmin } from "../lib/roles";
 
 const router = Router();
 
-function isAdmin(req: Express.Request): boolean {
-  return req.isAuthenticated() && !req.user.id.startsWith("hr:");
-}
 
 router.get("/specialisms", async (_req, res) => {
   try {

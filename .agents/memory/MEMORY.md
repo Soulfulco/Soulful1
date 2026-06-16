@@ -1,5 +1,1 @@
-- [Soulful public showcase endpoints](soulful-public-showcase-endpoints.md) — public list endpoints leak PII; use field-projected /showcase routes for marketing pages.
-- [drizzle-kit push TTY limitation](drizzle-kit-push-tty.md) — push can hang on rename-conflict prompt with no TTY; create new tables via psql SQL instead.
-- [Vite "Importing a module script failed"](vite-module-script-failed.md) — usually a transient dep-reoptimize/codegen artifact; restart web workflow before treating as a real bug.
-- [Specialisms stay in sync](specialisms-sync.md) — free-text specialism entry (bulk import) must auto-create missing rows in the managed `specialisms` table.
-- [Event registration integrity](event-registration-integrity.md) — pending paid reservations must count as held seats; partial unique index + row-lock txn prevent oversell/dupes; confirm just flips status.
+- [Multi-role session gating](role-session-gating.md) — Soulful sessions are id-prefixed (`hr:`, `pract:`, admin=neither); never gate admin with inverse `startsWith("hr:")` checks.

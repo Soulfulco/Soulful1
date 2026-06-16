@@ -6,20 +6,23 @@ import { Loader2 } from "lucide-react";
 type Props = {
   children: React.ReactNode;
   requireAdmin?: boolean;
+  requirePractitioner?: boolean;
 };
 
-export default function ProtectedRoute({ children, requireAdmin = false }: Props) {
-  const { isAuthenticated, isAdminUser, isLoading } = useAuth();
+export default function ProtectedRoute({ children, requireAdmin = false, requirePractitioner = false }: Props) {
+  const { isAuthenticated, isAdminUser, isPractitionerUser, isLoading } = useAuth();
   const [, navigate] = useLocation();
 
   useEffect(() => {
     if (isLoading) return;
     if (!isAuthenticated) {
-      navigate("/dashboard/login");
+      navigate(requirePractitioner ? "/practitioner/login" : "/dashboard/login");
+    } else if (requirePractitioner && !isPractitionerUser) {
+      navigate("/practitioner/login");
     } else if (requireAdmin && !isAdminUser) {
       navigate("/dashboard");
     }
-  }, [isLoading, isAuthenticated, isAdminUser, requireAdmin, navigate]);
+  }, [isLoading, isAuthenticated, isAdminUser, isPractitionerUser, requireAdmin, requirePractitioner, navigate]);
 
   if (isLoading) {
     return (
@@ -30,6 +33,7 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Props
   }
 
   if (!isAuthenticated) return null;
+  if (requirePractitioner && !isPractitionerUser) return null;
   if (requireAdmin && !isAdminUser) return null;
 
   return <>{children}</>;

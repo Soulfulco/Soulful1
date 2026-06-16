@@ -176,6 +176,7 @@ export interface PractitionerInput {
   location?: string;
   qualifications?: string;
   avatarUrl?: string;
+  password?: string;
 }
 
 export interface Event {

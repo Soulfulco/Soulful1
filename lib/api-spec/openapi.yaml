@@ -1589,6 +1589,7 @@ components:
         location:      { type: string }
         qualifications: { type: string }
         avatarUrl:     { type: string }
+        password:      { type: string }
 
     Event:
       type: object

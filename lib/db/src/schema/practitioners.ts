@@ -8,6 +8,7 @@ export const practitionersTable = pgTable("practitioners", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
+  passwordHash: text("password_hash"),
   specialism: text("specialism").notNull(),
   bio: text("bio").notNull(),
   sessionRateGbp: numeric("session_rate_gbp", { precision: 10, scale: 2 }).notNull(),

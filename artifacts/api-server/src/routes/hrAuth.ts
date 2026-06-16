@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import crypto from "crypto";
 import { createSession, clearSession, getSessionId, SESSION_COOKIE, SESSION_TTL } from "../lib/auth";
+import { isAdmin } from "../lib/roles";
 
 const router = Router();
 
@@ -107,8 +108,8 @@ router.get("/hr/me", async (req, res) => {
 // Admin: create an HR user for a company (Soulful admin only)
 router.post("/hr/users", async (req, res) => {
   if (!req.isAuthenticated()) return res.status(401).json({ error: "Not authenticated" });
-  // Only Replit-authed admins (non-hr: prefix) can create HR accounts
-  if (req.user.id.startsWith("hr:")) return res.status(403).json({ error: "Forbidden" });
+  // Only Soulful admins can create HR accounts (excludes hr: and pract: sessions)
+  if (!isAdmin(req)) return res.status(403).json({ error: "Forbidden" });
 
   try {
     const { companyId, email, password, name } = req.body;
@@ -135,7 +136,7 @@ router.post("/hr/users", async (req, res) => {
 // Admin: list HR users
 router.get("/hr/users", async (req, res) => {
   if (!req.isAuthenticated()) return res.status(401).json({ error: "Not authenticated" });
-  if (req.user.id.startsWith("hr:")) return res.status(403).json({ error: "Forbidden" });
+  if (!isAdmin(req)) return res.status(403).json({ error: "Forbidden" });
   try {
     const result = await db.execute(sql`
       SELECT hr.id, hr.email, hr.name, hr.role, hr.is_active, hr.created_at,

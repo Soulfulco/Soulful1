@@ -2,12 +2,10 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { practitionersTable, specialismsTable } from "@workspace/db";
 import { and, eq, ilike, or, sql } from "drizzle-orm";
+import { isAdmin } from "../lib/roles";
+import { hashPassword } from "./practitionerAuth";
 
 const router = Router();
-
-function isAdmin(req: Express.Request): boolean {
-  return req.isAuthenticated() && !req.user.id.startsWith("hr:");
-}
 
 router.get("/practitioners", async (req, res) => {
   try {
@@ -45,10 +43,18 @@ router.get("/practitioners", async (req, res) => {
 
 router.post("/practitioners", async (req, res) => {
   try {
-    const { name, email, specialism, bio, sessionRateGbp, location, qualifications, avatarUrl } = req.body;
+    const { name, email, specialism, bio, sessionRateGbp, location, qualifications, avatarUrl, password } = req.body;
+    let passwordHash: string | undefined;
+    if (password !== undefined && password !== null && password !== "") {
+      if (typeof password !== "string" || password.length < 8) {
+        return res.status(400).json({ error: "Password must be at least 8 characters" });
+      }
+      passwordHash = hashPassword(password);
+    }
+    const normalizedEmail = typeof email === "string" ? email.toLowerCase().trim() : email;
     const [p] = await db
       .insert(practitionersTable)
-      .values({ name, email, specialism, bio, sessionRateGbp: String(sessionRateGbp), location, qualifications, avatarUrl })
+      .values({ name, email: normalizedEmail, specialism, bio, sessionRateGbp: String(sessionRateGbp), location, qualifications, avatarUrl, passwordHash })
       .returning();
     res.status(201).json({ ...p, sessionRateGbp: Number(p.sessionRateGbp), averageRating: null, createdAt: p.createdAt.toISOString() });
   } catch (err) {

@@ -188,7 +188,8 @@ export const CreatePractitionerBody = zod.object({
   "sessionRateGbp": zod.number(),
   "location": zod.string().optional(),
   "qualifications": zod.string().optional(),
-  "avatarUrl": zod.string().optional()
+  "avatarUrl": zod.string().optional(),
+  "password": zod.string().optional()
 })
 
 

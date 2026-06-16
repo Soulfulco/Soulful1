@@ -8,6 +8,7 @@ import {
   practitionersTable,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { isAdmin } from "../lib/roles";
 
 const router = Router();
 
@@ -23,7 +24,7 @@ router.get("/subscriptions", async (_req, res) => {
 router.put("/subscriptions/:id", async (req, res) => {
   try {
     if (!req.isAuthenticated()) return res.status(401).json({ error: "Not authenticated" });
-    if (req.user.id.startsWith("hr:")) return res.status(403).json({ error: "Forbidden" });
+    if (!isAdmin(req)) return res.status(403).json({ error: "Forbidden" });
 
     const id = Number(req.params.id);
     if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid plan id" });

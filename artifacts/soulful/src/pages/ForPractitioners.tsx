@@ -45,6 +45,7 @@ export default function ForPractitioners() {
     location: "",
     qualifications: "",
     avatarUrl: "",
+    password: "",
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -55,6 +56,10 @@ export default function ForPractitioners() {
     }
     if (!formData.specialism) {
       toast({ title: "Select a specialism", description: "Please choose your primary specialism.", variant: "destructive" });
+      return;
+    }
+    if (formData.password.length < 8) {
+      toast({ title: "Choose a password", description: "Your portal password must be at least 8 characters.", variant: "destructive" });
       return;
     }
 
@@ -68,6 +73,7 @@ export default function ForPractitioners() {
         location: formData.location,
         qualifications: formData.qualifications,
         avatarUrl: formData.avatarUrl || undefined,
+        password: formData.password,
       }
     }, {
       onSuccess: (practitioner) => {
@@ -231,6 +237,22 @@ export default function ForPractitioners() {
                         onChange={(e) => setFormData({...formData, email: e.target.value})}
                       />
                     </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="password">Portal Password</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      required
+                      minLength={8}
+                      autoComplete="new-password"
+                      className="bg-background h-11"
+                      value={formData.password}
+                      onChange={(e) => setFormData({...formData, password: e.target.value})}
+                      placeholder="At least 8 characters"
+                    />
+                    <p className="text-xs text-muted-foreground">You'll use this to log in to your practitioner portal and manage availability.</p>
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-5">

@@ -22,6 +22,8 @@ const Locations = lazy(() => import("@/pages/Locations"));
 const Join = lazy(() => import("@/pages/Join"));
 const EmployeePortal = lazy(() => import("@/pages/EmployeePortal"));
 const DashboardLogin = lazy(() => import("@/pages/DashboardLogin"));
+const PractitionerLogin = lazy(() => import("@/pages/PractitionerLogin"));
+const PractitionerPortal = lazy(() => import("@/pages/PractitionerPortal"));
 
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const DashboardBookings = lazy(() => import("@/pages/DashboardBookings"));
@@ -100,6 +102,16 @@ function Router() {
         {/* Login */}
         <Route path="/dashboard/login">
           <DashboardLogin />
+        </Route>
+
+        {/* Practitioner portal */}
+        <Route path="/practitioner/login">
+          <PractitionerLogin />
+        </Route>
+        <Route path="/practitioner/portal">
+          <ProtectedRoute requirePractitioner>
+            <PractitionerPortal />
+          </ProtectedRoute>
         </Route>
 
         {/* Protected Dashboard Routes */}

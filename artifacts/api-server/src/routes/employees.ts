@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import { employeesTable, companiesTable, bookingsTable } from "@workspace/db/schema";
 import { eq, and, sql } from "drizzle-orm";
+import { isAdmin } from "../lib/roles";
 
 // Authorize a write to a company's employees:
 // - must be authenticated
@@ -22,6 +23,12 @@ async function authorizeCompanyWrite(req: Request, res: Response, companyId: num
       res.status(403).json({ error: "Forbidden" });
       return false;
     }
+    return true;
+  }
+  // Non-HR sessions must be Soulful admins; practitioners and other roles are forbidden.
+  if (!isAdmin(req)) {
+    res.status(403).json({ error: "Forbidden" });
+    return false;
   }
   return true;
 }

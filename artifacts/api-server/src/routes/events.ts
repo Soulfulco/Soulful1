@@ -4,12 +4,10 @@ import { eventsTable, eventRegistrationsTable } from "@workspace/db";
 import { and, asc, count, desc, eq, gte, ilike, inArray, sql } from "drizzle-orm";
 import { getUncachableStripeClient } from "../stripeClient";
 import { logger } from "../lib/logger";
+import { isAdmin } from "../lib/roles";
 
 const router = Router();
 
-function isAdmin(req: Express.Request): boolean {
-  return req.isAuthenticated() && !req.user.id.startsWith("hr:");
-}
 
 function baseUrl(): string {
   const domain = process.env.REPLIT_DOMAINS?.split(",")[0];
