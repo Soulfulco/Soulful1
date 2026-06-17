@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useCreateCompany, useListSubscriptions, getListSubscriptionsQueryKey, useCreateStripeCheckout, useListPractitionerShowcase, type PractitionerShowcase } from "@workspace/api-client-react";
 import { LogoMarquee } from "@/components/LogoMarquee";
 import { useSiteContent } from "@/hooks/useSiteContent";
+import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ export default function ForCorporates() {
   const c = useSiteContent();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { refetch } = useAuth();
 
   const { data: plans, isLoading: plansLoading } = useListSubscriptions({
     query: { queryKey: getListSubscriptionsQueryKey() }
@@ -27,6 +29,10 @@ export default function ForCorporates() {
   const createCompany = useCreateCompany();
   const startCheckout = useCreateStripeCheckout();
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
+  const [registering, setRegistering] = useState(false);
+
+  const selectedPlan = corporatePlans.find(p => p.id === selectedPlanId);
+  const isFreePlan = !!selectedPlan && Number(selectedPlan.priceGbp) === 0 && !selectedPlan.stripePriceId;
 
   const [formData, setFormData] = useState({
     name: "",
@@ -34,6 +40,7 @@ export default function ForCorporates() {
     industry: "",
     employeeCount: "",
     contactName: "",
+    password: "",
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -42,6 +49,45 @@ export default function ForCorporates() {
       toast({ title: "Select a plan", description: "Please select a subscription plan first.", variant: "destructive" });
       return;
     }
+
+    if (isFreePlan) {
+      if (formData.password.length < 8) {
+        toast({ title: "Choose a password", description: "Your account password must be at least 8 characters.", variant: "destructive" });
+        return;
+      }
+      setRegistering(true);
+      (async () => {
+        try {
+          const res = await fetch("/api/hr/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              name: formData.name,
+              email: formData.email,
+              industry: formData.industry,
+              employeeCount: parseInt(formData.employeeCount, 10),
+              contactName: formData.contactName,
+              password: formData.password,
+              planId: selectedPlanId,
+            }),
+          });
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            throw new Error(body.error || "Registration failed");
+          }
+          await refetch();
+          toast({ title: "Welcome to Soulful!", description: "Your free account is ready." });
+          setLocation("/dashboard");
+        } catch (err) {
+          toast({ title: "Registration failed", description: err instanceof Error ? err.message : "Please try again.", variant: "destructive" });
+        } finally {
+          setRegistering(false);
+        }
+      })();
+      return;
+    }
+
     createCompany.mutate({
       data: {
         name: formData.name,
@@ -240,8 +286,14 @@ export default function ForCorporates() {
                             <CardDescription className="mt-1 text-xs leading-relaxed">{plan.description}</CardDescription>
                           </div>
                           <div className="text-right flex-shrink-0 ml-4">
-                            <span className="text-2xl font-serif font-bold text-foreground">£{plan.priceGbp}</span>
-                            <span className="text-muted-foreground text-sm">/mo</span>
+                            {Number(plan.priceGbp) === 0 ? (
+                              <span className="text-2xl font-serif font-bold text-foreground">Free</span>
+                            ) : (
+                              <>
+                                <span className="text-2xl font-serif font-bold text-foreground">£{plan.priceGbp}</span>
+                                <span className="text-muted-foreground text-sm">/mo</span>
+                              </>
+                            )}
                           </div>
                         </div>
                         {sessionFeature && rateFeature && (
@@ -375,12 +427,29 @@ export default function ForCorporates() {
                     </div>
                   </div>
 
+                  {isFreePlan && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="password">Create a Password</Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        required
+                        minLength={8}
+                        autoComplete="new-password"
+                        className="bg-background h-11"
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground">You'll log in with your admin email and this password.</p>
+                    </div>
+                  )}
+
                   <Button
                     type="submit"
                     className="w-full h-12 rounded-full text-base mt-4"
-                    disabled={createCompany.isPending || startCheckout.isPending || !selectedPlanId}
+                    disabled={createCompany.isPending || startCheckout.isPending || registering || !selectedPlanId}
                   >
-                    {createCompany.isPending || startCheckout.isPending ? "Creating account..." : selectedPlanId ? "Complete Registration" : "Select a plan first"}
+                    {createCompany.isPending || startCheckout.isPending || registering ? "Creating account..." : selectedPlanId ? (isFreePlan ? "Create free account" : "Complete Registration") : "Select a plan first"}
                   </Button>
                 </form>
               </CardContent>

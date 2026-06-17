@@ -7,7 +7,7 @@ import {
   companiesTable,
   practitionersTable,
 } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { isAdmin } from "../lib/roles";
 
 const router = Router();
@@ -18,6 +18,87 @@ router.get("/subscriptions", async (_req, res) => {
     res.json(plans.map((p) => ({ ...p, priceGbp: Number(p.priceGbp) })));
   } catch {
     res.status(500).json({ error: "Failed to list plans" });
+  }
+});
+
+// Public: record a FREE-plan subscription during self-serve sign-up. Only accepts
+// plans with no price / no Stripe link — paid plans must go through checkout.
+router.post("/subscriptions/start-free", async (req, res) => {
+  try {
+    // Must be signed in: the caller has to own the entity they're subscribing.
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Not authenticated" });
+    const userId = req.user.id as string;
+
+    const { companyId, practitionerId, planId } = req.body ?? {};
+    const pid = Number(planId);
+    if (!pid || Number.isNaN(pid)) return res.status(400).json({ error: "planId is required" });
+
+    const hasCompany = companyId !== undefined && companyId !== null && companyId !== "";
+    const hasPractitioner =
+      practitionerId !== undefined && practitionerId !== null && practitionerId !== "";
+    if (hasCompany === hasPractitioner) {
+      return res
+        .status(400)
+        .json({ error: "Provide exactly one of companyId or practitionerId" });
+    }
+
+    // Ownership: a practitioner session may only subscribe its own profile; an HR
+    // session may only subscribe its own company. Anything else is forbidden.
+    if (hasPractitioner && userId !== `pract:${Number(practitionerId)}`) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    if (hasCompany) {
+      if (!userId.startsWith("hr:")) return res.status(403).json({ error: "Forbidden" });
+      const hrId = Number(userId.slice(3));
+      const owns = await db.execute(
+        sql`SELECT 1 FROM hr_users WHERE id = ${hrId} AND company_id = ${Number(companyId)} AND is_active = true`,
+      );
+      if (owns.rows.length === 0) return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [plan] = await db
+      .select()
+      .from(subscriptionPlansTable)
+      .where(eq(subscriptionPlansTable.id, pid))
+      .limit(1);
+    if (!plan) return res.status(404).json({ error: "Plan not found" });
+    if (plan.stripePriceId || Number(plan.priceGbp) > 0) {
+      return res.status(400).json({ error: "This plan is not free" });
+    }
+    const expectedType = hasCompany ? "corporate" : "practitioner";
+    if (plan.planType !== expectedType) {
+      return res
+        .status(400)
+        .json({ error: `Plan is a ${plan.planType} plan and cannot be used here` });
+    }
+
+    if (hasCompany) {
+      const cId = Number(companyId);
+      const [company] = await db
+        .select()
+        .from(companiesTable)
+        .where(eq(companiesTable.id, cId))
+        .limit(1);
+      if (!company) return res.status(404).json({ error: "Company not found" });
+      await db
+        .insert(companySubscriptionsTable)
+        .values({ companyId: cId, planId: pid, status: "active" });
+    } else {
+      const prId = Number(practitionerId);
+      const [practitioner] = await db
+        .select()
+        .from(practitionersTable)
+        .where(eq(practitionersTable.id, prId))
+        .limit(1);
+      if (!practitioner) return res.status(404).json({ error: "Practitioner not found" });
+      await db
+        .insert(practitionerSubscriptionsTable)
+        .values({ practitionerId: prId, planId: pid, status: "active" });
+    }
+
+    res.status(201).json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Failed to start free subscription" });
   }
 });
 

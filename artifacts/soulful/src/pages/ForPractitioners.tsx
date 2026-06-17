@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useCreatePractitioner, useListSubscriptions, getListSubscriptionsQueryKey, useCreateStripeCheckout, useListCompanyShowcase, type CompanyShowcase, useListSpecialisms, getListSpecialismsQueryKey } from "@workspace/api-client-react";
 import { LogoMarquee } from "@/components/LogoMarquee";
 import { useSiteContent } from "@/hooks/useSiteContent";
+import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ export default function ForPractitioners() {
   const c = useSiteContent();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { refetch } = useAuth();
 
   const { data: specialismsData } = useListSpecialisms({
     query: { queryKey: getListSpecialismsQueryKey() }
@@ -35,6 +37,9 @@ export default function ForPractitioners() {
   const createPractitioner = useCreatePractitioner();
   const startCheckout = useCreateStripeCheckout();
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
+
+  const selectedPlan = practitionerPlans.find(p => p.id === selectedPlanId);
+  const isFreePlan = !!selectedPlan && Number(selectedPlan.priceGbp) === 0 && !selectedPlan.stripePriceId;
   
   const [formData, setFormData] = useState({
     name: "",
@@ -85,7 +90,33 @@ export default function ForPractitioners() {
         password: formData.password,
       }
     }, {
-      onSuccess: (practitioner) => {
+      onSuccess: async (practitioner) => {
+        if (isFreePlan) {
+          try {
+            // Log in first so the free-subscription call is authenticated as this
+            // practitioner (the endpoint enforces ownership).
+            const loginRes = await fetch("/api/practitioner/login", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ email: formData.email, password: formData.password }),
+            });
+            if (!loginRes.ok) throw new Error("login failed");
+            const subRes = await fetch("/api/subscriptions/start-free", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ practitionerId: practitioner.id, planId: selectedPlanId }),
+            });
+            if (!subRes.ok) throw new Error("subscription failed");
+            await refetch();
+            toast({ title: "You're listed!", description: "Your free practitioner profile is now live." });
+          } catch {
+            toast({ title: "Profile created", description: "Your free listing was created — please log in to finish setting it up.", variant: "destructive" });
+          }
+          setLocation("/dashboard");
+          return;
+        }
         startCheckout.mutate({
           data: {
             planId: selectedPlanId,
@@ -167,8 +198,14 @@ export default function ForPractitioners() {
                           <CardDescription className="mt-1">{plan.description}</CardDescription>
                         </div>
                         <div className="text-right">
-                          <span className="text-2xl font-serif font-bold text-foreground">£{plan.priceGbp}</span>
-                          <span className="text-muted-foreground text-sm">/mo</span>
+                          {Number(plan.priceGbp) === 0 ? (
+                            <span className="text-2xl font-serif font-bold text-foreground">Free</span>
+                          ) : (
+                            <>
+                              <span className="text-2xl font-serif font-bold text-foreground">£{plan.priceGbp}</span>
+                              <span className="text-muted-foreground text-sm">/mo</span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </CardHeader>
