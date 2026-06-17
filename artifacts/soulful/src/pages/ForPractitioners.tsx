@@ -1,9 +1,7 @@
 import { useState } from "react";
-import { useCreatePractitioner, useListSubscriptions, getListSubscriptionsQueryKey, useCreateStripeCheckout, useListCompanyShowcase, type CompanyShowcase, useListSpecialisms, getListSpecialismsQueryKey } from "@workspace/api-client-react";
+import { useCreatePractitioner, useListSubscriptions, getListSubscriptionsQueryKey, useListCompanyShowcase, type CompanyShowcase, useListSpecialisms, getListSpecialismsQueryKey } from "@workspace/api-client-react";
 import { LogoMarquee } from "@/components/LogoMarquee";
 import { useSiteContent } from "@/hooks/useSiteContent";
-import { useAuth } from "@/contexts/AuthContext";
-import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -16,9 +14,7 @@ import { PhotoUpload } from "@/components/PhotoUpload";
 
 export default function ForPractitioners() {
   const c = useSiteContent();
-  const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { refetch } = useAuth();
 
   const { data: specialismsData } = useListSpecialisms({
     query: { queryKey: getListSpecialismsQueryKey() }
@@ -35,11 +31,8 @@ export default function ForPractitioners() {
   const partnerCompanies = companies || [];
 
   const createPractitioner = useCreatePractitioner();
-  const startCheckout = useCreateStripeCheckout();
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
-
-  const selectedPlan = practitionerPlans.find(p => p.id === selectedPlanId);
-  const isFreePlan = !!selectedPlan && Number(selectedPlan.priceGbp) === 0 && !selectedPlan.stripePriceId;
+  const [submitted, setSubmitted] = useState(false);
   
   const [formData, setFormData] = useState({
     name: "",
@@ -90,54 +83,12 @@ export default function ForPractitioners() {
         password: formData.password,
       }
     }, {
-      onSuccess: async (practitioner) => {
-        if (isFreePlan) {
-          try {
-            // Log in first so the free-subscription call is authenticated as this
-            // practitioner (the endpoint enforces ownership).
-            const loginRes = await fetch("/api/practitioner/login", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              credentials: "include",
-              body: JSON.stringify({ email: formData.email, password: formData.password }),
-            });
-            if (!loginRes.ok) throw new Error("login failed");
-            const subRes = await fetch("/api/subscriptions/start-free", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              credentials: "include",
-              body: JSON.stringify({ practitionerId: practitioner.id, planId: selectedPlanId }),
-            });
-            if (!subRes.ok) throw new Error("subscription failed");
-            await refetch();
-            toast({ title: "You're listed!", description: "Your free practitioner profile is now live." });
-          } catch {
-            toast({ title: "Profile created", description: "Your free listing was created — please log in to finish setting it up.", variant: "destructive" });
-          }
-          setLocation("/dashboard");
-          return;
-        }
-        startCheckout.mutate({
-          data: {
-            planId: selectedPlanId,
-            practitionerId: practitioner.id,
-            successPath: "/dashboard",
-            cancelPath: "/for-practitioners",
-          },
-        }, {
-          onSuccess: (session) => {
-            if (session.url) {
-              window.location.href = session.url;
-            } else {
-              toast({ title: "Application submitted", description: "Your profile is pending review. Set up billing from your dashboard." });
-              setLocation("/dashboard");
-            }
-          },
-          onError: () => {
-            toast({ title: "Application submitted", description: "Your profile was created, but we couldn't open checkout. You can set up billing from your dashboard.", variant: "destructive" });
-            setLocation("/dashboard");
-          },
-        });
+      onSuccess: () => {
+        // New practitioners are not listed instantly: their application goes to the
+        // Soulful team for review and an onboarding call before the profile goes live.
+        setSubmitted(true);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        toast({ title: "Application received", description: "Thanks! Our team will review your application and arrange a call before your profile goes live." });
       },
       onError: () => {
         toast({ title: "Submission failed", description: "Please check your details and try again.", variant: "destructive" });
@@ -255,6 +206,21 @@ export default function ForPractitioners() {
           {/* Right col: Form */}
           <div>
             <Card className="rounded-3xl border-none shadow-lg bg-card">
+              {submitted ? (
+              <CardContent className="py-16 text-center space-y-4">
+                <div className="mx-auto w-14 h-14 rounded-full bg-secondary/10 flex items-center justify-center">
+                  <CheckCircle2 className="h-7 w-7 text-secondary" />
+                </div>
+                <h2 className="text-2xl font-serif text-foreground">Application received</h2>
+                <p className="text-muted-foreground max-w-sm mx-auto leading-relaxed">
+                  Thank you for applying to Soulful. Our team will review your details and reach out to arrange a short call before your profile goes live. Once you're approved, you can sign in to your practitioner portal with the password you just set.
+                </p>
+                <Button asChild variant="outline" className="rounded-full mt-2">
+                  <a href="/">Back to home</a>
+                </Button>
+              </CardContent>
+              ) : (
+              <>
               <CardHeader className="pb-6">
                 <CardTitle className="text-2xl font-serif">Apply to join</CardTitle>
                 <CardDescription>Tell us about your practice.</CardDescription>
@@ -382,12 +348,14 @@ export default function ForPractitioners() {
                   <Button 
                     type="submit" 
                     className="w-full h-12 rounded-full text-base mt-4 bg-secondary hover:bg-secondary/90 text-secondary-foreground" 
-                    disabled={createPractitioner.isPending || startCheckout.isPending || !selectedPlanId}
+                    disabled={createPractitioner.isPending || !selectedPlanId}
                   >
-                    {createPractitioner.isPending || startCheckout.isPending ? "Submitting..." : selectedPlanId ? "Submit Application" : "Select a plan first"}
+                    {createPractitioner.isPending ? "Submitting..." : selectedPlanId ? "Submit Application" : "Select a plan first"}
                   </Button>
                 </form>
               </CardContent>
+              </>
+              )}
             </Card>
           </div>
         </div>

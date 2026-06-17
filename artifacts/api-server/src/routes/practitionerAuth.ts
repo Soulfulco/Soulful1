@@ -89,6 +89,7 @@ router.get("/practitioner/me", async (req, res) => {
     specialism: p.specialism,
     avatarUrl: p.avatarUrl,
     isActive: p.isActive,
+    approvalStatus: p.approvalStatus,
     googleConnected: Boolean(p.googleRefreshToken),
     googleEmail: p.googleEmail ?? null,
   });

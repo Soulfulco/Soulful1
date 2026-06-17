@@ -1551,7 +1551,7 @@ components:
     # ── Practitioner ────────────────────────────────────────────────────────
     Practitioner:
       type: object
-      required: [id, name, email, specialism, bio, sessionRateGbp, isActive, subscriptionStatus, avatarUrl, createdAt]
+      required: [id, name, email, specialism, bio, sessionRateGbp, isActive, approvalStatus, subscriptionStatus, avatarUrl, createdAt]
       properties:
         id:            { type: integer }
         name:          { type: string }
@@ -1562,6 +1562,7 @@ components:
         inPersonRateGbp: { type: ["number", "null"] }
         onlineRateGbp:  { type: ["number", "null"] }
         isActive:      { type: boolean }
+        approvalStatus: { type: string, enum: [pending, approved, rejected] }
         subscriptionStatus: { type: string, enum: [active, inactive, trial] }
         avatarUrl:     { type: ["string", "null"] }
         location:      { type: ["string", "null"] }
@@ -1732,6 +1733,7 @@ components:
         qualifications: { type: string }
         avatarUrl:     { type: string }
         isActive:      { type: boolean }
+        approvalStatus: { type: string, enum: [pending, approved, rejected] }
 
     # ── Specialism ──────────────────────────────────────────────────────────
     Specialism:

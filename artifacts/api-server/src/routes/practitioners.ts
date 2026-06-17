@@ -23,6 +23,7 @@ export function serializePractitioner(p: PractitionerRow) {
     inPersonRateGbp: p.inPersonRateGbp != null ? Number(p.inPersonRateGbp) : null,
     onlineRateGbp: p.onlineRateGbp != null ? Number(p.onlineRateGbp) : null,
     isActive: p.isActive,
+    approvalStatus: p.approvalStatus,
     subscriptionStatus: p.subscriptionStatus,
     avatarUrl: p.avatarUrl,
     location: p.location,
@@ -81,6 +82,10 @@ router.post("/practitioners", async (req, res) => {
     if (baseRate == null) {
       return res.status(400).json({ error: "At least one of in-person or online rate is required" });
     }
+    // Admin-created practitioners go live immediately; public self-registrations
+    // are held as pending applications (hidden) until an admin approves them and
+    // arranges an onboarding call.
+    const adminCreating = isAdmin(req);
     const [p] = await db
       .insert(practitionersTable)
       .values({
@@ -95,6 +100,8 @@ router.post("/practitioners", async (req, res) => {
         qualifications,
         avatarUrl,
         passwordHash,
+        approvalStatus: adminCreating ? "approved" : "pending",
+        isActive: adminCreating,
       })
       .returning();
     res.status(201).json(serializePractitioner(p));
@@ -213,7 +220,11 @@ router.post("/practitioners/bulk", async (req, res) => {
       }
     }
 
-    const created = toInsert.length > 0 ? await db.insert(practitionersTable).values(toInsert).returning() : [];
+    // Bulk import is admin-only (gated above), so imported practitioners are
+    // trusted and go straight to approved.
+    const created = toInsert.length > 0
+      ? await db.insert(practitionersTable).values(toInsert.map((r) => ({ ...r, approvalStatus: "approved" as const }))).returning()
+      : [];
     return res.status(201).json({
       created: created.length,
       skipped: rows.length - created.length - invalid.length,
@@ -241,7 +252,7 @@ router.patch("/practitioners/:id", async (req, res) => {
   try {
     if (!isAdmin(req)) return res.status(401).json({ error: "Not authorised" });
     const id = Number(req.params.id);
-    const { name, bio, specialism, inPersonRateGbp, onlineRateGbp, location, qualifications, avatarUrl, isActive } = req.body;
+    const { name, bio, specialism, inPersonRateGbp, onlineRateGbp, location, qualifications, avatarUrl, isActive, approvalStatus } = req.body;
     const updates: Record<string, unknown> = {};
     if (name !== undefined) updates.name = name;
     if (bio !== undefined) updates.bio = bio;
@@ -249,7 +260,25 @@ router.patch("/practitioners/:id", async (req, res) => {
     if (location !== undefined) updates.location = location;
     if (qualifications !== undefined) updates.qualifications = qualifications;
     if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
-    if (isActive !== undefined) updates.isActive = isActive;
+    // Invariant: a practitioner is only ever live (isActive) when approved. The
+    // public directory, profile lookup and login gate on isActive, so we must
+    // never leave a live-but-unapproved profile. Activating implies approval;
+    // pending/rejected always force inactive.
+    if (approvalStatus !== undefined) {
+      if (!["pending", "approved", "rejected"].includes(approvalStatus)) {
+        return res.status(400).json({ error: "Invalid approvalStatus" });
+      }
+      if (approvalStatus !== "approved" && isActive === true) {
+        return res
+          .status(400)
+          .json({ error: "Cannot activate a practitioner that hasn't been approved" });
+      }
+      updates.approvalStatus = approvalStatus;
+      updates.isActive = approvalStatus === "approved" ? (isActive === undefined ? true : isActive) : false;
+    } else if (isActive !== undefined) {
+      if (isActive === true) updates.approvalStatus = "approved";
+      updates.isActive = isActive;
+    }
 
     // If either mode rate is being changed, recompute the derived base rate from
     // the merged (new ?? existing) values so the three rates never drift, and

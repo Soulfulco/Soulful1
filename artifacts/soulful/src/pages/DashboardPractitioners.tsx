@@ -165,6 +165,7 @@ export default function DashboardPractitioners() {
   );
 
   const isEditing = editingId !== null;
+  const pending = (practitioners ?? []).filter((p) => p.approvalStatus === "pending");
 
   const openAdd = () => {
     setEditingId(null);
@@ -204,6 +205,27 @@ export default function DashboardPractitioners() {
         onSuccess: () => {
           toast({ title: "Status updated", description: `Practitioner is now ${!currentStatus ? "active" : "inactive"}.` });
           refetch();
+        },
+      }
+    );
+  };
+
+  const handleApproval = (id: number, name: string, decision: "approved" | "rejected") => {
+    updatePractitioner.mutate(
+      { id, data: { approvalStatus: decision } },
+      {
+        onSuccess: () => {
+          toast({
+            title: decision === "approved" ? "Application approved" : "Application rejected",
+            description:
+              decision === "approved"
+                ? `${name} is now live in the directory.`
+                : `${name}'s application was rejected and stays hidden.`,
+          });
+          refetch();
+        },
+        onError: () => {
+          toast({ title: "Error", description: "Could not update the application. Please try again.", variant: "destructive" });
         },
       }
     );
@@ -542,6 +564,59 @@ export default function DashboardPractitioners() {
         </div>
       </div>
 
+      {pending.length > 0 && (
+        <Card className="border border-secondary/30 bg-secondary/5 shadow-sm p-6 space-y-4">
+          <div>
+            <h2 className="text-lg font-serif text-foreground">Pending applications</h2>
+            <p className="text-sm text-muted-foreground">
+              New practitioners waiting for review. Reach out to arrange a call, then approve to make their profile live.
+            </p>
+          </div>
+          <div className="space-y-3">
+            {pending.map((p) => (
+              <div
+                key={p.id}
+                className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-serif text-xs overflow-hidden shrink-0">
+                    {p.avatarUrl ? <img src={p.avatarUrl} alt="" className="h-full w-full object-cover" /> : p.name.charAt(0)}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-medium text-sm truncate">{p.name}</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      <span className="capitalize">{p.specialism}</span> · {rateSummary(p)}
+                    </div>
+                    <a href={`mailto:${p.email}`} className="text-xs text-secondary hover:underline">{p.email}</a>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button size="sm" variant="outline" onClick={() => openEdit(p)} className="gap-1.5">
+                    <Pencil className="h-3.5 w-3.5" /> Review
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-destructive hover:text-destructive"
+                    disabled={updatePractitioner.isPending}
+                    onClick={() => handleApproval(p.id, p.name, "rejected")}
+                  >
+                    Reject
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={updatePractitioner.isPending}
+                    onClick={() => handleApproval(p.id, p.name, "approved")}
+                  >
+                    Approve
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       <Card className="border-none shadow-sm overflow-hidden bg-card">
         <div className="overflow-x-auto">
           <Table>
@@ -610,6 +685,15 @@ export default function DashboardPractitioners() {
                         <span className="text-xs text-muted-foreground w-12">
                           {practitioner.isActive ? "Active" : "Hidden"}
                         </span>
+                        {practitioner.approvalStatus !== "approved" && (
+                          <Badge variant="outline" className={
+                            practitioner.approvalStatus === "pending"
+                              ? "bg-secondary/10 text-secondary border-secondary/20"
+                              : "bg-destructive/10 text-destructive border-destructive/20"
+                          }>
+                            {practitioner.approvalStatus === "pending" ? "Pending" : "Rejected"}
+                          </Badge>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="text-right">

@@ -168,6 +168,7 @@ export const ListPractitionersResponseItem = zod.object({
   "inPersonRateGbp": zod.number().nullish(),
   "onlineRateGbp": zod.number().nullish(),
   "isActive": zod.boolean(),
+  "approvalStatus": zod.enum(['pending', 'approved', 'rejected']),
   "subscriptionStatus": zod.enum(['active', 'inactive', 'trial']),
   "avatarUrl": zod.string().nullable(),
   "location": zod.string().nullish(),
@@ -454,6 +455,7 @@ export const GetPractitionerResponse = zod.object({
   "inPersonRateGbp": zod.number().nullish(),
   "onlineRateGbp": zod.number().nullish(),
   "isActive": zod.boolean(),
+  "approvalStatus": zod.enum(['pending', 'approved', 'rejected']),
   "subscriptionStatus": zod.enum(['active', 'inactive', 'trial']),
   "avatarUrl": zod.string().nullable(),
   "location": zod.string().nullish(),
@@ -480,7 +482,8 @@ export const UpdatePractitionerBody = zod.object({
   "location": zod.string().optional(),
   "qualifications": zod.string().optional(),
   "avatarUrl": zod.string().optional(),
-  "isActive": zod.boolean().optional()
+  "isActive": zod.boolean().optional(),
+  "approvalStatus": zod.enum(['pending', 'approved', 'rejected']).optional()
 })
 
 export const UpdatePractitionerResponse = zod.object({
@@ -493,6 +496,7 @@ export const UpdatePractitionerResponse = zod.object({
   "inPersonRateGbp": zod.number().nullish(),
   "onlineRateGbp": zod.number().nullish(),
   "isActive": zod.boolean(),
+  "approvalStatus": zod.enum(['pending', 'approved', 'rejected']),
   "subscriptionStatus": zod.enum(['active', 'inactive', 'trial']),
   "avatarUrl": zod.string().nullable(),
   "location": zod.string().nullish(),
@@ -1001,6 +1005,7 @@ export const GetPopularPractitionersResponseItem = zod.object({
   "inPersonRateGbp": zod.number().nullish(),
   "onlineRateGbp": zod.number().nullish(),
   "isActive": zod.boolean(),
+  "approvalStatus": zod.enum(['pending', 'approved', 'rejected']),
   "subscriptionStatus": zod.enum(['active', 'inactive', 'trial']),
   "avatarUrl": zod.string().nullable(),
   "location": zod.string().nullish(),

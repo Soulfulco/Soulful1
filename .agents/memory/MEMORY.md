@@ -4,3 +4,4 @@
 - [Practitioner rates](soulful-practitioner-rates.md) — inPerson/online rates are the source of truth; sessionRateGbp is derived server-side (`inPerson ?? online`); clear via explicit null.
 - [serializePractitioner DTO](soulful-public-showcase-endpoints.md) — all practitioner responses must use the DTO helper, never spread `...row` (leaks passwordHash/google tokens).
 - [Free-trial signup](soulful-free-trial-signup.md) — free=no stripePriceId+£0 (skip checkout); employers self-register via public POST /hr/register; start-free is ownership-gated (log in first).
+- [Practitioner approval](soulful-practitioner-approval.md) — self-reg=pending+inactive until admin approves; live⟹approved invariant in PATCH; column default is `approved` (drizzle push backfill gotcha).

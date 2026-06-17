@@ -3,6 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
 export const subscriptionStatusEnum = pgEnum("subscription_status", ["active", "inactive", "trial"]);
+export const approvalStatusEnum = pgEnum("approval_status", ["pending", "approved", "rejected"]);
 
 export const practitionersTable = pgTable("practitioners", {
   id: serial("id").primaryKey(),
@@ -15,6 +16,7 @@ export const practitionersTable = pgTable("practitioners", {
   inPersonRateGbp: numeric("in_person_rate_gbp", { precision: 10, scale: 2 }),
   onlineRateGbp: numeric("online_rate_gbp", { precision: 10, scale: 2 }),
   isActive: boolean("is_active").notNull().default(true),
+  approvalStatus: approvalStatusEnum("approval_status").notNull().default("approved"),
   subscriptionStatus: subscriptionStatusEnum("subscription_status").notNull().default("trial"),
   avatarUrl: text("avatar_url"),
   location: text("location"),

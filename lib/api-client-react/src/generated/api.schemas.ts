@@ -129,6 +129,15 @@ export interface HealthStatus {
   status: string;
 }
 
+export type PractitionerApprovalStatus = typeof PractitionerApprovalStatus[keyof typeof PractitionerApprovalStatus];
+
+
+export const PractitionerApprovalStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
 export type PractitionerSubscriptionStatus = typeof PractitionerSubscriptionStatus[keyof typeof PractitionerSubscriptionStatus];
 
 
@@ -150,6 +159,7 @@ export interface Practitioner {
   /** @nullable */
   onlineRateGbp?: number | null;
   isActive: boolean;
+  approvalStatus: PractitionerApprovalStatus;
   subscriptionStatus: PractitionerSubscriptionStatus;
   /** @nullable */
   avatarUrl: string | null;
@@ -285,6 +295,15 @@ export interface PractitionerBulkResult {
   practitioners: Practitioner[];
 }
 
+export type PractitionerUpdateApprovalStatus = typeof PractitionerUpdateApprovalStatus[keyof typeof PractitionerUpdateApprovalStatus];
+
+
+export const PractitionerUpdateApprovalStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
 export interface PractitionerUpdate {
   name?: string;
   bio?: string;
@@ -297,6 +316,7 @@ export interface PractitionerUpdate {
   qualifications?: string;
   avatarUrl?: string;
   isActive?: boolean;
+  approvalStatus?: PractitionerUpdateApprovalStatus;
 }
 
 export interface Specialism {

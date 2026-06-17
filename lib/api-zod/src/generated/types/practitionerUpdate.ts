@@ -5,6 +5,7 @@
  * Soulful Corporate Wellbeing Platform API
  * OpenAPI spec version: 0.1.0
  */
+import type { PractitionerUpdateApprovalStatus } from './practitionerUpdateApprovalStatus';
 
 export interface PractitionerUpdate {
   name?: string;
@@ -18,4 +19,5 @@ export interface PractitionerUpdate {
   qualifications?: string;
   avatarUrl?: string;
   isActive?: boolean;
+  approvalStatus?: PractitionerUpdateApprovalStatus;
 }
