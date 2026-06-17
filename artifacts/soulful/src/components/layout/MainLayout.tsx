@@ -36,7 +36,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             <NavLinks />
             <div className="flex items-center gap-4 ml-4 border-l pl-8">
               <Button variant="ghost" asChild>
-                <Link href="/for-corporates">Sign In</Link>
+                <Link href="/login">Sign In</Link>
               </Button>
               <Button className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-6" asChild>
                 <Link href="/for-corporates">Get Started</Link>
@@ -55,7 +55,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               <NavLinks />
               <div className="flex flex-col gap-4 mt-8 border-t pt-8">
                 <Button variant="outline" className="w-full justify-center" asChild>
-                  <Link href="/for-corporates">Sign In</Link>
+                  <Link href="/login">Sign In</Link>
                 </Button>
                 <Button className="w-full justify-center rounded-full" asChild>
                   <Link href="/for-corporates">Get Started</Link>

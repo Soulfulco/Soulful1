@@ -20,6 +20,7 @@ const ForCorporates = lazy(() => import("@/pages/ForCorporates"));
 const ForPractitioners = lazy(() => import("@/pages/ForPractitioners"));
 const Locations = lazy(() => import("@/pages/Locations"));
 const Join = lazy(() => import("@/pages/Join"));
+const SignIn = lazy(() => import("@/pages/SignIn"));
 const EmployeePortal = lazy(() => import("@/pages/EmployeePortal"));
 const DashboardLogin = lazy(() => import("@/pages/DashboardLogin"));
 const PractitionerLogin = lazy(() => import("@/pages/PractitionerLogin"));
@@ -94,6 +95,9 @@ function Router() {
         </Route>
         <Route path="/join">
           <Join />
+        </Route>
+        <Route path="/login">
+          <SignIn />
         </Route>
         <Route path="/employee">
           <EmployeePortal />
