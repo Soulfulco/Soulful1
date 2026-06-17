@@ -5,6 +5,7 @@ import {
   useGetCompanyUtilisation, getGetCompanyUtilisationQueryKey,
   useRegisterEmployee, useBulkCreateEmployees,
 } from "@workspace/api-client-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -216,8 +217,11 @@ function ImportEmployeesDialog({ companyId, onDone }: { companyId: number; onDon
 export default function DashboardEmployees() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { hrSession, isAdminUser } = useAuth();
   const [copiedCode, setCopiedCode] = useState("");
-  const [selectedCompanyId, setSelectedCompanyId] = useState<number>(1);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<number>(
+    hrSession?.companyId ?? 1
+  );
 
   const { data: companies } = useListCompanies({ query: { queryKey: getListCompaniesQueryKey() } });
 
@@ -255,19 +259,21 @@ export default function DashboardEmployees() {
           <p className="text-muted-foreground">Monitor usage and manage employee access by company.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Select
-            value={String(selectedCompanyId)}
-            onValueChange={v => setSelectedCompanyId(Number(v))}
-          >
-            <SelectTrigger className="w-56">
-              <SelectValue placeholder="Select company" />
-            </SelectTrigger>
-            <SelectContent>
-              {companies?.map(c => (
-                <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {isAdminUser && (
+            <Select
+              value={String(selectedCompanyId)}
+              onValueChange={v => setSelectedCompanyId(Number(v))}
+            >
+              <SelectTrigger className="w-56">
+                <SelectValue placeholder="Select company" />
+              </SelectTrigger>
+              <SelectContent>
+                {companies?.map(c => (
+                  <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <AddEmployeeDialog companyId={selectedCompanyId} onDone={refreshEmployees} />
           <ImportEmployeesDialog companyId={selectedCompanyId} onDone={refreshEmployees} />
         </div>

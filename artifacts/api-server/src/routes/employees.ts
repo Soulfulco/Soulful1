@@ -130,6 +130,8 @@ companyEmployeesRouter.get("/companies/join/:code", async (req, res) => {
 companyEmployeesRouter.get("/companies/:id/employees", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid company id" });
+    if (!(await authorizeCompanyWrite(req, res, id))) return;
     const employees = await db
       .select()
       .from(employeesTable)
@@ -201,6 +203,8 @@ companyEmployeesRouter.post("/companies/:id/employees/bulk", async (req, res) =>
 companyEmployeesRouter.get("/companies/:id/utilisation", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid company id" });
+    if (!(await authorizeCompanyWrite(req, res, id))) return;
     const employees = await db
       .select()
       .from(employeesTable)
