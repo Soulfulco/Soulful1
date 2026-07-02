@@ -23,6 +23,7 @@ import storageRouter from "./storage";
 import stripeRouter from "./stripe";
 import eventsRouter from "./events";
 import googleCalendarRouter from "./googleCalendar";
+import mailingListRouter from "./mailingList";
 
 const router: IRouter = Router();
 
@@ -51,5 +52,6 @@ router.use(storageRouter);
 router.use(stripeRouter);
 router.use(eventsRouter);
 router.use(googleCalendarRouter);
+router.use(mailingListRouter);
 
 export default router;

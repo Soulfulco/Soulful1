@@ -1,7 +1,64 @@
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Menu } from "lucide-react";
+import { Menu, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useToast } from "@/hooks/use-toast";
+
+function MailingListSignup() {
+  const { toast } = useToast();
+  const [email, setEmail] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [subscribed, setSubscribed] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRe.test(email.trim())) {
+      toast({ title: "Enter a valid email", variant: "destructive" });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/mailing-list/subscribe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), source: "footer" }),
+      });
+      if (!res.ok) throw new Error();
+      setSubscribed(true);
+      setEmail("");
+      toast({ title: "You're on the list!", description: "Thanks for subscribing." });
+    } catch {
+      toast({ title: "Couldn't subscribe", description: "Please try again.", variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (subscribed) {
+    return <p className="text-sm text-primary">Thanks — you're subscribed!</p>;
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+      <p className="text-sm text-muted-foreground">Get wellbeing tips and event updates in your inbox.</p>
+      <div className="flex gap-2">
+        <Input
+          type="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="h-10"
+        />
+        <Button type="submit" size="sm" className="h-10 shrink-0" disabled={submitting}>
+          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Join"}
+        </Button>
+      </div>
+    </form>
+  );
+}
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -16,6 +73,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       </Link>
       <Link href="/events" className={`text-sm font-medium transition-colors hover:text-primary ${location === "/events" ? "text-primary" : "text-muted-foreground"}`}>
         Events
+      </Link>
+      <Link href="/volunteering" className={`text-sm font-medium transition-colors hover:text-primary ${location === "/volunteering" ? "text-primary" : "text-muted-foreground"}`}>
+        Volunteering
       </Link>
       <Link href="/dashboard" className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary">
         Admin
@@ -72,7 +132,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
       <footer className="border-t bg-card mt-auto">
         <div className="container mx-auto py-12 px-4 md:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
             <div className="flex flex-col gap-4 md:col-span-1">
               <Link href="/" className="flex items-center gap-2 hover:opacity-90">
                 <img src="/images/logo.png" alt="Soulful" className="h-7 w-7 rounded-md object-cover" />
@@ -87,6 +147,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               <h4 className="font-semibold font-serif text-foreground">Platform</h4>
               <Link href="/for-corporates" className="text-sm text-muted-foreground hover:text-primary transition-colors">For Corporates</Link>
               <Link href="/for-practitioners" className="text-sm text-muted-foreground hover:text-primary transition-colors">For Practitioners</Link>
+              <Link href="/volunteering" className="text-sm text-muted-foreground hover:text-primary transition-colors">Volunteering &amp; Fundraising</Link>
               <Link href="/propose-session" className="text-sm text-muted-foreground hover:text-primary transition-colors">Propose a Session</Link>
             </div>
 
@@ -101,6 +162,11 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               <h4 className="font-semibold font-serif text-foreground">Legal</h4>
               <a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">Privacy Policy</a>
               <a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">Terms of Service</a>
+            </div>
+
+            <div className="flex flex-col gap-3 md:col-span-1">
+              <h4 className="font-semibold font-serif text-foreground">Stay in the loop</h4>
+              <MailingListSignup />
             </div>
           </div>
           <div className="mt-12 pt-8 border-t text-center text-sm text-muted-foreground">

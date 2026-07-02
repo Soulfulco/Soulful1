@@ -15,6 +15,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 const Home = lazy(() => import("@/pages/Home"));
 const Practitioners = lazy(() => import("@/pages/Practitioners"));
 const Events = lazy(() => import("@/pages/Events"));
+const Volunteering = lazy(() => import("@/pages/Volunteering"));
 const PractitionerProfile = lazy(() => import("@/pages/PractitionerProfile"));
 const ForCorporates = lazy(() => import("@/pages/ForCorporates"));
 const ForPractitioners = lazy(() => import("@/pages/ForPractitioners"));
@@ -44,6 +45,7 @@ const DashboardContent = lazy(() => import("@/pages/DashboardContent"));
 const DashboardPlans = lazy(() => import("@/pages/DashboardPlans"));
 const DashboardSpecialisms = lazy(() => import("@/pages/DashboardSpecialisms"));
 const DashboardEvents = lazy(() => import("@/pages/DashboardEvents"));
+const DashboardMailingList = lazy(() => import("@/pages/DashboardMailingList"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -83,6 +85,9 @@ function Router() {
         </Route>
         <Route path="/events">
           <MainLayout><Events /></MainLayout>
+        </Route>
+        <Route path="/volunteering">
+          <MainLayout><Volunteering /></MainLayout>
         </Route>
         <Route path="/for-corporates">
           <MainLayout><ForCorporates /></MainLayout>
@@ -202,6 +207,12 @@ function Router() {
         <Route path="/dashboard/events">
           <ProtectedRoute requireAdmin>
             <DashboardLayout><DashboardEvents /></DashboardLayout>
+          </ProtectedRoute>
+        </Route>
+
+        <Route path="/dashboard/mailing-list">
+          <ProtectedRoute requireAdmin>
+            <DashboardLayout><DashboardMailingList /></DashboardLayout>
           </ProtectedRoute>
         </Route>
 

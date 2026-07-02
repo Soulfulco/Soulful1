@@ -220,6 +220,22 @@ export default function DashboardEvents() {
                 <div className="space-y-1.5">
                   <Label htmlFor="category">Category</Label>
                   <Input id="category" placeholder="e.g. Community" value={form.category} onChange={(e) => handleChange("category", e.target.value)} />
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {["Volunteering", "Fundraising", "Community", "Wellbeing"].map((preset) => (
+                      <button
+                        type="button"
+                        key={preset}
+                        onClick={() => handleChange("category", preset)}
+                        className={`text-xs px-2 py-1 rounded-full border transition-colors ${
+                          form.category === preset
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-muted text-muted-foreground border-transparent hover:border-border"
+                        }`}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="organizer">Organiser</Label>
