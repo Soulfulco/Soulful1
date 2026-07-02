@@ -24,6 +24,7 @@ import stripeRouter from "./stripe";
 import eventsRouter from "./events";
 import googleCalendarRouter from "./googleCalendar";
 import mailingListRouter from "./mailingList";
+import employeePreferencesRouter from "./employeePreferences";
 
 const router: IRouter = Router();
 
@@ -53,5 +54,6 @@ router.use(stripeRouter);
 router.use(eventsRouter);
 router.use(googleCalendarRouter);
 router.use(mailingListRouter);
+router.use(employeePreferencesRouter);
 
 export default router;

@@ -11,22 +11,22 @@ export function googleConfigured(): boolean {
   return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 }
 
-export function getRedirectUri(): string {
+export function getRedirectUri(callbackPath = "/api/practitioner/google/callback"): string {
   const domain = process.env.REPLIT_DOMAINS?.split(",")[0];
   if (!domain) throw new Error("REPLIT_DOMAINS not set");
-  return `https://${domain}/api/practitioner/google/callback`;
+  return `https://${domain}${callbackPath}`;
 }
 
-function oauthClient(): OAuth2Client {
+function oauthClient(callbackPath?: string): OAuth2Client {
   return new OAuth2Client({
     clientId: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    redirectUri: getRedirectUri(),
+    redirectUri: getRedirectUri(callbackPath),
   });
 }
 
-export function getAuthUrl(state: string): string {
-  return oauthClient().generateAuthUrl({
+export function getAuthUrl(state: string, callbackPath?: string): string {
+  return oauthClient(callbackPath).generateAuthUrl({
     access_type: "offline",
     prompt: "consent",
     scope: SCOPES,
@@ -39,8 +39,8 @@ export interface ExchangeResult {
   email: string | null;
 }
 
-export async function exchangeCode(code: string): Promise<ExchangeResult> {
-  const client = oauthClient();
+export async function exchangeCode(code: string, callbackPath?: string): Promise<ExchangeResult> {
+  const client = oauthClient(callbackPath);
   const { tokens } = await client.getToken(code);
   let email: string | null = null;
   if (tokens.id_token) {

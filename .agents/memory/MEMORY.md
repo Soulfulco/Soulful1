@@ -5,3 +5,5 @@
 - [serializePractitioner DTO](soulful-public-showcase-endpoints.md) — all practitioner responses must use the DTO helper, never spread `...row` (leaks passwordHash/google tokens).
 - [Free-trial signup](soulful-free-trial-signup.md) — free=no stripePriceId+£0 (skip checkout); employers self-register via public POST /hr/register; start-free is ownership-gated (log in first).
 - [Practitioner approval](soulful-practitioner-approval.md) — self-reg=pending+inactive until admin approves; live⟹approved invariant in PATCH; column default is `approved` (drizzle push backfill gotcha).
+- [Drizzle sql array params](drizzle-sql-array-params.md) — raw `sql\`\`` templates don't auto-convert JS arrays to Postgres arrays; build `{...}` literal + `::type[]` cast yourself.
+- [Soulful route paths](soulful-route-paths.md) — employee-facing page is `/employee` (not `/portal`); practitioner page is `/practitioner/portal`. Check App.tsx routes before hardcoding redirect paths.

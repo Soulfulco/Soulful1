@@ -4,10 +4,20 @@ import { useGetEmployee, useListEmployeeBookings, getGetEmployeeQueryKey, getLis
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, User, LogOut, ArrowRight, CheckCircle2, Users, MapPin, Sparkles, Building2, CalendarDays, Download } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Calendar, Clock, User, LogOut, ArrowRight, CheckCircle2, Users, MapPin, Sparkles, Building2, CalendarDays, Download, Settings, Link2, RefreshCw, Unlink } from "lucide-react";
 import { format } from "date-fns";
 import WellbeingSurvey from "@/components/wellbeing/WellbeingSurvey";
 import WellbeingProgress from "@/components/wellbeing/WellbeingProgress";
+import { useToast } from "@/hooks/use-toast";
 
 interface StoredEmployee {
   id: number;
@@ -57,6 +67,37 @@ const EVENT_TYPE_EMOJI: Record<string, string> = {
   social: "☕", talk: "🎙️", other: "✨",
 };
 
+const THEME_PRESETS: Record<string, { label: string; swatch: string; primary: string; primaryForeground: string }> = {
+  sage: { label: "Sage", swatch: "hsl(91 16% 50%)", primary: "91 16% 50%", primaryForeground: "0 0% 100%" },
+  terracotta: { label: "Terracotta", swatch: "hsl(15 55% 55%)", primary: "15 55% 55%", primaryForeground: "0 0% 100%" },
+  ocean: { label: "Ocean", swatch: "hsl(205 55% 48%)", primary: "205 55% 48%", primaryForeground: "0 0% 100%" },
+  lavender: { label: "Lavender", swatch: "hsl(265 35% 60%)", primary: "265 35% 60%", primaryForeground: "0 0% 100%" },
+  sunset: { label: "Sunset", swatch: "hsl(20 75% 58%)", primary: "20 75% 58%", primaryForeground: "0 0% 100%" },
+};
+
+const AVATAR_EMOJIS = ["🌿", "🌊", "🌸", "🌞", "🌙", "🍃", "🦋", "🐝", "🌵", "🍄", "🐚", "⭐"];
+
+const FOCUS_AREA_OPTIONS: { id: string; label: string; emoji: string }[] = [
+  { id: "stress", label: "Stress", emoji: "😮‍💨" },
+  { id: "sleep", label: "Sleep", emoji: "😴" },
+  { id: "fitness", label: "Fitness", emoji: "🏃" },
+  { id: "nutrition", label: "Nutrition", emoji: "🥗" },
+  { id: "mindfulness", label: "Mindfulness", emoji: "🧘" },
+  { id: "connection", label: "Connection", emoji: "🤝" },
+];
+
+interface EmployeePreferences {
+  employeeId: number;
+  themeColor: string;
+  avatarEmoji: string;
+  focusAreas: string[];
+  showGroupSessions: boolean;
+  showSocialCalendar: boolean;
+  showSelfFunded: boolean;
+  googleConnected: boolean;
+  googleEmail: string | null;
+}
+
 function AllowanceBar({ used, total }: { used: number; total: number }) {
   const pct = total > 0 ? Math.min(used / total, 1) : 0;
   const remaining = Math.max(0, total - used);
@@ -103,6 +144,20 @@ export default function EmployeePortal() {
   const [surveyRequired, setSurveyRequired] = useState(false);
   const [surveyType, setSurveyType] = useState<"initial" | "monthly">("initial");
 
+  // Personalisation
+  const { toast } = useToast();
+  const [prefs, setPrefs] = useState<EmployeePreferences | null>(null);
+  const [prefsOpen, setPrefsOpen] = useState(false);
+  const [savingPrefs, setSavingPrefs] = useState(false);
+  const [draftTheme, setDraftTheme] = useState("sage");
+  const [draftAvatar, setDraftAvatar] = useState("🌿");
+  const [draftFocusAreas, setDraftFocusAreas] = useState<Set<string>>(new Set());
+  const [draftShowGroup, setDraftShowGroup] = useState(true);
+  const [draftShowSocial, setDraftShowSocial] = useState(true);
+  const [draftShowSelfFunded, setDraftShowSelfFunded] = useState(true);
+  const [googleSyncing, setGoogleSyncing] = useState(false);
+  const [googleActing, setGoogleActing] = useState(false);
+
   useEffect(() => {
     const raw = localStorage.getItem("soulful_employee");
     if (!raw) { navigate("/join"); return; }
@@ -122,6 +177,53 @@ export default function EmployeePortal() {
         .catch(() => {});
     }
   }, [navigate]);
+
+  // Load preferences
+  useEffect(() => {
+    if (!stored?.id) return;
+    fetch(`/api/employee/preferences?employeeId=${stored.id}`)
+      .then(r => r.json())
+      .then((data: EmployeePreferences) => {
+        setPrefs(data);
+        setDraftTheme(data.themeColor);
+        setDraftAvatar(data.avatarEmoji);
+        setDraftFocusAreas(new Set(data.focusAreas));
+        setDraftShowGroup(data.showGroupSessions);
+        setDraftShowSocial(data.showSocialCalendar);
+        setDraftShowSelfFunded(data.showSelfFunded);
+      })
+      .catch(() => {});
+  }, [stored?.id]);
+
+  // Apply theme colour to CSS variables
+  useEffect(() => {
+    const preset = THEME_PRESETS[prefs?.themeColor ?? "sage"] ?? THEME_PRESETS.sage;
+    document.documentElement.style.setProperty("--primary", preset.primary);
+    document.documentElement.style.setProperty("--primary-foreground", preset.primaryForeground);
+    return () => {
+      document.documentElement.style.removeProperty("--primary");
+      document.documentElement.style.removeProperty("--primary-foreground");
+    };
+  }, [prefs?.themeColor]);
+
+  // Handle Google OAuth redirect result
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const google = params.get("google");
+    if (!google) return;
+    if (google === "connected") {
+      toast({ title: "Google Calendar connected", description: "Your bookings and events will now sync automatically." });
+    } else if (google === "noaccess") {
+      toast({ title: "Couldn't connect", description: "Google didn't grant calendar access. Please try again.", variant: "destructive" });
+    } else if (google === "error") {
+      toast({ title: "Couldn't connect", description: "Something went wrong connecting Google Calendar.", variant: "destructive" });
+    }
+    window.history.replaceState({}, "", window.location.pathname);
+    if (stored?.id) {
+      fetch(`/api/employee/preferences?employeeId=${stored.id}`).then(r => r.json()).then(setPrefs).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stored?.id]);
 
   const { data: employee, isLoading: isLoadingEmployee } = useGetEmployee(
     stored?.id ?? 0,
@@ -278,6 +380,91 @@ export default function EmployeePortal() {
     navigate("/join");
   };
 
+  const toggleFocusArea = (id: string) => {
+    setDraftFocusAreas(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSavePrefs = async () => {
+    if (!stored) return;
+    setSavingPrefs(true);
+    try {
+      const res = await fetch("/api/employee/preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employeeId: stored.id,
+          themeColor: draftTheme,
+          avatarEmoji: draftAvatar,
+          focusAreas: Array.from(draftFocusAreas),
+          showGroupSessions: draftShowGroup,
+          showSocialCalendar: draftShowSocial,
+          showSelfFunded: draftShowSelfFunded,
+        }),
+      });
+      if (res.ok) {
+        const data: EmployeePreferences = await res.json();
+        setPrefs(data);
+        setPrefsOpen(false);
+        toast({ title: "Your space is updated", description: "Personalisation saved." });
+      } else {
+        toast({ title: "Couldn't save", description: "Please try again.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Couldn't save", description: "Please try again.", variant: "destructive" });
+    }
+    setSavingPrefs(false);
+  };
+
+  const handleConnectGoogle = () => {
+    if (!stored) return;
+    window.location.href = `/api/employee/google/connect?employeeId=${stored.id}`;
+  };
+
+  const handleDisconnectGoogle = async () => {
+    if (!stored) return;
+    setGoogleActing(true);
+    try {
+      const res = await fetch("/api/employee/google/disconnect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeeId: stored.id }),
+      });
+      if (res.ok) {
+        setPrefs(prev => prev ? { ...prev, googleConnected: false, googleEmail: null } : prev);
+        toast({ title: "Google Calendar disconnected" });
+      }
+    } catch {}
+    setGoogleActing(false);
+  };
+
+  const handleSyncGoogle = async () => {
+    if (!stored) return;
+    setGoogleSyncing(true);
+    try {
+      const res = await fetch("/api/employee/google/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeeId: stored.id }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast({
+          title: "Synced",
+          description: data.synced > 0 ? `${data.synced} event${data.synced === 1 ? "" : "s"} added to Google Calendar.` : "Everything is already up to date.",
+        });
+      } else {
+        toast({ title: "Sync failed", description: data.error ?? "Please try again.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Sync failed", description: "Please try again.", variant: "destructive" });
+    }
+    setGoogleSyncing(false);
+  };
+
   if (!loaded || isLoadingEmployee) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -317,11 +504,19 @@ export default function EmployeePortal() {
         </Link>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-              <User className="h-4 w-4 text-primary" />
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-base">
+              {prefs?.avatarEmoji ?? <User className="h-4 w-4 text-primary" />}
             </div>
             <span className="text-sm font-medium hidden sm:block">{emp?.name}</span>
           </div>
+          <button
+            onClick={() => setPrefsOpen(true)}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+            title="Personalise your space"
+          >
+            <Settings className="h-4 w-4" />
+            <span className="hidden sm:inline">Personalise</span>
+          </button>
           <button
             onClick={handleSignOut}
             className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
@@ -332,13 +527,148 @@ export default function EmployeePortal() {
         </div>
       </header>
 
+      {/* Personalisation dialog */}
+      <Dialog open={prefsOpen} onOpenChange={setPrefsOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-serif">Personalise your space</DialogTitle>
+            <DialogDescription>Make your wellness space feel like yours.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-2">
+            {/* Avatar */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Your avatar</p>
+              <div className="flex flex-wrap gap-2">
+                {AVATAR_EMOJIS.map(emoji => (
+                  <button
+                    key={emoji}
+                    onClick={() => setDraftAvatar(emoji)}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all ${
+                      draftAvatar === emoji ? "bg-primary/15 ring-2 ring-primary" : "bg-muted hover:bg-muted/70"
+                    }`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Theme colour */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Colour theme</p>
+              <div className="flex flex-wrap gap-3">
+                {Object.entries(THEME_PRESETS).map(([id, preset]) => (
+                  <button
+                    key={id}
+                    onClick={() => setDraftTheme(id)}
+                    className="flex flex-col items-center gap-1.5"
+                    title={preset.label}
+                  >
+                    <span
+                      className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+                        draftTheme === id ? "ring-2 ring-offset-2 ring-foreground/70" : ""
+                      }`}
+                      style={{ background: preset.swatch }}
+                    >
+                      {draftTheme === id && <CheckCircle2 className="h-4 w-4 text-white" />}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">{preset.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Focus areas */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium">What matters most to you?</p>
+              <p className="text-xs text-muted-foreground -mt-1">Pick a few — helps us surface the right sessions and events</p>
+              <div className="flex flex-wrap gap-2">
+                {FOCUS_AREA_OPTIONS.map(opt => {
+                  const active = draftFocusAreas.has(opt.id);
+                  return (
+                    <button
+                      key={opt.id}
+                      onClick={() => toggleFocusArea(opt.id)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all flex items-center gap-1.5 ${
+                        active ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border text-muted-foreground hover:border-foreground/30"
+                      }`}
+                    >
+                      <span>{opt.emoji}</span>
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Section visibility */}
+            <div className="space-y-3">
+              <p className="text-sm font-medium">Show on my space</p>
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Group sessions</span>
+                  <Switch checked={draftShowGroup} onCheckedChange={setDraftShowGroup} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Social calendar</span>
+                  <Switch checked={draftShowSocial} onCheckedChange={setDraftShowSocial} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Self-funded 1:1 booking</span>
+                  <Switch checked={draftShowSelfFunded} onCheckedChange={setDraftShowSelfFunded} />
+                </div>
+              </div>
+            </div>
+
+            {/* Google Calendar */}
+            <div className="space-y-2 pt-2 border-t">
+              <p className="text-sm font-medium">Calendar sync</p>
+              {prefs?.googleConnected ? (
+                <div className="flex items-center justify-between gap-3 bg-secondary/30 rounded-lg px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> Connected to Google Calendar
+                    </p>
+                    {prefs.googleEmail && <p className="text-[11px] text-muted-foreground truncate">{prefs.googleEmail}</p>}
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <Button variant="outline" size="sm" className="h-8 text-xs rounded-full gap-1" disabled={googleSyncing} onClick={handleSyncGoogle}>
+                      <RefreshCw className={`h-3 w-3 ${googleSyncing ? "animate-spin" : ""}`} /> Sync
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full text-muted-foreground" disabled={googleActing} onClick={handleDisconnectGoogle} title="Disconnect">
+                      <Unlink className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button variant="outline" size="sm" className="rounded-full text-xs gap-1.5" onClick={handleConnectGoogle}>
+                  <Link2 className="h-3.5 w-3.5" /> Connect Google Calendar
+                </Button>
+              )}
+              <p className="text-[11px] text-muted-foreground">Automatically add your bookings, group sessions and social events to Google Calendar.</p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPrefsOpen(false)}>Cancel</Button>
+            <Button onClick={handleSavePrefs} disabled={savingPrefs}>{savingPrefs ? "Saving..." : "Save"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <main className="flex-1 container mx-auto max-w-3xl px-4 md:px-8 py-10 space-y-10">
         {/* Greeting */}
-        <div>
-          <p className="text-sm text-muted-foreground font-medium">Welcome back</p>
-          <h1 className="text-3xl font-serif text-foreground mt-0.5">
-            {emp?.name?.split(" ")[0]}'s wellness space
-          </h1>
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-xl flex-shrink-0">
+            {prefs?.avatarEmoji ?? "🌿"}
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground font-medium">Welcome back</p>
+            <h1 className="text-3xl font-serif text-foreground mt-0.5">
+              {emp?.name?.split(" ")[0]}'s wellness space
+            </h1>
+          </div>
         </div>
 
         {/* ── COMPANY-COVERED PERKS ── */}
@@ -348,7 +678,7 @@ export default function EmployeePortal() {
             <h2 className="text-base font-semibold text-foreground">Covered by your employer</h2>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className={`grid gap-4 ${(prefs?.showGroupSessions ?? true) ? "sm:grid-cols-2" : ""}`}>
             {/* Monthly 1:1 allowance */}
             <Card className="border-none shadow-sm bg-card">
               <CardContent className="pt-5 pb-5 px-5 space-y-4">
@@ -375,33 +705,35 @@ export default function EmployeePortal() {
             </Card>
 
             {/* Group sessions summary */}
-            <Card className="border-none shadow-sm bg-secondary/30">
-              <CardContent className="pt-5 pb-5 px-5 space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Users className="h-4 w-4 text-primary" />
+            {(prefs?.showGroupSessions ?? true) && (
+              <Card className="border-none shadow-sm bg-secondary/30">
+                <CardContent className="pt-5 pb-5 px-5 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Users className="h-4 w-4 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Practitioner group sessions</p>
+                      <p className="text-xs text-muted-foreground">Yoga, meditation & more</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium">Practitioner group sessions</p>
-                    <p className="text-xs text-muted-foreground">Yoga, meditation & more</p>
-                  </div>
-                </div>
-                {loadingGroup ? (
-                  <div className="h-8 bg-muted animate-pulse rounded" />
-                ) : groupSessions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">None scheduled yet.</p>
-                ) : (
-                  <div className="space-y-1">
-                    <p className="text-2xl font-serif font-bold">{groupSessions.length}</p>
-                    <p className="text-xs text-muted-foreground">upcoming · {attending.size} you're attending</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  {loadingGroup ? (
+                    <div className="h-8 bg-muted animate-pulse rounded" />
+                  ) : groupSessions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">None scheduled yet.</p>
+                  ) : (
+                    <div className="space-y-1">
+                      <p className="text-2xl font-serif font-bold">{groupSessions.length}</p>
+                      <p className="text-xs text-muted-foreground">upcoming · {attending.size} you're attending</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Group sessions list */}
-          {groupSessions.length > 0 && (
+          {(prefs?.showGroupSessions ?? true) && groupSessions.length > 0 && (
             <div className="mt-4 space-y-3">
               {groupSessions.map(session => {
                 const isAttending = attending.has(session.id);
@@ -456,6 +788,7 @@ export default function EmployeePortal() {
         </section>
 
         {/* ── WELLBEING SOCIAL CALENDAR ── */}
+        {(prefs?.showSocialCalendar ?? true) && (
         <section>
           <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
             <div className="flex items-center gap-2">
@@ -550,8 +883,10 @@ export default function EmployeePortal() {
             </div>
           )}
         </section>
+        )}
 
         {/* ── SELF-FUNDED 1:1s ── */}
+        {(prefs?.showSelfFunded ?? true) && (
         <section>
           <div className="flex items-center gap-2 mb-4">
             <Sparkles className="h-4 w-4 text-muted-foreground" />
@@ -573,6 +908,7 @@ export default function EmployeePortal() {
             </CardContent>
           </Card>
         </section>
+        )}
 
         {/* ── UPCOMING 1:1 BOOKINGS ── */}
         {(upcomingBookings.length > 0 || isLoadingBookings) && (
