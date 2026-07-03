@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { rateSummary } from "@/lib/utils";
 import { useListPractitioners, getListPractitionersQueryKey, useListSpecialisms, getListSpecialismsQueryKey } from "@workspace/api-client-react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,9 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 export default function Practitioners() {
   const [search, setSearch] = useState("");
   const [specialism, setSpecialism] = useState<string>("");
+  const rawSearch = useSearch();
+  const urlParams = new URLSearchParams(rawSearch);
+  const isSelfFunded = urlParams.get("paymentType") === "self";
 
   const { data: specialisms } = useListSpecialisms({
     query: { queryKey: getListSpecialismsQueryKey() }
@@ -77,7 +80,7 @@ export default function Practitioners() {
               ))
             ) : practitioners?.length ? (
               practitioners.map((practitioner) => (
-                <Link key={practitioner.id} href={`/practitioners/${practitioner.id}`}>
+                <Link key={practitioner.id} href={`/practitioners/${practitioner.id}${isSelfFunded ? "?paymentType=self" : ""}`}>
                   <Card className="h-full border-none shadow-sm hover:shadow-md transition-shadow cursor-pointer bg-card overflow-hidden group">
                     <div className="aspect-square bg-muted relative overflow-hidden">
                       {practitioner.avatarUrl ? (

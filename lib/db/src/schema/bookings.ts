@@ -18,6 +18,8 @@ export const bookingsTable = pgTable("bookings", {
   employeeEmail: text("employee_email").notNull(),
   notes: text("notes"),
   googleEventId: text("google_event_id"),
+  stripeSessionId: text("stripe_session_id"),
+  paymentType: text("payment_type").notNull().default("corporate"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { practitionerRates, rateSummary } from "@/lib/utils";
 import { 
   useGetPractitioner, getGetPractitionerQueryKey, 
@@ -11,9 +11,10 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { MapPin, Star, Clock, GraduationCap, ArrowLeft, CheckCircle2 } from "lucide-react";
-import { Link } from "wouter";
+import { MapPin, Star, Clock, GraduationCap, ArrowLeft, CheckCircle2, CreditCard, Loader2 } from "lucide-react";
+import { Link, useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -21,7 +22,12 @@ import { Label } from "@/components/ui/label";
 export default function PractitionerProfile({ id }: { id: string }) {
   const practitionerId = parseInt(id, 10);
   const { toast } = useToast();
-  
+  const search = useSearch();
+  const params = new URLSearchParams(search);
+  const isSelfFunded = params.get("paymentType") === "self";
+  const checkoutParam = params.get("checkout");
+  const sessionId = params.get("session_id");
+
   const { data: practitioner, isLoading: isLoadingProfile } = useGetPractitioner(practitionerId, { 
     query: { enabled: !!practitionerId, queryKey: getGetPractitionerQueryKey(practitionerId) } 
   });
@@ -39,12 +45,42 @@ export default function PractitionerProfile({ id }: { id: string }) {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [bookingForm, setBookingForm] = useState({
     employeeName: "",
     employeeEmail: "",
-    companyId: 1, // Mocking company for now as this would normally come from auth context
+    companyId: 1,
     notes: ""
   });
+
+  // Handle Stripe redirect-back toasts
+  useEffect(() => {
+    if (checkoutParam === "success" && sessionId) {
+      // Confirm the booking server-side then show success
+      fetch(`/api/bookings/confirm?session_id=${encodeURIComponent(sessionId)}`)
+        .then(r => r.json())
+        .then(() => {
+          toast({
+            title: "Payment confirmed!",
+            description: "Your self-funded session is booked. You'll receive a confirmation email shortly.",
+          });
+        })
+        .catch(() => {
+          toast({
+            title: "Session booked",
+            description: "Your payment was received. Check your email for confirmation.",
+          });
+        });
+    } else if (checkoutParam === "cancelled") {
+      toast({
+        title: "Payment cancelled",
+        description: "Your session slot has been released. Feel free to pick another time.",
+        variant: "destructive",
+      });
+    }
+    // Only run on mount (from redirect)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const availableDates = slots?.filter(s => !s.isBooked).map(s => new Date(s.startTime)) || [];
   const slotsForSelectedDate = slots?.filter(s => 
@@ -64,10 +100,19 @@ export default function PractitionerProfile({ id }: { id: string }) {
         sessionType: practitioner?.specialism || "session",
         employeeName: bookingForm.employeeName,
         employeeEmail: bookingForm.employeeEmail,
-        notes: bookingForm.notes
+        notes: bookingForm.notes,
+        paymentType: isSelfFunded ? "self" : "corporate",
       }
     }, {
-      onSuccess: () => {
+      onSuccess: (data: unknown) => {
+        const result = data as { status?: string; checkoutUrl?: string | null };
+        // Self-funded: redirect to Stripe Checkout
+        if (result?.status === "payment_required" && result?.checkoutUrl) {
+          setIsRedirecting(true);
+          window.location.href = result.checkoutUrl;
+          return;
+        }
+        // Corporate: confirm immediately
         setIsBookingOpen(false);
         setSelectedSlot(null);
         setBookingForm({ ...bookingForm, employeeName: "", employeeEmail: "", notes: "" });
@@ -125,8 +170,15 @@ export default function PractitionerProfile({ id }: { id: string }) {
                   )}
                 </div>
                 <div>
-                  <div className="inline-block px-3 py-1 bg-secondary/10 text-secondary rounded-full text-xs font-medium uppercase tracking-wider mb-2">
-                    {practitioner.specialism}
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <div className="inline-block px-3 py-1 bg-secondary/10 text-secondary rounded-full text-xs font-medium uppercase tracking-wider">
+                      {practitioner.specialism}
+                    </div>
+                    {isSelfFunded && (
+                      <Badge variant="outline" className="gap-1 text-xs border-primary/40 text-primary">
+                        <CreditCard className="h-3 w-3" /> Personal booking
+                      </Badge>
+                    )}
                   </div>
                   <h1 className="text-3xl md:text-4xl font-serif text-foreground mb-2">{practitioner.name}</h1>
                   <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
@@ -193,7 +245,12 @@ export default function PractitionerProfile({ id }: { id: string }) {
           {/* Sidebar / Booking */}
           <div className="lg:col-span-1 space-y-6">
             <Card className="rounded-3xl border shadow-sm sticky top-24 overflow-hidden">
-              <div className="bg-primary p-6 text-primary-foreground text-center">
+              <div className={`p-6 text-center ${isSelfFunded ? "bg-gradient-to-br from-primary to-primary/80" : "bg-primary"} text-primary-foreground`}>
+                {isSelfFunded && (
+                  <div className="text-xs font-medium bg-primary-foreground/20 rounded-full px-3 py-1 mb-3 inline-block">
+                    You pay directly — not billed to your company
+                  </div>
+                )}
                 <div className="flex items-center justify-center gap-4 flex-wrap">
                   {practitionerRates(practitioner).map((r) => (
                     <div key={r.label}>
@@ -212,9 +269,7 @@ export default function PractitionerProfile({ id }: { id: string }) {
                   selected={date}
                   onSelect={setDate}
                   disabled={(date) => {
-                    // Disable past dates
                     if (date < new Date(new Date().setHours(0,0,0,0))) return true;
-                    // Only enable dates with available slots
                     return !availableDates.some(d => d.toDateString() === date.toDateString());
                   }}
                   className="rounded-xl border bg-background/50 p-3 mb-6"
@@ -261,14 +316,27 @@ export default function PractitionerProfile({ id }: { id: string }) {
                       className="w-full rounded-full h-12 text-base" 
                       disabled={!selectedSlot}
                     >
-                      Continue to Booking
+                      {isSelfFunded ? (
+                        <><CreditCard className="h-4 w-4 mr-2" /> Continue to Payment</>
+                      ) : (
+                        "Continue to Booking"
+                      )}
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-[425px] rounded-2xl">
                     <DialogHeader>
-                      <DialogTitle className="text-2xl font-serif">Confirm Booking</DialogTitle>
+                      <DialogTitle className="text-2xl font-serif">
+                        {isSelfFunded ? "Book & Pay" : "Confirm Booking"}
+                      </DialogTitle>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
+                      {isSelfFunded && (
+                        <div className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-xl text-sm text-primary">
+                          <CreditCard className="h-4 w-4 shrink-0" />
+                          <span>You'll be taken to a secure Stripe checkout to pay the session fee directly.</span>
+                        </div>
+                      )}
+
                       <div className="flex items-center gap-3 p-3 bg-muted rounded-xl mb-2">
                         <div className="h-10 w-10 rounded-full bg-background border flex items-center justify-center text-primary font-serif">
                           {practitioner.name.charAt(0)}
@@ -287,7 +355,7 @@ export default function PractitionerProfile({ id }: { id: string }) {
                       )}
 
                       <div className="grid gap-2">
-                        <Label htmlFor="name">Employee Name</Label>
+                        <Label htmlFor="name">Your Name</Label>
                         <Input 
                           id="name" 
                           value={bookingForm.employeeName} 
@@ -296,7 +364,7 @@ export default function PractitionerProfile({ id }: { id: string }) {
                         />
                       </div>
                       <div className="grid gap-2">
-                        <Label htmlFor="email">Employee Email</Label>
+                        <Label htmlFor="email">Your Email</Label>
                         <Input 
                           id="email" 
                           type="email" 
@@ -318,16 +386,31 @@ export default function PractitionerProfile({ id }: { id: string }) {
                     <Button 
                       className="w-full rounded-full h-12" 
                       onClick={handleBooking}
-                      disabled={createBooking.isPending || !bookingForm.employeeName || !bookingForm.employeeEmail}
+                      disabled={createBooking.isPending || isRedirecting || !bookingForm.employeeName || !bookingForm.employeeEmail}
                     >
-                      {createBooking.isPending ? "Confirming..." : "Confirm Booking"}
+                      {(createBooking.isPending || isRedirecting) ? (
+                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {isRedirecting ? "Redirecting to payment..." : "Processing..."}</>
+                      ) : isSelfFunded ? (
+                        <><CreditCard className="h-4 w-4 mr-2" /> Pay & Confirm Booking</>
+                      ) : (
+                        "Confirm Booking"
+                      )}
                     </Button>
                   </DialogContent>
                 </Dialog>
                 
                 <div className="mt-4 flex items-start gap-2 text-xs text-muted-foreground">
-                  <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-                  <p>This session will be billed to your corporate account automatically upon completion.</p>
+                  {isSelfFunded ? (
+                    <>
+                      <CreditCard className="h-4 w-4 text-primary shrink-0" />
+                      <p>Payment processed securely via Stripe. This session is personal and won't appear on your company account.</p>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                      <p>This session will be billed to your corporate account automatically upon completion.</p>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>

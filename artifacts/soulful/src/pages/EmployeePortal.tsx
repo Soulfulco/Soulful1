@@ -901,7 +901,7 @@ export default function EmployeePortal() {
                 </p>
               </div>
               <Button asChild variant="outline" className="rounded-full flex-shrink-0">
-                <Link href="/practitioners">
+                <Link href="/practitioners?paymentType=self">
                   Browse practitioners <ArrowRight className="h-4 w-4 ml-1.5" />
                 </Link>
               </Button>
