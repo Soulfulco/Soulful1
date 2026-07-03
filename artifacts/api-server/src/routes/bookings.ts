@@ -93,9 +93,10 @@ router.get("/bookings/confirm", async (req, res) => {
 
 router.post("/bookings", async (req, res) => {
   try {
-    const { companyId, practitionerId, timeSlotId, sessionType, employeeName, employeeEmail, notes, paymentType } = req.body;
+    const { companyId, practitionerId, timeSlotId, sessionType, employeeName, employeeEmail, notes, paymentType, shareWithEmployer } = req.body;
 
     const effectivePaymentType: string = paymentType === "self" ? "self" : "corporate";
+    const effectiveShare: boolean = effectivePaymentType === "corporate" ? true : (shareWithEmployer !== false);
 
     // For self-funded bookings, create a pending booking then redirect to Stripe Checkout.
     if (effectivePaymentType === "self") {
@@ -118,7 +119,7 @@ router.post("/bookings", async (req, res) => {
 
       const [booking] = await db
         .insert(bookingsTable)
-        .values({ companyId, practitionerId, timeSlotId, sessionType, employeeName, employeeEmail, notes, paymentType: "self", status: "pending" })
+        .values({ companyId, practitionerId, timeSlotId, sessionType, employeeName, employeeEmail, notes, paymentType: "self", status: "pending", shareWithEmployer: effectiveShare })
         .returning();
 
       await db.update(timeSlotsTable).set({ isBooked: true }).where(eq(timeSlotsTable.id, timeSlotId));
@@ -158,7 +159,7 @@ router.post("/bookings", async (req, res) => {
     // Corporate-funded booking — confirm immediately.
     const [booking] = await db
       .insert(bookingsTable)
-      .values({ companyId, practitionerId, timeSlotId, sessionType, employeeName, employeeEmail, notes, paymentType: "corporate" })
+      .values({ companyId, practitionerId, timeSlotId, sessionType, employeeName, employeeEmail, notes, paymentType: "corporate", shareWithEmployer: true })
       .returning();
 
     await db.update(timeSlotsTable).set({ isBooked: true }).where(eq(timeSlotsTable.id, timeSlotId));

@@ -12,8 +12,9 @@ import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
-import { MapPin, Star, Clock, GraduationCap, ArrowLeft, CheckCircle2, CreditCard, Loader2 } from "lucide-react";
+import { MapPin, Star, Clock, GraduationCap, ArrowLeft, CheckCircle2, CreditCard, Loader2, EyeOff } from "lucide-react";
 import { Link, useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -46,6 +47,7 @@ export default function PractitionerProfile({ id }: { id: string }) {
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [shareWithEmployer, setShareWithEmployer] = useState(true);
   const [bookingForm, setBookingForm] = useState({
     employeeName: "",
     employeeEmail: "",
@@ -102,6 +104,7 @@ export default function PractitionerProfile({ id }: { id: string }) {
         employeeEmail: bookingForm.employeeEmail,
         notes: bookingForm.notes,
         paymentType: isSelfFunded ? "self" : "corporate",
+        shareWithEmployer: isSelfFunded ? shareWithEmployer : true,
       }
     }, {
       onSuccess: (data: unknown) => {
@@ -334,6 +337,23 @@ export default function PractitionerProfile({ id }: { id: string }) {
                         <div className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-xl text-sm text-primary">
                           <CreditCard className="h-4 w-4 shrink-0" />
                           <span>You'll be taken to a secure Stripe checkout to pay the session fee directly.</span>
+                        </div>
+                      )}
+
+                      {isSelfFunded && (
+                        <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-muted/40">
+                          <div className="flex items-start gap-2">
+                            <EyeOff className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                            <div>
+                              <p className="text-sm font-medium leading-tight">Share details with my employer</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {shareWithEmployer
+                                  ? "Your name and session will appear on company reports."
+                                  : "Only the practitioner name will be visible to your employer."}
+                              </p>
+                            </div>
+                          </div>
+                          <Switch checked={shareWithEmployer} onCheckedChange={setShareWithEmployer} />
                         </div>
                       )}
 

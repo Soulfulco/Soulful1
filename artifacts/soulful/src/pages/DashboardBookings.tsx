@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { Building2, User, Clock, ChevronDown } from "lucide-react";
+import { Building2, User, Clock, ChevronDown, EyeOff } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -105,7 +105,14 @@ export default function DashboardBookings() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm font-medium">{booking.employeeName}</div>
+                      {(booking as any).shareWithEmployer === false ? (
+                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground italic">
+                          <EyeOff className="h-3.5 w-3.5 shrink-0" />
+                          Private booking
+                        </div>
+                      ) : (
+                        <div className="text-sm font-medium">{booking.employeeName}</div>
+                      )}
                       <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                         <Building2 className="h-3 w-3" />
                         {booking.companyName}

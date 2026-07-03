@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, timestamp, boolean, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { practitionersTable } from "./practitioners";
@@ -20,6 +20,7 @@ export const bookingsTable = pgTable("bookings", {
   googleEventId: text("google_event_id"),
   stripeSessionId: text("stripe_session_id"),
   paymentType: text("payment_type").notNull().default("corporate"),
+  shareWithEmployer: boolean("share_with_employer").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
