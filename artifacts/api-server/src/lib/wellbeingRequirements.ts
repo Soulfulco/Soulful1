@@ -72,6 +72,8 @@ export const REQUIREMENTS: RequirementDefinition[] = [
   },
 ];
 
+export const wellbeingRequirementKeys: WellbeingRequirementKey[] = REQUIREMENTS.map((r) => r.key);
+
 export type ComplianceStatus = "on_track" | "due_soon" | "overdue" | "no_data";
 
 export type RequirementCompliance = RequirementDefinition & {
