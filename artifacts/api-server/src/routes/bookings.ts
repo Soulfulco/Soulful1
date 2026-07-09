@@ -7,6 +7,7 @@ import { logger } from "../lib/logger";
 import { getUncachableStripeClient } from "../stripeClient";
 import { awardPoints } from "../lib/gamification";
 import { logRequirementSafe } from "../lib/wellbeingRequirements";
+import { isHr, isAdmin, isPractitioner, resolveHrCompanyId } from "../lib/roles";
 
 const router = Router();
 
@@ -48,11 +49,32 @@ function serializeBooking(
 
 router.get("/bookings", async (req, res) => {
   try {
-    const { companyId, practitionerId, status } = req.query as {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    if (isPractitioner(req)) {
+      return res.status(403).json({ error: "Not authorized to list bookings" });
+    }
+
+    const { practitionerId: practitionerIdParam, status } = req.query as {
       companyId?: string;
       practitionerId?: string;
       status?: string;
     };
+
+    // Never trust a client-supplied companyId for access control. HR sessions
+    // are hard-scoped server-side to their own company; only Soulful admins
+    // may see across companies (optionally still filtered by ?companyId=).
+    let scopedCompanyId: number | null = null;
+    if (isHr(req)) {
+      scopedCompanyId = await resolveHrCompanyId(req);
+      if (scopedCompanyId == null) {
+        return res.status(403).json({ error: "No company associated with this account" });
+      }
+    } else if (isAdmin(req)) {
+      const { companyId } = req.query as { companyId?: string };
+      scopedCompanyId = companyId ? Number(companyId) : null;
+    }
 
     const bookings = await db.select().from(bookingsTable);
     const practitioners = await db.select({ id: practitionersTable.id, name: practitionersTable.name }).from(practitionersTable);
@@ -63,17 +85,28 @@ router.get("/bookings", async (req, res) => {
     const compMap = Object.fromEntries(companies.map((c) => [c.id, c.name]));
     const slotMap = Object.fromEntries(slots.map((s) => [s.id, s]));
 
-    let result = bookings.map((b) => ({
-      ...b,
-      practitionerName: practMap[b.practitionerId] ?? null,
-      companyName: compMap[b.companyId] ?? null,
-      startTime: slotMap[b.timeSlotId]?.startTime?.toISOString() ?? null,
-      endTime: slotMap[b.timeSlotId]?.endTime?.toISOString() ?? null,
-      createdAt: b.createdAt.toISOString(),
-    }));
+    let result = bookings.map((b) => {
+      // HR never sees the special-category content field. When the employee
+      // has not opted to share, their identity is masked too — HR only ever
+      // sees aggregate practitioner/session-type usage for private bookings.
+      const redactForHr = isHr(req);
+      const isPrivate = !b.shareWithEmployer;
+      return {
+        ...b,
+        notes: redactForHr ? null : b.notes,
+        employeeName: redactForHr && isPrivate ? null : b.employeeName,
+        employeeEmail: redactForHr && isPrivate ? null : b.employeeEmail,
+        isPrivateBooking: redactForHr && isPrivate,
+        practitionerName: practMap[b.practitionerId] ?? null,
+        companyName: compMap[b.companyId] ?? null,
+        startTime: slotMap[b.timeSlotId]?.startTime?.toISOString() ?? null,
+        endTime: slotMap[b.timeSlotId]?.endTime?.toISOString() ?? null,
+        createdAt: b.createdAt.toISOString(),
+      };
+    });
 
-    if (companyId) result = result.filter((b) => b.companyId === Number(companyId));
-    if (practitionerId) result = result.filter((b) => b.practitionerId === Number(practitionerId));
+    if (scopedCompanyId != null) result = result.filter((b) => b.companyId === scopedCompanyId);
+    if (practitionerIdParam) result = result.filter((b) => b.practitionerId === Number(practitionerIdParam));
     if (status) result = result.filter((b) => b.status === status);
 
     res.json(result);
