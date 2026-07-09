@@ -8,7 +8,6 @@
     "seed-stripe": "tsx ./src/seed-stripe-products.ts",
     "create-admin": "tsx ./src/create-admin.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
-    "create-admin": "tsx ./src/create-admin.ts",
   },
   "dependencies": {
     "@workspace/db": "workspace:*",
