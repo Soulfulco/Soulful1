@@ -15,6 +15,7 @@ import groupSessionsRouter from "./groupSessions";
 import socialCalendarRouter from "./socialCalendar";
 import hrAuthRouter from "./hrAuth";
 import practitionerAuthRouter from "./practitionerAuth";
+import adminAuthRouter from "./adminAuth";
 import wellbeingRouter from "./wellbeing";
 import proposalsRouter from "./proposals";
 import calendarTemplatesRouter from "./calendarTemplates";
@@ -28,8 +29,6 @@ import employeePreferencesRouter from "./employeePreferences";
 import gamificationRouter from "./gamification";
 import wellbeingPlanRouter from "./wellbeingPlan";
 import referralsRouter from "./referrals";
-import adminAuthRouter from "./adminAuth";
-
 const router: IRouter = Router();
 
 router.use(healthRouter);
@@ -49,6 +48,7 @@ router.use(groupSessionsRouter);
 router.use(socialCalendarRouter);
 router.use(hrAuthRouter);
 router.use(practitionerAuthRouter);
+router.use(adminAuthRouter);
 router.use(wellbeingRouter);
 router.use(proposalsRouter);
 router.use(calendarTemplatesRouter);
