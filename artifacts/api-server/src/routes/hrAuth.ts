@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import crypto from "crypto";
 import { createSession, clearSession, getSessionId, SESSION_COOKIE, SESSION_TTL } from "../lib/auth";
 import { isAdmin } from "../lib/roles";
+import { resolveReferralCode, generateUniqueReferralCode } from "../lib/referrals";
 
 const router = Router();
 
@@ -77,7 +78,8 @@ router.post("/hr/login", async (req, res) => {
 // go through Stripe checkout instead, so this rejects any plan that has a price.
 router.post("/hr/register", async (req, res) => {
   try {
-    const { name, email, industry, employeeCount, contactName, password, planId } = req.body ?? {};
+    const { name, email, industry, employeeCount, contactName, password, planId, referralCode } =
+      req.body ?? {};
     if (!name || !email || !industry || !contactName || !password) {
       return res
         .status(400)
@@ -123,6 +125,9 @@ router.post("/hr/register", async (req, res) => {
         .json({ error: "An account with this email already exists. Please log in." });
     }
 
+    const referrer = await resolveReferralCode(referralCode);
+    const ownReferralCode = await generateUniqueReferralCode();
+
     // Create company + HR login + free subscription atomically so a mid-sequence
     // failure (incl. a concurrent duplicate email) never leaves orphan rows.
     let company: { id: number; name: string };
@@ -130,11 +135,19 @@ router.post("/hr/register", async (req, res) => {
     try {
       const out = await db.transaction(async (tx) => {
         const companyResult = await tx.execute(sql`
-          INSERT INTO companies (name, email, industry, employee_count, contact_name)
-          VALUES (${name}, ${normEmail}, ${industry}, ${count}, ${contactName})
+          INSERT INTO companies (name, email, industry, employee_count, contact_name, referral_code, referred_by_company_id)
+          VALUES (${name}, ${normEmail}, ${industry}, ${count}, ${contactName}, ${ownReferralCode}, ${referrer?.id ?? null})
           RETURNING id, name
         `);
         const co = companyResult.rows[0] as { id: number; name: string };
+
+        if (referrer) {
+          await tx.execute(sql`
+            INSERT INTO company_referrals (referrer_company_id, referred_company_id, status)
+            VALUES (${referrer.id}, ${co.id}, 'pending')
+            ON CONFLICT (referred_company_id) DO NOTHING
+          `);
+        }
 
         const hash = hashPassword(password);
         const hrResult = await tx.execute(sql`

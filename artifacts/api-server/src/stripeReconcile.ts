@@ -7,6 +7,7 @@ import {
 } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { logger } from "./lib/logger";
+import { rewardReferralIfEligible } from "./lib/referrals";
 
 type SubStatus = "active" | "cancelled" | "past_due";
 type EntityStatus = "active" | "inactive" | "trial";
@@ -137,6 +138,13 @@ export async function reconcileStripeToApp(): Promise<void> {
         await db
           .insert(companySubscriptionsTable)
           .values({ companyId, planId: appPlanId, status: subStatus });
+      }
+
+      // A real Stripe subscription reaching "active" here means the company
+      // signed a paid contract and its first payment was taken — the
+      // referral reward condition. Rewarding is idempotent (pending -> once).
+      if (entityStatus === "active") {
+        await rewardReferralIfEligible(companyId);
       }
     } catch (err) {
       logger.error({ err, subscriptionId: row.id }, "Stripe reconcile: failed for company");

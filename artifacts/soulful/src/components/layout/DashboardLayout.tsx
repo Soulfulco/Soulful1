@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Calendar, Users, Building2, CreditCard, HeartHandshake, UsersRound, CalendarDays, LogOut, UserCog, Heart, Inbox, BookOpen, PencilLine, Tag, Ticket, Mail, ClipboardCheck } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Building2, CreditCard, HeartHandshake, UsersRound, CalendarDays, LogOut, UserCog, Heart, Inbox, BookOpen, PencilLine, Tag, Ticket, Mail, ClipboardCheck, Gift } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ const adminNavigation = [
   { name: "Wellbeing Programmes", href: "/dashboard/programmes", icon: BookOpen },
   { name: "Team Wellbeing", href: "/dashboard/wellbeing", icon: Heart },
   { name: "Wellbeing Action Plan", href: "/dashboard/wellbeing-plan", icon: ClipboardCheck },
+  { name: "Refer & Earn", href: "/dashboard/referrals", icon: Gift },
   { name: "Session Proposals", href: "/dashboard/proposals", icon: Inbox },
   { name: "Site Content", href: "/dashboard/content", icon: PencilLine },
   { name: "Mailing List", href: "/dashboard/mailing-list", icon: Mail },
@@ -34,6 +35,7 @@ const hrNavigation = [
   { name: "Employees", href: "/dashboard/employees", icon: HeartHandshake },
   { name: "Team Wellbeing", href: "/dashboard/wellbeing", icon: Heart },
   { name: "Wellbeing Action Plan", href: "/dashboard/wellbeing-plan", icon: ClipboardCheck },
+  { name: "Refer & Earn", href: "/dashboard/referrals", icon: Gift },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

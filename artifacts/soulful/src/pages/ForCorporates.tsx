@@ -41,6 +41,7 @@ export default function ForCorporates() {
     employeeCount: "",
     contactName: "",
     password: "",
+    referralCode: new URLSearchParams(window.location.search).get("ref") ?? "",
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -70,6 +71,7 @@ export default function ForCorporates() {
               contactName: formData.contactName,
               password: formData.password,
               planId: selectedPlanId,
+              referralCode: formData.referralCode.trim() || undefined,
             }),
           });
           if (!res.ok) {
@@ -95,7 +97,8 @@ export default function ForCorporates() {
         industry: formData.industry,
         employeeCount: parseInt(formData.employeeCount, 10),
         contactName: formData.contactName,
-      }
+        referralCode: formData.referralCode.trim() || undefined,
+      } as any
     }, {
       onSuccess: (company) => {
         startCheckout.mutate({
@@ -425,6 +428,17 @@ export default function ForCorporates() {
                         onChange={(e) => setFormData({ ...formData, employeeCount: e.target.value })}
                       />
                     </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="referralCode">Referral Code (optional)</Label>
+                    <Input
+                      id="referralCode"
+                      className="bg-background h-11"
+                      placeholder="e.g. AB12CD3"
+                      value={formData.referralCode}
+                      onChange={(e) => setFormData({ ...formData, referralCode: e.target.value.toUpperCase() })}
+                    />
                   </div>
 
                   {isFreePlan && (

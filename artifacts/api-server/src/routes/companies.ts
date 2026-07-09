@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { companiesTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { isAdmin } from "../lib/roles";
+import { generateUniqueReferralCode, resolveReferralCode, recordReferral } from "../lib/referrals";
 
 const router = Router();
 
@@ -39,7 +40,7 @@ router.get("/companies", async (req, res) => {
 router.post("/companies", async (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: "Forbidden" });
   try {
-    const { name, email, industry, employeeCount, contactName, logoUrl } = req.body;
+    const { name, email, industry, employeeCount, contactName, logoUrl, referralCode } = req.body;
     if (!name || !email || !industry) {
       return res.status(400).json({ error: "name, email and industry are required" });
     }
@@ -47,7 +48,24 @@ router.post("/companies", async (req, res) => {
     if (!Number.isInteger(count) || count < 1) {
       return res.status(400).json({ error: "employeeCount must be a positive whole number" });
     }
-    const [c] = await db.insert(companiesTable).values({ name, email, industry, employeeCount: count, contactName, logoUrl }).returning();
+    const referrer = await resolveReferralCode(referralCode);
+    const ownReferralCode = await generateUniqueReferralCode();
+    const [c] = await db
+      .insert(companiesTable)
+      .values({
+        name,
+        email,
+        industry,
+        employeeCount: count,
+        contactName,
+        logoUrl,
+        referralCode: ownReferralCode,
+        referredByCompanyId: referrer?.id ?? null,
+      })
+      .returning();
+    if (referrer) {
+      await recordReferral(referrer.id, c.id);
+    }
     res.status(201).json({ ...c, createdAt: c.createdAt.toISOString() });
   } catch {
     res.status(500).json({ error: "Failed to create company" });

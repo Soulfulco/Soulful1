@@ -27,6 +27,7 @@ import mailingListRouter from "./mailingList";
 import employeePreferencesRouter from "./employeePreferences";
 import gamificationRouter from "./gamification";
 import wellbeingPlanRouter from "./wellbeingPlan";
+import referralsRouter from "./referrals";
 
 const router: IRouter = Router();
 
@@ -59,5 +60,6 @@ router.use(mailingListRouter);
 router.use(employeePreferencesRouter);
 router.use(gamificationRouter);
 router.use(wellbeingPlanRouter);
+router.use(referralsRouter);
 
 export default router;

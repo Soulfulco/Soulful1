@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, pgEnum, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -16,6 +16,8 @@ export const companiesTable = pgTable("companies", {
   totalBookings: integer("total_bookings").notNull().default(0),
   inviteCode: text("invite_code").unique(),
   stripeCustomerId: text("stripe_customer_id"),
+  referralCode: text("referral_code").unique(),
+  referredByCompanyId: integer("referred_by_company_id").references((): AnyPgColumn => companiesTable.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
