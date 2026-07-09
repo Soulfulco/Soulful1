@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Menu, Loader2 } from "lucide-react";
+import { Menu, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -62,20 +62,35 @@ function MailingListSignup() {
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
+  const [isEmployee, setIsEmployee] = useState(false);
+
+  useEffect(() => {
+    const checkEmployee = () => setIsEmployee(!!localStorage.getItem("soulful_employee"));
+    checkEmployee();
+    window.addEventListener("storage", checkEmployee);
+    window.addEventListener("focus", checkEmployee);
+    return () => {
+      window.removeEventListener("storage", checkEmployee);
+      window.removeEventListener("focus", checkEmployee);
+    };
+  }, []);
 
   const NavLinks = () => (
     <>
-      <Link href="/for-corporates" className={`text-sm font-medium transition-colors hover:text-primary ${location === "/for-corporates" ? "text-primary" : "text-muted-foreground"}`}>
-        For Corporates
-      </Link>
-      <Link href="/for-practitioners" className={`text-sm font-medium transition-colors hover:text-primary ${location === "/for-practitioners" ? "text-primary" : "text-muted-foreground"}`}>
-        For Practitioners
+      <Link href="/practitioners" className={`text-sm font-medium transition-colors hover:text-primary ${location === "/practitioners" ? "text-primary" : "text-muted-foreground"}`}>
+        Practitioners
       </Link>
       <Link href="/events" className={`text-sm font-medium transition-colors hover:text-primary ${location === "/events" ? "text-primary" : "text-muted-foreground"}`}>
         Events
       </Link>
       <Link href="/volunteering" className={`text-sm font-medium transition-colors hover:text-primary ${location === "/volunteering" ? "text-primary" : "text-muted-foreground"}`}>
         Volunteering
+      </Link>
+      <Link href="/for-corporates" className={`text-sm font-medium transition-colors hover:text-primary ${location === "/for-corporates" ? "text-primary" : "text-muted-foreground"}`}>
+        For Corporates
+      </Link>
+      <Link href="/for-practitioners" className={`text-sm font-medium transition-colors hover:text-primary ${location === "/for-practitioners" ? "text-primary" : "text-muted-foreground"}`}>
+        For Practitioners
       </Link>
       <Link href="/dashboard" className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary">
         Admin
@@ -95,12 +110,23 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           <nav className="hidden md:flex items-center gap-8">
             <NavLinks />
             <div className="flex items-center gap-4 ml-4 border-l pl-8">
-              <Button variant="ghost" asChild>
-                <Link href="/login">Sign In</Link>
-              </Button>
-              <Button className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-6" asChild>
-                <Link href="/for-corporates">Get Started</Link>
-              </Button>
+              {isEmployee ? (
+                <Button className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-6" asChild>
+                  <Link href="/employee">
+                    <Sparkles className="h-4 w-4 mr-1.5" />
+                    My Wellbeing
+                  </Link>
+                </Button>
+              ) : (
+                <>
+                  <Button variant="ghost" asChild>
+                    <Link href="/login">Sign In</Link>
+                  </Button>
+                  <Button className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-6" asChild>
+                    <Link href="/for-corporates">Get Started</Link>
+                  </Button>
+                </>
+              )}
             </div>
           </nav>
 
@@ -114,12 +140,23 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             <SheetContent side="right" className="flex flex-col gap-6 pt-12">
               <NavLinks />
               <div className="flex flex-col gap-4 mt-8 border-t pt-8">
-                <Button variant="outline" className="w-full justify-center" asChild>
-                  <Link href="/login">Sign In</Link>
-                </Button>
-                <Button className="w-full justify-center rounded-full" asChild>
-                  <Link href="/for-corporates">Get Started</Link>
-                </Button>
+                {isEmployee ? (
+                  <Button className="w-full justify-center rounded-full" asChild>
+                    <Link href="/employee">
+                      <Sparkles className="h-4 w-4 mr-1.5" />
+                      My Wellbeing
+                    </Link>
+                  </Button>
+                ) : (
+                  <>
+                    <Button variant="outline" className="w-full justify-center" asChild>
+                      <Link href="/login">Sign In</Link>
+                    </Button>
+                    <Button className="w-full justify-center rounded-full" asChild>
+                      <Link href="/for-corporates">Get Started</Link>
+                    </Button>
+                  </>
+                )}
               </div>
             </SheetContent>
           </Sheet>

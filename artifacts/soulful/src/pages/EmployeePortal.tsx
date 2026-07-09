@@ -499,12 +499,37 @@ export default function EmployeePortal() {
       )}
 
       {/* Header */}
-      <header className="h-16 border-b bg-card/80 backdrop-blur sticky top-0 z-10 flex items-center justify-between px-6">
-        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+      <header className="h-16 border-b bg-card/80 backdrop-blur sticky top-0 z-10 flex items-center justify-between px-6 gap-4">
+        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity shrink-0">
           <img src="/images/logo.png" alt="Soulful" className="h-7 w-7 rounded-md object-cover" />
-          <span className="font-serif text-xl font-bold tracking-tight">Soulful</span>
+          <span className="font-serif text-xl font-bold tracking-tight hidden sm:block">Soulful</span>
         </Link>
-        <div className="flex items-center gap-4">
+
+        <nav className="flex items-center gap-1 sm:gap-2 overflow-x-auto">
+          <span className="text-sm font-medium text-primary px-3 py-1.5 rounded-full bg-primary/10 whitespace-nowrap">
+            My Wellbeing
+          </span>
+          <Link
+            href="/events"
+            className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors px-3 py-1.5 rounded-full hover:bg-muted whitespace-nowrap"
+          >
+            Events
+          </Link>
+          <Link
+            href="/volunteering"
+            className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors px-3 py-1.5 rounded-full hover:bg-muted whitespace-nowrap"
+          >
+            Volunteering
+          </Link>
+          <Link
+            href="/practitioners"
+            className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors px-3 py-1.5 rounded-full hover:bg-muted whitespace-nowrap"
+          >
+            Practitioners
+          </Link>
+        </nav>
+
+        <div className="flex items-center gap-4 shrink-0">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-base">
               {prefs?.avatarEmoji ?? <User className="h-4 w-4 text-primary" />}
