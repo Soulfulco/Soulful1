@@ -5,6 +5,7 @@ import crypto from "crypto";
 import { logger } from "../lib/logger";
 import { isSameOrigin } from "../lib/csrf";
 import { googleConfigured, getAuthUrl, exchangeCode, createEvent } from "../lib/googleCalendar";
+import { awardPoints } from "../lib/gamification";
 
 const router: IRouter = Router();
 
@@ -93,7 +94,7 @@ router.put("/employee/preferences", async (req, res) => {
     : null;
 
   try {
-    await getOrCreate(employeeId);
+    const before = await getOrCreate(employeeId);
     const row = await db.execute<PreferencesRow>(sql`
       UPDATE employee_preferences SET
         theme_color = COALESCE(${themeColor}, theme_color),
@@ -107,6 +108,14 @@ router.put("/employee/preferences", async (req, res) => {
       RETURNING *
     `);
     res.json(serialize(row.rows[0]));
+
+    // Award one-time "personalisation complete" points the first time focus areas are set.
+    const hadNoFocusAreas = !before.focus_areas || before.focus_areas.length === 0;
+    if (hadNoFocusAreas && cleanedFocusAreas && cleanedFocusAreas.length > 0) {
+      awardPoints(employeeId, "profile_complete").catch((err) =>
+        logger.error({ err, employeeId }, "Failed to award gamification points for profile completion"),
+      );
+    }
   } catch (err) {
     logger.error({ err, employeeId }, "Failed to update employee preferences");
     res.status(500).json({ error: "Failed to update preferences" });

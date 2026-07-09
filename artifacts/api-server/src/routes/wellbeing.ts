@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { awardPoints } from "../lib/gamification";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -25,6 +27,12 @@ router.post("/wellbeing/surveys", async (req, res) => {
       RETURNING *
     `);
     res.status(201).json(result.rows[0]);
+
+    if (surveyType === "monthly") {
+      awardPoints(Number(employeeId), "wellbeing_checkin").catch((err) =>
+        logger.error({ err, employeeId }, "Failed to award gamification points for wellbeing check-in"),
+      );
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to submit survey" });

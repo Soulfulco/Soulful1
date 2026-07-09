@@ -12,3 +12,4 @@ export * from "./auth";
 export * from "./googleBusy";
 export * from "./mailingList";
 export * from "./employeePreferences";
+export * from "./gamification";

@@ -668,6 +668,32 @@ export interface EmployeeBulkResult {
   employees: Employee[];
 }
 
+export interface GamificationBadge {
+  key: string;
+  name: string;
+  description: string;
+  category: string;
+  emoji: string;
+  earnedAt: string;
+}
+
+export interface GamificationActivityEntry {
+  activityType: string;
+  points: number;
+  createdAt: string;
+}
+
+export interface GamificationSummary {
+  employeeId: number;
+  totalPoints: number;
+  level: number;
+  pointsIntoLevel: number;
+  pointsForNextLevel: number;
+  currentStreakWeeks: number;
+  badges: GamificationBadge[];
+  recentActivity: GamificationActivityEntry[];
+}
+
 export interface CompanyPublic {
   id: number;
   name: string;

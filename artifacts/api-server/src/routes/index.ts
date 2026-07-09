@@ -25,6 +25,7 @@ import eventsRouter from "./events";
 import googleCalendarRouter from "./googleCalendar";
 import mailingListRouter from "./mailingList";
 import employeePreferencesRouter from "./employeePreferences";
+import gamificationRouter from "./gamification";
 
 const router: IRouter = Router();
 
@@ -55,5 +56,6 @@ router.use(eventsRouter);
 router.use(googleCalendarRouter);
 router.use(mailingListRouter);
 router.use(employeePreferencesRouter);
+router.use(gamificationRouter);
 
 export default router;

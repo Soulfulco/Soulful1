@@ -7,3 +7,4 @@
 - [Practitioner approval](soulful-practitioner-approval.md) — self-reg=pending+inactive until admin approves; live⟹approved invariant in PATCH; column default is `approved` (drizzle push backfill gotcha).
 - [Drizzle sql array params](drizzle-sql-array-params.md) — raw `sql\`\`` templates don't auto-convert JS arrays to Postgres arrays; build `{...}` literal + `::type[]` cast yourself.
 - [Soulful route paths](soulful-route-paths.md) — employee-facing page is `/employee` (not `/portal`); practitioner page is `/practitioner/portal`. Check App.tsx routes before hardcoding redirect paths.
+- [pnpm packageManager pin breaks Replit workflows](pnpm-version-pin-breaks-workflows.md) — engines.pnpm 11.10.0 pin (for Railway) makes local pnpm-wrapper workflows hang/fail; use npx tsc/orval directly instead.

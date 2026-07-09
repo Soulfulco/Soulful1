@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { awardPoints } from "../lib/gamification";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -109,6 +111,12 @@ router.post("/group-sessions/:id/attend", async (req, res) => {
       RETURNING *
     `);
     res.status(201).json(result.rows[0] ?? { message: "Already signed up" });
+
+    if (result.rows[0] && employeeId) {
+      awardPoints(Number(employeeId), "group_session").catch((err) =>
+        logger.error({ err, employeeId }, "Failed to award gamification points for group session"),
+      );
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to sign up" });

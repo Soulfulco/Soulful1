@@ -1,12 +1,27 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { bookingsTable, practitionersTable, companiesTable, timeSlotsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { bookingsTable, practitionersTable, companiesTable, timeSlotsTable, employeesTable } from "@workspace/db";
+import { eq, and } from "drizzle-orm";
 import { createEvent, deleteEvent } from "../lib/googleCalendar";
 import { logger } from "../lib/logger";
 import { getUncachableStripeClient } from "../stripeClient";
+import { awardPoints } from "../lib/gamification";
 
 const router = Router();
+
+// Self-funded bookings are excluded from gamification per the privacy model.
+async function awardBookingPoints(companyId: number, employeeEmail: string): Promise<void> {
+  try {
+    const [employee] = await db
+      .select({ id: employeesTable.id })
+      .from(employeesTable)
+      .where(and(eq(employeesTable.companyId, companyId), eq(employeesTable.email, employeeEmail)))
+      .limit(1);
+    if (employee) await awardPoints(employee.id, "booking_1on1");
+  } catch (err) {
+    logger.error({ err, companyId, employeeEmail }, "Failed to award gamification points for booking");
+  }
+}
 
 function baseUrl(): string {
   const domain = process.env.REPLIT_DOMAINS?.split(",")[0];
@@ -84,6 +99,8 @@ router.get("/bookings/confirm", async (req, res) => {
       await db.update(bookingsTable).set({ status: "confirmed" }).where(eq(bookingsTable.id, booking.id));
       return res.json({ status: "confirmed", bookingId: booking.id });
     }
+    // Note: self-funded (paymentType "self") bookings are intentionally excluded from
+    // gamification points per the privacy model — only corporate-funded bookings count.
     res.json({ status: booking.status, bookingId: booking.id });
   } catch (err) {
     logger.error({ err }, "Failed to confirm booking");
@@ -192,6 +209,8 @@ router.post("/bookings", async (req, res) => {
       startTime: slot?.startTime?.toISOString(),
       endTime: slot?.endTime?.toISOString(),
     }));
+
+    awardBookingPoints(companyId, employeeEmail);
   } catch (err) {
     logger.error({ err }, "Failed to create booking");
     res.status(500).json({ error: "Failed to create booking" });

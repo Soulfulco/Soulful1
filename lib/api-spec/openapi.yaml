@@ -1192,6 +1192,20 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/Booking" }
 
+  /employees/{id}/gamification:
+    get:
+      operationId: getEmployeeGamification
+      tags: [employees]
+      summary: Get an employee's private gamification summary (points, level, badges, recent activity)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Gamification summary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GamificationSummary" }
+
   /companies/{id}/employees:
     get:
       operationId: listCompanyEmployees
@@ -2063,6 +2077,42 @@ components:
         employees:
           type: array
           items: { $ref: "#/components/schemas/Employee" }
+
+    GamificationBadge:
+      type: object
+      required: [key, name, description, category, emoji, earnedAt]
+      properties:
+        key:         { type: string }
+        name:        { type: string }
+        description: { type: string }
+        category:    { type: string }
+        emoji:       { type: string }
+        earnedAt:    { type: string, format: date-time }
+
+    GamificationActivityEntry:
+      type: object
+      required: [activityType, points, createdAt]
+      properties:
+        activityType: { type: string }
+        points:       { type: integer }
+        createdAt:    { type: string, format: date-time }
+
+    GamificationSummary:
+      type: object
+      required: [employeeId, totalPoints, level, pointsIntoLevel, pointsForNextLevel, badges, recentActivity, currentStreakWeeks]
+      properties:
+        employeeId:         { type: integer }
+        totalPoints:        { type: integer }
+        level:              { type: integer }
+        pointsIntoLevel:    { type: integer }
+        pointsForNextLevel: { type: integer }
+        currentStreakWeeks: { type: integer }
+        badges:
+          type: array
+          items: { $ref: "#/components/schemas/GamificationBadge" }
+        recentActivity:
+          type: array
+          items: { $ref: "#/components/schemas/GamificationActivityEntry" }
 
     CompanyPublic:
       type: object

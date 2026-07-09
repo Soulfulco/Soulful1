@@ -17,6 +17,7 @@ import { Calendar, Clock, User, LogOut, ArrowRight, CheckCircle2, Users, MapPin,
 import { format } from "date-fns";
 import WellbeingSurvey from "@/components/wellbeing/WellbeingSurvey";
 import WellbeingProgress from "@/components/wellbeing/WellbeingProgress";
+import GamificationWidget from "@/components/gamification/GamificationWidget";
 import { useToast } from "@/hooks/use-toast";
 
 interface StoredEmployee {
@@ -670,6 +671,9 @@ export default function EmployeePortal() {
             </h1>
           </div>
         </div>
+
+        {/* ── GAMIFICATION ── */}
+        {stored && <GamificationWidget employeeId={stored.id} />}
 
         {/* ── COMPANY-COVERED PERKS ── */}
         <section>

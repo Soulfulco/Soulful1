@@ -49,6 +49,7 @@ import type {
   EventRegistration,
   EventRegistrationInput,
   EventUpdate,
+  GamificationSummary,
   GetStripeSubscriptionStatusParams,
   GetUpcomingBookingsParams,
   HandleBrowserLoginCallbackParams,
@@ -4697,6 +4698,83 @@ export function useListEmployeeBookings<TData = Awaited<ReturnType<typeof listEm
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListEmployeeBookingsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetEmployeeGamificationUrl = (id: number,) => {
+
+
+
+
+  return `/api/employees/${id}/gamification`
+}
+
+/**
+ * @summary Get an employee's private gamification summary (points, level, badges, recent activity)
+ */
+export const getEmployeeGamification = async (id: number, options?: RequestInit): Promise<GamificationSummary> => {
+
+  return customFetch<GamificationSummary>(getGetEmployeeGamificationUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEmployeeGamificationQueryKey = (id: number,) => {
+    return [
+    `/api/employees/${id}/gamification`
+    ] as const;
+    }
+
+
+export const getGetEmployeeGamificationQueryOptions = <TData = Awaited<ReturnType<typeof getEmployeeGamification>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmployeeGamification>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEmployeeGamificationQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEmployeeGamification>>> = ({ signal }) => getEmployeeGamification(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEmployeeGamification>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEmployeeGamificationQueryResult = NonNullable<Awaited<ReturnType<typeof getEmployeeGamification>>>
+export type GetEmployeeGamificationQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get an employee's private gamification summary (points, level, badges, recent activity)
+ */
+
+export function useGetEmployeeGamification<TData = Awaited<ReturnType<typeof getEmployeeGamification>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEmployeeGamification>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEmployeeGamificationQueryOptions(id,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

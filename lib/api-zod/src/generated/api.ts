@@ -1106,6 +1106,36 @@ export const ListEmployeeBookingsResponse = zod.array(ListEmployeeBookingsRespon
 
 
 /**
+ * @summary Get an employee's private gamification summary (points, level, badges, recent activity)
+ */
+export const GetEmployeeGamificationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetEmployeeGamificationResponse = zod.object({
+  "employeeId": zod.number(),
+  "totalPoints": zod.number(),
+  "level": zod.number(),
+  "pointsIntoLevel": zod.number(),
+  "pointsForNextLevel": zod.number(),
+  "currentStreakWeeks": zod.number(),
+  "badges": zod.array(zod.object({
+  "key": zod.string(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "category": zod.string(),
+  "emoji": zod.string(),
+  "earnedAt": zod.coerce.date()
+})),
+  "recentActivity": zod.array(zod.object({
+  "activityType": zod.string(),
+  "points": zod.number(),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
  * @summary List all employees for a company (HR view)
  */
 export const ListCompanyEmployeesParams = zod.object({
