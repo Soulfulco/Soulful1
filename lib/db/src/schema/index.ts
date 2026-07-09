@@ -15,3 +15,4 @@ export * from "./employeePreferences";
 export * from "./gamification";
 export * from "./wellbeingPlan";
 export * from "./referrals";
+export * from "./adminUsers";

@@ -28,6 +28,7 @@ import employeePreferencesRouter from "./employeePreferences";
 import gamificationRouter from "./gamification";
 import wellbeingPlanRouter from "./wellbeingPlan";
 import referralsRouter from "./referrals";
+import adminAuthRouter from "./adminAuth";
 
 const router: IRouter = Router();
 
