@@ -8,7 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, AlertCircle } from "lucide-react";
 
-export default function DashboardLogin() {
+// Deliberately not linked from any public nav, the Sign In chooser, or the
+// HR login page — reach this only by navigating directly to its URL.
+export default function AdminLogin() {
   const { refetch } = useAuth();
   const [, navigate] = useLocation();
   const [email, setEmail] = useState("");
@@ -16,12 +18,12 @@ export default function DashboardLogin() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function handleHrLogin(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      const res = await fetch("/api/hr/login", {
+      const res = await fetch("/api/admin/login", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -47,19 +49,16 @@ export default function DashboardLogin() {
         <div className="text-center">
           <img src="/images/logo.png" alt="Soulful" className="h-12 w-12 rounded-xl mx-auto mb-3 object-cover" />
           <h1 className="font-serif text-3xl font-bold text-foreground">Soulful</h1>
-          <p className="text-muted-foreground text-sm mt-1">Corporate Wellbeing Platform</p>
+          <p className="text-muted-foreground text-sm mt-1">Platform Administration</p>
         </div>
 
         <Card>
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg">HR Portal</CardTitle>
+            <CardTitle className="text-lg">Admin Sign In</CardTitle>
           </CardHeader>
 
           <CardContent>
-            <form onSubmit={handleHrLogin} className="space-y-4">
-              <CardDescription className="text-xs text-muted-foreground mb-2">
-                Log in with your company HR credentials
-              </CardDescription>
+            <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
@@ -67,11 +66,10 @@ export default function DashboardLogin() {
                 </Alert>
               )}
               <div className="space-y-2">
-                <Label htmlFor="email">Work Email</Label>
+                <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="hr@yourcompany.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -83,7 +81,6 @@ export default function DashboardLogin() {
                 <Input
                   id="password"
                   type="password"
-                  placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -92,15 +89,11 @@ export default function DashboardLogin() {
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Sign in to HR Portal
+                Sign In
               </Button>
             </form>
           </CardContent>
         </Card>
-
-        <p className="text-center text-xs text-muted-foreground">
-          © {new Date().getFullYear()} Soulful. All rights reserved.
-        </p>
       </div>
     </div>
   );

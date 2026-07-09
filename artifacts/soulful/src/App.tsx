@@ -28,6 +28,7 @@ const PractitionerLogin = lazy(() => import("@/pages/PractitionerLogin"));
 const PractitionerPortal = lazy(() => import("@/pages/PractitionerPortal"));
 
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const AdminLogin = lazy(() => import("@/pages/AdminLogin"));
 const DashboardBookings = lazy(() => import("@/pages/DashboardBookings"));
 const DashboardPractitioners = lazy(() => import("@/pages/DashboardPractitioners"));
 const DashboardCompanies = lazy(() => import("@/pages/DashboardCompanies"));
@@ -113,6 +114,10 @@ function Router() {
         {/* Login */}
         <Route path="/dashboard/login">
           <DashboardLogin />
+        </Route>
+        {/* Deliberately not linked from any nav or the Sign In chooser page */}
+        <Route path="/dashboard/admin-login">
+          <AdminLogin />
         </Route>
 
         {/* Practitioner portal */}
