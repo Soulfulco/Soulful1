@@ -11,6 +11,7 @@ import {
   reviewsTable,
 } from "@workspace/db";
 import { eq, count, avg, sql } from "drizzle-orm";
+import { isHr, isAdmin, isPractitioner, resolveHrCompanyId } from "../lib/roles";
 
 const router = Router();
 
@@ -93,76 +94,62 @@ router.get("/dashboard/upcoming-bookings", async (req, res) => {
   }
 });
 
-router.get("/dashboard/popular-practitioners", async (_req, res) => {
+router.get("/dashboard/upcoming-bookings", async (req, res) => {
   try {
-    const bookings = await db.select({ practitionerId: bookingsTable.practitionerId }).from(bookingsTable);
-    const counts: Record<number, number> = {};
-    for (const b of bookings) counts[b.practitionerId] = (counts[b.practitionerId] ?? 0) + 1;
-    const sorted = Object.entries(counts)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 5)
-      .map(([id]) => Number(id));
-
-    const practitioners = await db.select().from(practitionersTable);
-    const result = sorted
-      .map((id) => practitioners.find((p) => p.id === id))
-      .filter(Boolean)
-      .map((p) => ({
-        ...p!,
-        sessionRateGbp: Number(p!.sessionRateGbp),
-        inPersonRateGbp: p!.inPersonRateGbp != null ? Number(p!.inPersonRateGbp) : null,
-        onlineRateGbp: p!.onlineRateGbp != null ? Number(p!.onlineRateGbp) : null,
-        averageRating: p!.averageRating ? Number(p!.averageRating) : null,
-        createdAt: p!.createdAt.toISOString(),
-      }));
-
-    // If fewer than 3, pad with any practitioners
-    if (result.length < 3) {
-      const extra = practitioners
-        .filter((p) => !result.find((r) => r.id === p.id))
-        .slice(0, 5 - result.length)
-        .map((p) => ({
-          ...p,
-          sessionRateGbp: Number(p.sessionRateGbp),
-          inPersonRateGbp: p.inPersonRateGbp != null ? Number(p.inPersonRateGbp) : null,
-          onlineRateGbp: p.onlineRateGbp != null ? Number(p.onlineRateGbp) : null,
-          averageRating: p.averageRating ? Number(p.averageRating) : null,
-          createdAt: p.createdAt.toISOString(),
-        }));
-      result.push(...extra);
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: "Authentication required" });
     }
+    if (isPractitioner(req)) {
+      return res.status(403).json({ error: "Not authorized to view bookings" });
+    }
+
+    let scopedCompanyId: number | null = null;
+    if (isHr(req)) {
+      scopedCompanyId = await resolveHrCompanyId(req);
+      if (scopedCompanyId == null) {
+        return res.status(403).json({ error: "No company associated with this account" });
+      }
+    } else if (isAdmin(req)) {
+      const { companyId } = req.query as { companyId?: string };
+      scopedCompanyId = companyId ? Number(companyId) : null;
+    }
+
+    const { practitionerId: practitionerIdParam } = req.query as { practitionerId?: string };
+    const bookings = await db.select().from(bookingsTable);
+    const practitioners = await db.select({ id: practitionersTable.id, name: practitionersTable.name }).from(practitionersTable);
+    const companies = await db.select({ id: companiesTable.id, name: companiesTable.name }).from(companiesTable);
+    const slots = await db.select().from(timeSlotsTable);
+
+    const practMap = Object.fromEntries(practitioners.map((p) => [p.id, p.name]));
+    const compMap = Object.fromEntries(companies.map((c) => [c.id, c.name]));
+    const slotMap = Object.fromEntries(slots.map((s) => [s.id, s]));
+
+    let result = bookings
+      .filter((b) => b.status !== "cancelled" && b.status !== "completed")
+      .map((b) => {
+        const redactForHr = isHr(req);
+        const isPrivate = !b.shareWithEmployer;
+        return {
+          ...b,
+          notes: redactForHr ? null : b.notes,
+          employeeName: redactForHr && isPrivate ? null : b.employeeName,
+          employeeEmail: redactForHr && isPrivate ? null : b.employeeEmail,
+          isPrivateBooking: redactForHr && isPrivate,
+          practitionerName: practMap[b.practitionerId] ?? null,
+          companyName: compMap[b.companyId] ?? null,
+          startTime: slotMap[b.timeSlotId]?.startTime?.toISOString() ?? null,
+          endTime: slotMap[b.timeSlotId]?.endTime?.toISOString() ?? null,
+          createdAt: b.createdAt.toISOString(),
+        };
+      })
+      .sort((a, b) => (a.startTime ?? "").localeCompare(b.startTime ?? ""))
+      .slice(0, 5);
+
+    if (scopedCompanyId != null) result = result.filter((b) => b.companyId === scopedCompanyId);
+    if (practitionerIdParam) result = result.filter((b) => b.practitionerId === Number(practitionerIdParam));
 
     res.json(result);
   } catch {
-    res.status(500).json({ error: "Failed to get popular practitioners" });
+    res.status(500).json({ error: "Failed to get upcoming bookings" });
   }
 });
-
-router.get("/dashboard/specialisms", async (_req, res) => {
-  try {
-    const bookings = await db.select({ practitionerId: bookingsTable.practitionerId }).from(bookingsTable);
-    const practitioners = await db
-      .select({ id: practitionersTable.id, specialism: practitionersTable.specialism })
-      .from(practitionersTable);
-    const specMap = Object.fromEntries(practitioners.map((p) => [p.id, p.specialism]));
-
-    const counts: Record<string, number> = {};
-    for (const b of bookings) {
-      const s = specMap[b.practitionerId] ?? "Other";
-      counts[s] = (counts[s] ?? 0) + 1;
-    }
-
-    // If no bookings yet, show practitioners by specialism
-    if (Object.keys(counts).length === 0) {
-      for (const p of practitioners) {
-        counts[p.specialism] = (counts[p.specialism] ?? 0) + 1;
-      }
-    }
-
-    res.json(Object.entries(counts).map(([specialism, count]) => ({ specialism, count })));
-  } catch {
-    res.status(500).json({ error: "Failed to get specialism breakdown" });
-  }
-});
-
-export default router;
