@@ -17,6 +17,7 @@ import { Calendar, Clock, User, LogOut, ArrowRight, CheckCircle2, Users, MapPin,
 import { format } from "date-fns";
 import WellbeingSurvey from "@/components/wellbeing/WellbeingSurvey";
 import WellbeingProgress from "@/components/wellbeing/WellbeingProgress";
+import WellbeingRequirementsWidget from "@/components/wellbeing/WellbeingRequirementsWidget";
 import GamificationWidget from "@/components/gamification/GamificationWidget";
 import { useToast } from "@/hooks/use-toast";
 
@@ -671,6 +672,9 @@ export default function EmployeePortal() {
             </h1>
           </div>
         </div>
+
+        {/* ── WELLBEING REQUIREMENTS ── */}
+        {stored && <WellbeingRequirementsWidget employeeId={stored.id} />}
 
         {/* ── GAMIFICATION ── */}
         {stored && <GamificationWidget employeeId={stored.id} />}

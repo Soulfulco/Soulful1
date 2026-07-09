@@ -22,6 +22,9 @@ const ALLOWED_UPLOAD_TYPES = new Set([
   "image/png",
   "image/webp",
   "image/gif",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]);
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
@@ -33,7 +36,7 @@ router.post("/storage/uploads/request-url", async (req: Request, res: Response) 
   }
 
   if (!ALLOWED_UPLOAD_TYPES.has(parsed.data.contentType)) {
-    res.status(400).json({ error: "Unsupported file type. Allowed: JPEG, PNG, WebP, GIF." });
+    res.status(400).json({ error: "Unsupported file type. Allowed: JPEG, PNG, WebP, GIF, PDF, DOC, DOCX." });
     return;
   }
 

@@ -6,6 +6,7 @@ import { createEvent, deleteEvent } from "../lib/googleCalendar";
 import { logger } from "../lib/logger";
 import { getUncachableStripeClient } from "../stripeClient";
 import { awardPoints } from "../lib/gamification";
+import { logRequirementSafe } from "../lib/wellbeingRequirements";
 
 const router = Router();
 
@@ -17,7 +18,10 @@ async function awardBookingPoints(companyId: number, employeeEmail: string): Pro
       .from(employeesTable)
       .where(and(eq(employeesTable.companyId, companyId), eq(employeesTable.email, employeeEmail)))
       .limit(1);
-    if (employee) await awardPoints(employee.id, "booking_1on1");
+    if (employee) {
+      await awardPoints(employee.id, "booking_1on1");
+      logRequirementSafe(employee.id, "one_on_one", "auto");
+    }
   } catch (err) {
     logger.error({ err, companyId, employeeEmail }, "Failed to award gamification points for booking");
   }

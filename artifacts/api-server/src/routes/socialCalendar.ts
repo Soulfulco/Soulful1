@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { awardPoints } from "../lib/gamification";
+import { logRequirementSafe } from "../lib/wellbeingRequirements";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -192,6 +193,7 @@ router.post("/social-events/:id/rsvp", async (req, res) => {
       awardPoints(Number(employeeId), "social_rsvp").catch((err) =>
         logger.error({ err, employeeId }, "Failed to award gamification points for social RSVP"),
       );
+      logRequirementSafe(Number(employeeId), "social_calendar", "auto");
     }
   } catch (err) {
     console.error(err);

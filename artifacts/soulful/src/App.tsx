@@ -37,6 +37,7 @@ const DashboardGroupSessions = lazy(() => import("@/pages/DashboardGroupSessions
 const DashboardSocialCalendar = lazy(() => import("@/pages/DashboardSocialCalendar"));
 const DashboardHrUsers = lazy(() => import("@/pages/DashboardHrUsers"));
 const DashboardWellbeing = lazy(() => import("@/pages/DashboardWellbeing"));
+const DashboardWellbeingPlan = lazy(() => import("@/pages/DashboardWellbeingPlan"));
 const DashboardProposals = lazy(() => import("@/pages/DashboardProposals"));
 const ProposeSession = lazy(() => import("@/pages/ProposeSession"));
 const DashboardCalendarTemplates = lazy(() => import("@/pages/DashboardCalendarTemplates"));
@@ -172,6 +173,11 @@ function Router() {
         <Route path="/dashboard/wellbeing">
           <ProtectedRoute>
             <DashboardLayout><DashboardWellbeing /></DashboardLayout>
+          </ProtectedRoute>
+        </Route>
+        <Route path="/dashboard/wellbeing-plan">
+          <ProtectedRoute>
+            <DashboardLayout><DashboardWellbeingPlan /></DashboardLayout>
           </ProtectedRoute>
         </Route>
         <Route path="/dashboard/proposals">
