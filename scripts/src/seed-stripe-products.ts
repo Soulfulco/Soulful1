@@ -19,8 +19,15 @@ function intervalFor(billingCycle: string): "month" | "year" {
 
 async function seed() {
   const stripe = await getUncachableStripeClient();
-  const plans = await db.select().from(subscriptionPlansTable);
-  console.log(`Found ${plans.length} app plans to sync to Stripe...`);
+  const allPlans = await db.select().from(subscriptionPlansTable);
+  // Free (£0) plans are intentionally never linked to Stripe — hrAuth's
+  // registration flow treats "no stripe_price_id and price is 0" as the
+  // signal to skip checkout entirely and activate the account immediately.
+  // Creating a real (even £0) Stripe price here would defeat that.
+  const plans = allPlans.filter((p) => Number(p.priceGbp) > 0);
+  console.log(
+    `Found ${allPlans.length} app plans (${allPlans.length - plans.length} free, skipped) to sync to Stripe...`,
+  );
 
   for (const plan of plans) {
     const interval = intervalFor(plan.billingCycle);
