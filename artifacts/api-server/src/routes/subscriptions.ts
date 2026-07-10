@@ -14,7 +14,7 @@ const router = Router();
 
 router.get("/subscriptions", async (_req, res) => {
   try {
-    const plans = await db.select().from(subscriptionPlansTable);
+    const plans = await db.select().from(subscriptionPlansTable).orderBy(subscriptionPlansTable.priceGbp);
     res.json(plans.map((p) => ({ ...p, priceGbp: Number(p.priceGbp) })));
   } catch {
     res.status(500).json({ error: "Failed to list plans" });
