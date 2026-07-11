@@ -10,6 +10,7 @@ export const mailingListSubscribersTable = pgTable(
     email: text("email").notNull(),
     name: text("name"),
     source: text("source").notNull().default("website"),
+    notes: text("notes"),
     hubspotContactId: text("hubspot_contact_id"),
     syncedAt: timestamp("synced_at"),
     syncError: text("sync_error"),

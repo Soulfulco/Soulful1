@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import { awardPoints } from "../lib/gamification";
 import { logRequirementSafe } from "../lib/wellbeingRequirements";
 import { logger } from "../lib/logger";
+import { isTrialLocked, TRIAL_LOCKED_MESSAGE } from "../lib/trialGate";
 
 const router = Router();
 
@@ -11,6 +12,9 @@ const router = Router();
 router.get("/group-sessions", async (req, res) => {
   try {
     const { companyId } = req.query as { companyId?: string };
+    if (companyId && (await isTrialLocked(Number(companyId)))) {
+      return res.status(402).json({ error: TRIAL_LOCKED_MESSAGE, locked: true });
+    }
     let query: ReturnType<typeof sql>;
     if (companyId) {
       query = sql`
@@ -91,15 +95,17 @@ router.get("/group-sessions/:id", async (req, res) => {
 });
 
 // Employee signs up to a group session
-router.post("/group-sessions/:id/attend", async (req, res) => {
+router.post("/group-sessions", async (req, res) => {
   try {
-    const groupSessionId = Number(req.params.id);
-    const { employeeId, employeeName, employeeEmail } = req.body;
-
-    // Check capacity
-    const session = await db.execute(sql`SELECT max_attendees FROM group_sessions WHERE id = ${groupSessionId}`);
-    if (!session.rows[0]) return res.status(404).json({ error: "Session not found" });
-    const countResult = await db.execute(sql`SELECT COUNT(*)::int AS cnt FROM group_session_attendees WHERE group_session_id = ${groupSessionId}`);
+    const {
+      companyId, practitionerId, sessionType,
+      startTime, endTime, maxAttendees,
+      locationType, locationDescription, notes,
+    } = req.body;
+    if (companyId && (await isTrialLocked(Number(companyId)))) {
+      return res.status(402).json({ error: TRIAL_LOCKED_MESSAGE, locked: true });
+    }
+    const result = await db.execute(sql`SELECT COUNT(*)::int AS cnt FROM group_session_attendees WHERE group_session_id = ${groupSessionId}`);
     const currentCount = (countResult.rows[0] as any).cnt;
     if (currentCount >= (session.rows[0] as any).max_attendees) {
       return res.status(409).json({ error: "Session is full" });

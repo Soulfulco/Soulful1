@@ -5,14 +5,12 @@ import { and, asc, count, desc, eq, gte, ilike, inArray, sql } from "drizzle-orm
 import { getUncachableStripeClient } from "../stripeClient";
 import { logger } from "../lib/logger";
 import { isAdmin } from "../lib/roles";
+import { baseUrl } from "../lib/url";
 
 const router = Router();
 
 
-function baseUrl(): string {
-  const domain = process.env.REPLIT_DOMAINS?.split(",")[0];
-  return domain ? `https://${domain}` : "";
-}
+
 
 function serializeEvent(e: typeof eventsTable.$inferSelect, registeredCount = 0) {
   return {

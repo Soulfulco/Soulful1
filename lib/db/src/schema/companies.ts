@@ -11,6 +11,7 @@ export const companiesTable = pgTable("companies", {
   industry: text("industry").notNull(),
   employeeCount: integer("employee_count").notNull(),
   subscriptionStatus: companySubscriptionStatusEnum("subscription_status").notNull().default("trial"),
+  trialEndsAt: timestamp("trial_ends_at"),
   logoUrl: text("logo_url"),
   contactName: text("contact_name"),
   totalBookings: integer("total_bookings").notNull().default(0),

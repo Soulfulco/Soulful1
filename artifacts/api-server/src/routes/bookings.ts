@@ -8,6 +8,7 @@ import { getUncachableStripeClient } from "../stripeClient";
 import { awardPoints } from "../lib/gamification";
 import { logRequirementSafe } from "../lib/wellbeingRequirements";
 import { isHr, isAdmin, isPractitioner, resolveHrCompanyId } from "../lib/roles";
+import { baseUrl } from "../lib/url";
 
 const router = Router();
 
@@ -28,10 +29,7 @@ async function awardBookingPoints(companyId: number, employeeEmail: string): Pro
   }
 }
 
-function baseUrl(): string {
-  const domain = process.env.REPLIT_DOMAINS?.split(",")[0];
-  return domain ? `https://${domain}` : "";
-}
+
 
 function serializeBooking(
   b: typeof bookingsTable.$inferSelect,

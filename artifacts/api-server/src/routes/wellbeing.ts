@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { awardPoints } from "../lib/gamification";
 import { logger } from "../lib/logger";
+import { isTrialLocked, TRIAL_LOCKED_MESSAGE } from "../lib/trialGate";
 
 const router = Router();
 
@@ -96,6 +97,9 @@ router.get("/wellbeing/surveys/status", async (req, res) => {
 router.get("/wellbeing/company/:companyId", async (req, res) => {
   try {
     const { companyId } = req.params;
+    if (await isTrialLocked(Number(companyId))) {
+      return res.status(402).json({ error: TRIAL_LOCKED_MESSAGE, locked: true });
+    }
 
     // Monthly averages across all employees
     const trends = await db.execute(sql`

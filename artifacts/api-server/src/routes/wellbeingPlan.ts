@@ -11,6 +11,7 @@ import {
   wellbeingRequirementKeys,
 } from "../lib/wellbeingRequirements";
 import type { WellbeingRequirementKey } from "@workspace/db";
+import { isTrialLocked, TRIAL_LOCKED_MESSAGE } from "../lib/trialGate";
 
 const router: IRouter = Router();
 
@@ -23,6 +24,9 @@ router.get("/wellbeing/requirements", (_req, res) => {
 router.get("/wellbeing/action-plan/:companyId", async (req, res) => {
   try {
     const companyId = Number(req.params.companyId);
+    if (await isTrialLocked(companyId)) {
+      return res.status(402).json({ error: TRIAL_LOCKED_MESSAGE, locked: true });
+    }
     const [plan] = await db
       .select()
       .from(wellbeingActionPlansTable)
@@ -42,6 +46,9 @@ router.post("/wellbeing/action-plan", async (req, res) => {
     const { companyId, fileUrl, fileName, uploadedBy } = req.body;
     if (!companyId || !fileUrl || !fileName) {
       return res.status(400).json({ error: "companyId, fileUrl and fileName are required" });
+    }
+    if (await isTrialLocked(Number(companyId))) {
+      return res.status(402).json({ error: TRIAL_LOCKED_MESSAGE, locked: true });
     }
     const [plan] = await db
       .insert(wellbeingActionPlansTable)

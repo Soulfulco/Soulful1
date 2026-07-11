@@ -8,7 +8,7 @@ export const employeesTable = pgTable("employees", {
   companyId: integer("company_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   email: text("email").notNull(),
-  sessionAllowancePerMonth: integer("session_allowance_per_month").notNull().default(2),
+  sessionAllowancePerMonth: integer("session_allowance_per_month").notNull().default(0),
   sessionsUsedThisMonth: integer("sessions_used_this_month").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),

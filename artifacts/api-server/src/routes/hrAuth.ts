@@ -1,10 +1,14 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { sql } from "drizzle-orm";
+import { companiesTable } from "@workspace/db";
+import { sql, eq } from "drizzle-orm";
 import crypto from "crypto";
 import { createSession, clearSession, getSessionId, SESSION_COOKIE, SESSION_TTL } from "../lib/auth";
 import { isAdmin } from "../lib/roles";
-import { resolveReferralCode, generateUniqueReferralCode } from "../lib/referrals";
+import { resolveReferralCode, generateUniqueReferralCode, generateUniqueInviteCode } from "../lib/referrals";
+import { logger } from "../lib/logger";
+import { getUncachableStripeClient } from "../stripeClient";
+import { baseUrl } from "../lib/url";
 
 const router = Router();
 
@@ -73,12 +77,13 @@ router.post("/hr/login", async (req, res) => {
   }
 });
 
-// Public: self-serve corporate sign-up on a FREE plan. Creates the company, an
-// HR login account, the free subscription, and logs the user in. Paid plans must
-// go through Stripe checkout instead, so this rejects any plan that has a price.
+// Public: self-serve corporate sign-up — handles free plans (instant
+// activation) and paid plans (creates the login, then redirects to Stripe
+// checkout) in one unified flow, so every signup ends up with a working
+// login regardless of which plan they picked.
 router.post("/hr/register", async (req, res) => {
   try {
-    const { name, email, industry, employeeCount, contactName, password, planId, referralCode } =
+    const { name, email, industry, employeeCount, contactName, password, planId, referralCode, employerName } =
       req.body ?? {};
     if (!name || !email || !industry || !contactName || !password) {
       return res
@@ -107,10 +112,11 @@ router.post("/hr/register", async (req, res) => {
     if (plan.plan_type !== "corporate") {
       return res.status(400).json({ error: "This is not a corporate plan" });
     }
-    if (plan.stripe_price_id || Number(plan.price_gbp) > 0) {
+    const isPaidPlan = !!plan.stripe_price_id || Number(plan.price_gbp) > 0;
+    if (isPaidPlan && !plan.stripe_price_id) {
       return res
         .status(400)
-        .json({ error: "This plan requires payment. Please complete checkout instead." });
+        .json({ error: "This plan is not yet linked to Stripe. Run the seed-stripe-products script first." });
     }
 
     const normEmail = email.toLowerCase().trim();
@@ -127,6 +133,14 @@ router.post("/hr/register", async (req, res) => {
 
     const referrer = await resolveReferralCode(referralCode);
     const ownReferralCode = await generateUniqueReferralCode();
+    const employeeInviteCode = await generateUniqueInviteCode();
+
+    // Education-sector signups get permanent free access — never locked —
+    // rather than the normal 1-week trial. Detected from the self-declared
+    // Industry field; a company can always be moved off this later by an
+    // admin editing their record, same as any other plan change.
+    const EDUCATION_KEYWORDS = ["education", "school", "university", "college", "academy", "nursery"];
+    const isEducation = EDUCATION_KEYWORDS.some((kw) => industry.toLowerCase().includes(kw));
 
     // Create company + HR login + free subscription atomically so a mid-sequence
     // failure (incl. a concurrent duplicate email) never leaves orphan rows.
@@ -135,8 +149,8 @@ router.post("/hr/register", async (req, res) => {
     try {
       const out = await db.transaction(async (tx) => {
         const companyResult = await tx.execute(sql`
-          INSERT INTO companies (name, email, industry, employee_count, contact_name, referral_code, referred_by_company_id)
-          VALUES (${name}, ${normEmail}, ${industry}, ${count}, ${contactName}, ${ownReferralCode}, ${referrer?.id ?? null})
+          INSERT INTO companies (name, email, industry, employee_count, contact_name, referral_code, referred_by_company_id, invite_code, trial_ends_at)
+          VALUES (${name}, ${normEmail}, ${industry}, ${count}, ${contactName}, ${ownReferralCode}, ${referrer?.id ?? null}, ${employeeInviteCode}, ${isEducation ? null : sql`now() + interval '7 days'`})
           RETURNING id, name
         `);
         const co = companyResult.rows[0] as { id: number; name: string };
@@ -157,10 +171,17 @@ router.post("/hr/register", async (req, res) => {
         `);
         const hr = hrResult.rows[0] as { id: number; email: string; name: string; role: string };
 
-        await tx.execute(sql`
-          INSERT INTO company_subscriptions (company_id, plan_id, status)
-          VALUES (${co.id}, ${pid}, 'active')
-        `);
+        // Free plans activate immediately. Paid plans don't get a
+        // company_subscriptions row yet — Stripe is the source of truth for
+        // whether payment actually succeeded, and the webhook sync creates
+        // this record once it does. Writing "active" here before payment
+        // completes would be misleading if checkout is abandoned.
+        if (!isPaidPlan) {
+          await tx.execute(sql`
+            INSERT INTO company_subscriptions (company_id, plan_id, status)
+            VALUES (${co.id}, ${pid}, 'active')
+          `);
+        }
         return { co, hr };
       });
       company = out.co;
@@ -174,6 +195,21 @@ router.post("/hr/register", async (req, res) => {
       }
       throw err;
     }
+
+    // Best-effort mailing list capture. The low-friction free/individual
+    // tiers exist partly to gather contact details, so every signup is
+    // added here too, along with their stated employer if given (e.g. an
+    // Individual Membership signup whose employer isn't yet a customer —
+    // a qualified lead for follow-up). Never blocks or fails the signup.
+    const leadNotes =
+      typeof employerName === "string" && employerName.trim()
+        ? `Stated employer: ${employerName.trim()}`
+        : null;
+    db.execute(sql`
+      INSERT INTO mailing_list_subscribers (email, name, source, notes)
+      VALUES (${normEmail}, ${contactName}, ${isPaidPlan ? "paid-tier-signup" : "free-tier-signup"}, ${leadNotes})
+      ON CONFLICT (lower(email)) DO NOTHING
+    `).catch((err: unknown) => logger.warn({ err, email: normEmail }, "Failed to add signup contact to mailing list"));
 
     const sessionData = {
       user: {
@@ -189,14 +225,55 @@ router.post("/hr/register", async (req, res) => {
       role: hrUser.role,
       access_token: "",
     };
+    // Log them in immediately either way — for paid plans this means
+    // they're already authenticated when Stripe redirects them back,
+    // rather than landing on the dashboard with no way to sign in.
     const sid = await createSession(sessionData as any);
     setSessionCookie(res, sid);
+
+    if (!isPaidPlan) {
+      return res.status(201).json({
+        ok: true,
+        user: sessionData.user,
+        companyId: company.id,
+        companyName: company.name,
+        role: hrUser.role,
+      });
+    }
+
+    // Paid plan — kick off Stripe checkout for their new subscription.
+    const stripe = await getUncachableStripeClient();
+    const origin = baseUrl();
+    const customer = await stripe.customers.create({
+      email: normEmail,
+      name: company.name,
+      metadata: { appCompanyId: String(company.id) },
+    });
+    await db
+      .update(companiesTable)
+      .set({ stripeCustomerId: customer.id })
+      .where(eq(companiesTable.id, company.id));
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      customer: customer.id,
+      line_items: [{ price: plan.stripe_price_id!, quantity: 1 }],
+      subscription_data: {
+        metadata: { appPlanId: String(pid), appCompanyId: String(company.id) },
+        trial_period_days: 7,
+      },
+      metadata: { appPlanId: String(pid), appCompanyId: String(company.id) },
+      success_url: `${origin}/dashboard?checkout=success`,
+      cancel_url: `${origin}/for-corporates?checkout=cancelled`,
+    });
+
     res.status(201).json({
       ok: true,
       user: sessionData.user,
       companyId: company.id,
       companyName: company.name,
       role: hrUser.role,
+      checkoutUrl: session.url,
     });
   } catch (err) {
     console.error(err);

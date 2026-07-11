@@ -11,15 +11,13 @@ import { eq, sql } from "drizzle-orm";
 import { getUncachableStripeClient } from "../stripeClient";
 import { logger } from "../lib/logger";
 import { isAdmin } from "../lib/roles";
+import { baseUrl } from "../lib/url";
 
 const router = Router();
 
 // Build redirect URLs from the trusted deployment domain — never from the
 // request's Origin header (which a caller can forge to create an open redirect).
-function baseUrl(): string {
-  const domain = process.env.REPLIT_DOMAINS?.split(",")[0];
-  return domain ? `https://${domain}` : "";
-}
+
 
 // Only allow app-relative redirect paths (e.g. "/dashboard"); reject absolute
 // URLs and protocol-relative paths ("//evil.com").
@@ -144,7 +142,12 @@ router.post("/stripe/checkout", async (req, res) => {
       customer: customerId ?? undefined,
       ...(customerId ? {} : email ? { customer_email: email } : {}),
       line_items: [{ price: plan.stripePriceId, quantity: 1 }],
-      subscription_data: { metadata },
+      // First month free, then Stripe automatically switches to its normal
+      // monthly billing cycle — generating and charging an invoice each
+      // period against the card collected at checkout. No separate code
+      // path needed for the "switch"; that's Stripe's default subscription
+      // behaviour once trial_end passes.
+      subscription_data: { metadata, trial_period_days: 30 },
       metadata,
       success_url: `${origin}${safePath(successPath, "/dashboard")}?checkout=success`,
       cancel_url: `${origin}${safePath(cancelPath, "/")}?checkout=cancelled`,
