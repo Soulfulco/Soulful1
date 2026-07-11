@@ -56,6 +56,9 @@ router.post("/group-sessions", async (req, res) => {
       startTime, endTime, maxAttendees,
       locationType, locationDescription, notes,
     } = req.body;
+    if (companyId && (await isTrialLocked(Number(companyId)))) {
+      return res.status(402).json({ error: TRIAL_LOCKED_MESSAGE, locked: true });
+    }
     const result = await db.execute(sql`
       INSERT INTO group_sessions
         (company_id, practitioner_id, session_type, start_time, end_time,
@@ -94,42 +97,7 @@ router.get("/group-sessions/:id", async (req, res) => {
   }
 });
 
-// Employee signs up to a group session
-router.post("/group-sessions", async (req, res) => {
-  try {
-    const {
-      companyId, practitionerId, sessionType,
-      startTime, endTime, maxAttendees,
-      locationType, locationDescription, notes,
-    } = req.body;
-    if (companyId && (await isTrialLocked(Number(companyId)))) {
-      return res.status(402).json({ error: TRIAL_LOCKED_MESSAGE, locked: true });
-    }
-    const result = await db.execute(sql`SELECT COUNT(*)::int AS cnt FROM group_session_attendees WHERE group_session_id = ${groupSessionId}`);
-    const currentCount = (countResult.rows[0] as any).cnt;
-    if (currentCount >= (session.rows[0] as any).max_attendees) {
-      return res.status(409).json({ error: "Session is full" });
-    }
 
-    const result = await db.execute(sql`
-      INSERT INTO group_session_attendees (group_session_id, employee_id, employee_name, employee_email)
-      VALUES (${groupSessionId}, ${employeeId ?? null}, ${employeeName}, ${employeeEmail})
-      ON CONFLICT (group_session_id, employee_email) DO NOTHING
-      RETURNING *
-    `);
-    res.status(201).json(result.rows[0] ?? { message: "Already signed up" });
-
-    if (result.rows[0] && employeeId) {
-      awardPoints(Number(employeeId), "group_session").catch((err) =>
-        logger.error({ err, employeeId }, "Failed to award gamification points for group session"),
-      );
-      logRequirementSafe(Number(employeeId), "group_session", "auto");
-    }
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to sign up" });
-  }
-});
 
 // Employee withdraws from a group session
 router.delete("/group-sessions/:id/attend", async (req, res) => {
