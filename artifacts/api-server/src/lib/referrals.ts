@@ -29,6 +29,23 @@ export async function generateUniqueReferralCode(): Promise<string> {
   }
   throw new Error("Could not generate a unique referral code");
 }
+// Generates a unique employee-facing invite code for a company, retrying on
+// the rare collision. This is what employees type in to join their
+// company's account — separate from the company-to-company referral code
+// above, though both use the same code shape.
+export async function generateUniqueInviteCode(): Promise<string> {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const code = randomCode();
+    const [existing] = await db
+      .select({ id: companiesTable.id })
+      .from(companiesTable)
+      .where(eq(companiesTable.inviteCode, code))
+      .limit(1);
+    if (!existing) return code;
+  }
+  throw new Error("Could not generate a unique invite code");
+}
+
 
 // Defensive: ensures a company has a referral code, generating one on demand
 // for companies created before this feature existed.
