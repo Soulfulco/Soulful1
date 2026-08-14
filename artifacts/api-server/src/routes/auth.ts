@@ -50,6 +50,15 @@ function setOidcCookie(res: Response, name: string, value: string) {
   });
 }
 
+function clearAuthCookies(res: Response) {
+  const cookieOpts = { path: "/", httpOnly: true, secure: true, sameSite: "none" as const };
+  res.clearCookie("code_verifier", cookieOpts);
+  res.clearCookie("nonce", cookieOpts);
+  res.clearCookie("state", cookieOpts);
+  res.clearCookie("return_to", cookieOpts);
+  res.clearCookie(SESSION_COOKIE, cookieOpts);
+}
+
 function getSafeReturnTo(value: unknown): string {
   if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) {
     return "/";
@@ -188,18 +197,34 @@ router.get("/callback", async (req: Request, res: Response) => {
 });
 
 router.get("/logout", async (req: Request, res: Response) => {
-  const config = await getOidcConfig();
   const origin = getOrigin(req);
-
   const sid = getSessionId(req);
   await clearSession(res, sid);
+  clearAuthCookies(res);
 
-  const endSessionUrl = oidc.buildEndSessionUrl(config, {
-    client_id: process.env.REPL_ID!,
-    post_logout_redirect_uri: origin,
-  });
+  try {
+    const config = await getOidcConfig();
+    const endSessionUrl = oidc.buildEndSessionUrl(config, {
+      client_id: process.env.REPL_ID!,
+      post_logout_redirect_uri: origin,
+    });
+    res.redirect(endSessionUrl.href);
+  } catch {
+    // If OIDC config fails, just redirect home with cookies already cleared
+    res.redirect(origin);
+  }
+});
 
-  res.redirect(endSessionUrl.href);
+/**
+ * Hard-reset route: clears all auth cookies and redirects to home without
+ * touching the OIDC provider. Use when the user is stuck in an expired-token
+ * loop and the normal logout flow fails.
+ */
+router.get("/clear-auth", (req: Request, res: Response) => {
+  const sid = getSessionId(req);
+  clearSession(res, sid).catch(() => {});
+  clearAuthCookies(res);
+  res.redirect(getOrigin(req));
 });
 
 router.post(
