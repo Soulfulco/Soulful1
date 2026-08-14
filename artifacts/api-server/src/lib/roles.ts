@@ -2,12 +2,6 @@ import { type Request } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 
-// Session user ids are prefixed by account type:
-//   "hr:<id>"       → HR portal user (scoped to one company)
-//   "pract:<id>"    → practitioner portal user
-//   "employee:<id>" → employee portal user (scoped to one company)
-//   anything else   → Soulful platform admin (Replit-authenticated)
-
 export function isHr(req: Request): boolean {
   return req.isAuthenticated() && req.user.id.startsWith("hr:");
 }
@@ -41,12 +35,6 @@ export function employeeId(req: Request): number | null {
   return Number.isNaN(id) ? null : id;
 }
 
-/**
- * Resolves the companyId an HR session is scoped to, by looking it up
- * server-side from the hr_users table — never trust a client-supplied
- * companyId for access control. Returns null if the current session is
- * not a valid, still-existing HR user.
- */
 export async function resolveHrCompanyId(req: Request): Promise<number | null> {
   if (!isHr(req)) return null;
   const hrId = Number(req.user!.id.slice("hr:".length));

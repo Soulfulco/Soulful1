@@ -11,7 +11,7 @@ export const employeesTable = pgTable(
     companyId: integer("company_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     email: text("email").notNull(),
-    passwordHash: text("password_hash"), // null until the employee claims their account via invite code
+    passwordHash: text("password_hash"),
     sessionAllowancePerMonth: integer("session_allowance_per_month").notNull().default(0),
     sessionsUsedThisMonth: integer("sessions_used_this_month").notNull().default(0),
     isActive: boolean("is_active").notNull().default(true),
