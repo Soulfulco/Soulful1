@@ -6,6 +6,7 @@ import { logger } from "../lib/logger";
 import { isSameOrigin } from "../lib/csrf";
 import { googleConfigured, getAuthUrl, exchangeCode, createEvent } from "../lib/googleCalendar";
 import { awardPoints } from "../lib/gamification";
+import { employeeId as getEmployeeIdFromSession } from "../lib/roles";
 
 const router: IRouter = Router();
 
@@ -55,10 +56,9 @@ async function getOrCreate(employeeId: number): Promise<PreferencesRow> {
   return created.rows[0];
 }
 
-// GET /employee/preferences?employeeId=123
 router.get("/employee/preferences", async (req, res) => {
-  const employeeId = Number(req.query.employeeId);
-  if (!employeeId) return res.status(400).json({ error: "employeeId is required" });
+  const employeeId = getEmployeeIdFromSession(req);
+  if (!employeeId) return res.status(401).json({ error: "Not authenticated" });
   try {
     const row = await getOrCreate(employeeId);
     res.json(serialize(row));
@@ -68,11 +68,12 @@ router.get("/employee/preferences", async (req, res) => {
   }
 });
 
-// PUT /employee/preferences
 router.put("/employee/preferences", async (req, res) => {
-  const { employeeId, themeColor, avatarEmoji, focusAreas, showGroupSessions, showSocialCalendar, showSelfFunded } =
+  const employeeId = getEmployeeIdFromSession(req);
+  if (!employeeId) return res.status(401).json({ error: "Not authenticated" });
+
+  const { themeColor, avatarEmoji, focusAreas, showGroupSessions, showSocialCalendar, showSelfFunded } =
     req.body as {
-      employeeId?: number;
       themeColor?: string;
       avatarEmoji?: string;
       focusAreas?: string[];
@@ -80,15 +81,12 @@ router.put("/employee/preferences", async (req, res) => {
       showSocialCalendar?: boolean;
       showSelfFunded?: boolean;
     };
-  if (!employeeId) return res.status(400).json({ error: "employeeId is required" });
   if (themeColor && !THEME_COLORS.has(themeColor)) {
     return res.status(400).json({ error: "Invalid theme color" });
   }
   const cleanedFocusAreas = Array.isArray(focusAreas)
     ? focusAreas.filter((f) => FOCUS_AREAS.has(f))
     : undefined;
-  // Postgres array literal syntax — drizzle's sql`` template doesn't auto-convert
-  // JS arrays into array params, so build the literal string ourselves.
   const focusAreasLiteral = cleanedFocusAreas
     ? `{${cleanedFocusAreas.map((a) => `"${a}"`).join(",")}}`
     : null;
@@ -109,7 +107,6 @@ router.put("/employee/preferences", async (req, res) => {
     `);
     res.json(serialize(row.rows[0]));
 
-    // Award one-time "personalisation complete" points the first time focus areas are set.
     const hadNoFocusAreas = !before.focus_areas || before.focus_areas.length === 0;
     if (hadNoFocusAreas && cleanedFocusAreas && cleanedFocusAreas.length > 0) {
       awardPoints(employeeId, "profile_complete").catch((err) =>
@@ -122,10 +119,9 @@ router.put("/employee/preferences", async (req, res) => {
   }
 });
 
-// GET /employee/google/connect?employeeId=123 — begin OAuth consent for the employee.
 router.get("/employee/google/connect", (req, res) => {
-  const employeeId = Number(req.query.employeeId);
-  if (!employeeId) return res.status(400).json({ error: "employeeId is required" });
+  const employeeId = getEmployeeIdFromSession(req);
+  if (!employeeId) return res.status(401).json({ error: "Not authenticated" });
   if (!googleConfigured()) {
     return res.status(503).json({ error: "Google Calendar is not configured yet" });
   }
@@ -141,7 +137,6 @@ router.get("/employee/google/connect", (req, res) => {
   res.redirect(getAuthUrl(state, EMPLOYEE_CALLBACK_PATH));
 });
 
-// OAuth callback: store the refresh token on the employee's preferences.
 router.get("/employee/google/callback", async (req, res) => {
   const { code, state, error } = req.query as { code?: string; state?: string; error?: string };
   const redirectBack = (status: string) => res.redirect(`${PORTAL_PATH}?google=${status}`);
@@ -175,11 +170,10 @@ router.get("/employee/google/callback", async (req, res) => {
   }
 });
 
-// POST /employee/google/disconnect { employeeId }
 router.post("/employee/google/disconnect", async (req, res) => {
   if (!isSameOrigin(req)) return res.status(403).json({ error: "Invalid request origin" });
-  const employeeId = Number((req.body as { employeeId?: number }).employeeId);
-  if (!employeeId) return res.status(400).json({ error: "employeeId is required" });
+  const employeeId = getEmployeeIdFromSession(req);
+  if (!employeeId) return res.status(401).json({ error: "Not authenticated" });
   try {
     await db.execute(sql`
       UPDATE employee_preferences
@@ -193,11 +187,10 @@ router.post("/employee/google/disconnect", async (req, res) => {
   }
 });
 
-// POST /employee/google/sync { employeeId } — push upcoming items to the employee's Google Calendar.
 router.post("/employee/google/sync", async (req, res) => {
   if (!isSameOrigin(req)) return res.status(403).json({ error: "Invalid request origin" });
-  const employeeId = Number((req.body as { employeeId?: number }).employeeId);
-  if (!employeeId) return res.status(400).json({ error: "employeeId is required" });
+  const employeeId = getEmployeeIdFromSession(req);
+  if (!employeeId) return res.status(401).json({ error: "Not authenticated" });
 
   try {
     const prefRow = await db.execute<PreferencesRow>(sql`
@@ -208,7 +201,6 @@ router.post("/employee/google/sync", async (req, res) => {
 
     let synced = 0;
 
-    // Confirmed 1:1 bookings not yet pushed.
     const bookings = await db.execute<{
       id: number;
       session_type: string;
@@ -235,7 +227,6 @@ router.post("/employee/google/sync", async (req, res) => {
       synced++;
     }
 
-    // Group sessions the employee is attending.
     const groupSessions = await db.execute<{
       id: number;
       session_type: string;
@@ -260,7 +251,6 @@ router.post("/employee/google/sync", async (req, res) => {
       synced++;
     }
 
-    // Social events the employee has RSVP'd to.
     const socialEvents = await db.execute<{
       id: number;
       title: string;

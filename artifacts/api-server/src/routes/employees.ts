@@ -2,13 +2,26 @@ import { Router, type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import { employeesTable, companiesTable, bookingsTable } from "@workspace/db/schema";
 import { eq, and, sql } from "drizzle-orm";
-import { isAdmin } from "../lib/roles";
+import bcrypt from "bcryptjs";
+import { isAdmin, employeeId } from "../lib/roles";
+import { createSession, clearSession, getSessionId, SESSION_COOKIE, SESSION_TTL } from "../lib/auth";
 
-// Authorize a write to a company's employees:
-// - must be authenticated
-// - Soulful admins (non "hr:" ids) may write to any company
-// - HR users (id "hr:<id>") may only write to their own company
-// Returns true if authorized; otherwise writes the error response and returns false.
+function hashPassword(password: string): string {
+  return bcrypt.hashSync(password, 10);
+}
+function verifyPassword(password: string, hash: string): boolean {
+  return bcrypt.compareSync(password, hash);
+}
+function setSessionCookie(res: any, sid: string) {
+  res.cookie(SESSION_COOKIE, sid, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "none",
+    path: "/",
+    maxAge: SESSION_TTL,
+  });
+}
+
 async function authorizeCompanyWrite(req: Request, res: Response, companyId: number): Promise<boolean> {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "Not authenticated" });
@@ -25,7 +38,6 @@ async function authorizeCompanyWrite(req: Request, res: Response, companyId: num
     }
     return true;
   }
-  // Non-HR sessions must be Soulful admins; practitioners and other roles are forbidden.
   if (!isAdmin(req)) {
     res.status(403).json({ error: "Forbidden" });
     return false;
@@ -33,10 +45,8 @@ async function authorizeCompanyWrite(req: Request, res: Response, companyId: num
   return true;
 }
 
-// ── /employees/* ──────────────────────────────────────────────────────────────
 export const employeesRouter = Router();
 
-// POST /employees — register or find existing employee
 employeesRouter.post("/employees", async (req, res) => {
   try {
     const { name, email, companyId, sessionAllowancePerMonth } = req.body;
@@ -60,26 +70,113 @@ employeesRouter.post("/employees", async (req, res) => {
   }
 });
 
-// POST /employees/login — passwordless lookup by email + companyId
-employeesRouter.post("/employees/login", async (req, res) => {
+employeesRouter.post("/employees/claim", async (req, res) => {
   try {
-    const { email, companyId } = req.body;
-    if (!email || !companyId) {
-      return res.status(400).json({ error: "email and companyId are required" });
+    const { email, companyId, password } = req.body ?? {};
+    if (!email || !companyId || !password) {
+      return res.status(400).json({ error: "email, companyId, and password are required" });
+    }
+    if (typeof password !== "string" || password.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters" });
     }
     const [employee] = await db
       .select()
       .from(employeesTable)
-      .where(and(eq(employeesTable.email, email), eq(employeesTable.companyId, companyId)))
+      .where(and(eq(employeesTable.email, String(email).toLowerCase().trim()), eq(employeesTable.companyId, companyId)))
       .limit(1);
-    if (!employee) return res.status(404).json({ error: "Employee not found" });
-    return res.json(employee);
-  } catch {
-    return res.status(500).json({ error: "Failed to login" });
+    if (!employee) return res.status(404).json({ error: "No employee record found for this email" });
+    if (employee.passwordHash) {
+      return res.status(409).json({ error: "This account has already been set up — please log in instead" });
+    }
+
+    const passwordHash = hashPassword(password);
+    await db.update(employeesTable).set({ passwordHash }).where(eq(employeesTable.id, employee.id));
+
+    const sessionData = {
+      user: {
+        id: `employee:${employee.id}`,
+        email: employee.email,
+        firstName: employee.name.split(" ")[0] ?? employee.name,
+        lastName: employee.name.split(" ").slice(1).join(" ") || null,
+        profileImageUrl: null,
+      },
+      employeeId: employee.id,
+      access_token: "",
+    };
+    const sid = await createSession(sessionData as any);
+    setSessionCookie(res, sid);
+    res.status(201).json({ ok: true, user: sessionData.user });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to set up account" });
   }
 });
 
-// GET /employees/:id
+employeesRouter.post("/employees/login", async (req, res) => {
+  try {
+    const { email, companyId, password } = req.body ?? {};
+    if (!email || !companyId || !password) {
+      return res.status(400).json({ error: "email, companyId, and password are required" });
+    }
+    const [employee] = await db
+      .select()
+      .from(employeesTable)
+      .where(and(eq(employeesTable.email, String(email).toLowerCase().trim()), eq(employeesTable.companyId, companyId)))
+      .limit(1);
+    if (!employee || !employee.passwordHash) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+    if (!verifyPassword(password, employee.passwordHash)) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const sessionData = {
+      user: {
+        id: `employee:${employee.id}`,
+        email: employee.email,
+        firstName: employee.name.split(" ")[0] ?? employee.name,
+        lastName: employee.name.split(" ").slice(1).join(" ") || null,
+        profileImageUrl: null,
+      },
+      employeeId: employee.id,
+      access_token: "",
+    };
+    const sid = await createSession(sessionData as any);
+    setSessionCookie(res, sid);
+    res.json({ ok: true, user: sessionData.user });
+  } catch (err) {
+    res.status(500).json({ error: "Login failed" });
+  }
+});
+
+employeesRouter.post("/employees/logout", async (req, res) => {
+  const sid = getSessionId(req);
+  await clearSession(res, sid);
+  res.json({ ok: true });
+});
+
+employeesRouter.patch("/employee/password", async (req, res) => {
+  const id = employeeId(req);
+  if (!id) return res.status(401).json({ error: "Not authenticated" });
+  try {
+    const { currentPassword, newPassword } = req.body ?? {};
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: "currentPassword and newPassword are required" });
+    }
+    if (typeof newPassword !== "string" || newPassword.length < 8) {
+      return res.status(400).json({ error: "New password must be at least 8 characters" });
+    }
+    const [employee] = await db.select().from(employeesTable).where(eq(employeesTable.id, id));
+    if (!employee || !employee.passwordHash) return res.status(404).json({ error: "Employee not found" });
+    if (!verifyPassword(currentPassword, employee.passwordHash)) {
+      return res.status(401).json({ error: "Current password is incorrect" });
+    }
+    await db.update(employeesTable).set({ passwordHash: hashPassword(newPassword) }).where(eq(employeesTable.id, id));
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Failed to change password" });
+  }
+});
+
 employeesRouter.get("/employees/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -91,7 +188,6 @@ employeesRouter.get("/employees/:id", async (req, res) => {
   }
 });
 
-// GET /employees/:id/bookings
 employeesRouter.get("/employees/:id/bookings", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -107,10 +203,8 @@ employeesRouter.get("/employees/:id/bookings", async (req, res) => {
   }
 });
 
-// ── /companies/* employee-related routes ─────────────────────────────────────
 export const companyEmployeesRouter = Router();
 
-// GET /companies/join/:code — resolve invite code to company info (public)
 companyEmployeesRouter.get("/companies/join/:code", async (req, res) => {
   try {
     const code = req.params.code.toUpperCase();
@@ -126,7 +220,6 @@ companyEmployeesRouter.get("/companies/join/:code", async (req, res) => {
   }
 });
 
-// GET /companies/:id/employees — list employees for a company
 companyEmployeesRouter.get("/companies/:id/employees", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -143,7 +236,6 @@ companyEmployeesRouter.get("/companies/:id/employees", async (req, res) => {
   }
 });
 
-// POST /companies/:id/employees/bulk — create many employees at once (HR view)
 companyEmployeesRouter.post("/companies/:id/employees/bulk", async (req, res) => {
   try {
     const companyId = parseInt(req.params.id);
@@ -176,7 +268,7 @@ companyEmployeesRouter.post("/companies/:id/employees/bulk", async (req, res) =>
       if (!name || !email) return invalid.push({ row: i + 1, reason: "missing name or email" });
       if (!emailRe.test(email)) return invalid.push({ row: i + 1, reason: "invalid email" });
       const key = email.toLowerCase();
-      if (seen.has(key)) return; // skip duplicate (existing or earlier in batch)
+      if (seen.has(key)) return;
       seen.add(key);
       const allowance = Number(r.sessionAllowancePerMonth);
       toInsert.push({
@@ -199,7 +291,6 @@ companyEmployeesRouter.post("/companies/:id/employees/bulk", async (req, res) =>
   }
 });
 
-// GET /companies/:id/utilisation — usage stats for HR dashboard
 companyEmployeesRouter.get("/companies/:id/utilisation", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
