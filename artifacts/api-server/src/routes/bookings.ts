@@ -29,8 +29,6 @@ async function awardBookingPoints(companyId: number, employeeEmail: string): Pro
   }
 }
 
-
-
 function serializeBooking(
   b: typeof bookingsTable.$inferSelect,
   extras: { practitionerName?: string | null; companyName?: string | null; startTime?: string | null; endTime?: string | null }
@@ -60,9 +58,6 @@ router.get("/bookings", async (req, res) => {
       status?: string;
     };
 
-    // Never trust a client-supplied companyId for access control. HR sessions
-    // are hard-scoped server-side to their own company; only Soulful admins
-    // may see across companies (optionally still filtered by ?companyId=).
     let scopedCompanyId: number | null = null;
     if (isHr(req)) {
       scopedCompanyId = await resolveHrCompanyId(req);
@@ -84,9 +79,6 @@ router.get("/bookings", async (req, res) => {
     const slotMap = Object.fromEntries(slots.map((s) => [s.id, s]));
 
     let result = bookings.map((b) => {
-      // HR never sees the special-category content field. When the employee
-      // has not opted to share, their identity is masked too — HR only ever
-      // sees aggregate practitioner/session-type usage for private bookings.
       const redactForHr = isHr(req);
       const isPrivate = !b.shareWithEmployer;
       return {
@@ -131,11 +123,12 @@ router.get("/bookings/confirm", async (req, res) => {
     const stripe = await getUncachableStripeClient();
     const session = await stripe.checkout.sessions.retrieve(sessionId);
     if (session.payment_status === "paid") {
-      await db.update(bookingsTable).set({ status: "confirmed" }).where(eq(bookingsTable.id, booking.id));
+      await db.update(bookingsTable).set({
+        status: "confirmed",
+        payoutStatus: booking.payoutStatus === "auto_pending" ? "auto_paid" : booking.payoutStatus,
+      }).where(eq(bookingsTable.id, booking.id));
       return res.json({ status: "confirmed", bookingId: booking.id });
     }
-    // Note: self-funded (paymentType "self") bookings are intentionally excluded from
-    // gamification points per the privacy model — only corporate-funded bookings count.
     res.json({ status: booking.status, bookingId: booking.id });
   } catch (err) {
     logger.error({ err }, "Failed to confirm booking");
@@ -150,102 +143,183 @@ router.post("/bookings", async (req, res) => {
     const effectivePaymentType: string = paymentType === "self" ? "self" : "corporate";
     const effectiveShare: boolean = effectivePaymentType === "corporate" ? true : (shareWithEmployer !== false);
 
-    // For self-funded bookings, create a pending booking then redirect to Stripe Checkout.
-    if (effectivePaymentType === "self") {
-      const [p] = await db
-        .select({
-          name: practitionersTable.name,
-          specialism: practitionersTable.specialism,
-          sessionRateGbp: practitionersTable.sessionRateGbp,
-          inPersonRateGbp: practitionersTable.inPersonRateGbp,
-          onlineRateGbp: practitionersTable.onlineRateGbp,
-          googleRefreshToken: practitionersTable.googleRefreshToken,
-        })
-        .from(practitionersTable)
-        .where(eq(practitionersTable.id, practitionerId));
+    const stripe = await getUncachableStripeClient();
 
-      if (!p) return res.status(404).json({ error: "Practitioner not found" });
+    const [practitionerForPricing] = await db
+      .select({
+        name: practitionersTable.name,
+        specialism: practitionersTable.specialism,
+        inPersonRateGbp: practitionersTable.inPersonRateGbp,
+        onlineRateGbp: practitionersTable.onlineRateGbp,
+        sessionRateGbp: practitionersTable.sessionRateGbp,
+        commissionRatePct: practitionersTable.commissionRatePct,
+        stripeConnectAccountId: practitionersTable.stripeConnectAccountId,
+        googleRefreshToken: practitionersTable.googleRefreshToken,
+      })
+      .from(practitionersTable)
+      .where(eq(practitionersTable.id, practitionerId));
 
-      const rate = Number(p.inPersonRateGbp ?? p.onlineRateGbp ?? p.sessionRateGbp ?? 0);
-      if (rate <= 0) return res.status(400).json({ error: "Practitioner has no rate set" });
+    if (!practitionerForPricing) return res.status(404).json({ error: "Practitioner not found" });
 
-      const [booking] = await db
-        .insert(bookingsTable)
-        .values({ companyId, practitionerId, timeSlotId, sessionType, employeeName, employeeEmail, notes, paymentType: "self", status: "pending", shareWithEmployer: effectiveShare })
-        .returning();
+    const rate = Number(
+      practitionerForPricing.inPersonRateGbp ?? practitionerForPricing.onlineRateGbp ?? practitionerForPricing.sessionRateGbp ?? 0
+    );
+    if (rate <= 0) return res.status(400).json({ error: "Practitioner has no rate set" });
 
-      await db.update(timeSlotsTable).set({ isBooked: true }).where(eq(timeSlotsTable.id, timeSlotId));
+    const commissionPct = Number(practitionerForPricing.commissionRatePct ?? 10);
+    const amountPence = Math.round(rate * 100);
 
-      const stripe = await getUncachableStripeClient();
-      const origin = baseUrl();
-      const session = await stripe.checkout.sessions.create({
-        mode: "payment",
-        customer_email: employeeEmail,
-        line_items: [
-          {
-            quantity: 1,
-            price_data: {
-              currency: "gbp",
-              unit_amount: Math.round(rate * 100),
-              product_data: {
-                name: `1:1 session with ${p.name}`,
-                description: `${p.specialism ?? sessionType} — 60 minute session`,
-              },
-            },
-          },
-        ],
-        metadata: { bookingId: String(booking.id), practitionerId: String(practitionerId) },
-        success_url: `${origin}/practitioners/${practitionerId}?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${origin}/practitioners/${practitionerId}?checkout=cancelled`,
-      });
-
-      await db.update(bookingsTable).set({ stripeSessionId: session.id }).where(eq(bookingsTable.id, booking.id));
-
-      return res.status(201).json({
-        status: "payment_required",
-        checkoutUrl: session.url,
-        bookingId: booking.id,
-      });
-    }
-
-    // Corporate-funded booking — confirm immediately.
-    const [booking] = await db
-      .insert(bookingsTable)
-      .values({ companyId, practitionerId, timeSlotId, sessionType, employeeName, employeeEmail, notes, paymentType: "corporate", shareWithEmployer: true })
-      .returning();
-
-    await db.update(timeSlotsTable).set({ isBooked: true }).where(eq(timeSlotsTable.id, timeSlotId));
-    const prevTb = (await db.select({ tb: companiesTable.totalBookings }).from(companiesTable).where(eq(companiesTable.id, companyId)))[0]?.tb ?? 0;
-    await db.update(companiesTable).set({ totalBookings: prevTb + 1 }).where(eq(companiesTable.id, companyId));
-
-    const [p] = await db.select({ name: practitionersTable.name, googleRefreshToken: practitionersTable.googleRefreshToken }).from(practitionersTable).where(eq(practitionersTable.id, practitionerId));
-    const [c] = await db.select({ name: companiesTable.name }).from(companiesTable).where(eq(companiesTable.id, companyId));
-    const [slot] = await db.select().from(timeSlotsTable).where(eq(timeSlotsTable.id, timeSlotId));
-
-    if (p?.googleRefreshToken && slot) {
+    let canSplit = false;
+    if (practitionerForPricing.stripeConnectAccountId) {
       try {
-        const eventId = await createEvent(p.googleRefreshToken, {
-          summary: `Soulful session — ${employeeName}`,
-          description: `${sessionType ?? "Wellbeing session"} with ${employeeName} (${employeeEmail})${c?.name ? `, ${c.name}` : ""}.${notes ? `\n\nNotes: ${notes}` : ""}`,
-          start: slot.startTime,
-          end: slot.endTime,
-          attendeeEmail: employeeEmail,
-        });
-        await db.update(bookingsTable).set({ googleEventId: eventId }).where(eq(bookingsTable.id, booking.id));
-        booking.googleEventId = eventId;
-      } catch (err) {
-        logger.warn({ err, bookingId: booking.id }, "Failed to push booking to Google Calendar");
+        const acct = await stripe.accounts.retrieve(practitionerForPricing.stripeConnectAccountId);
+        canSplit = Boolean(acct.payouts_enabled);
+      } catch {
+        canSplit = false;
       }
     }
 
-    res.status(201).json(serializeBooking(booking, {
-      practitionerName: p?.name,
-      companyName: c?.name,
-      startTime: slot?.startTime?.toISOString(),
-      endTime: slot?.endTime?.toISOString(),
-    }));
+    // ── CORPORATE: off-session charge to the company's card on file ──────
+    if (effectivePaymentType === "corporate") {
+      const [company] = await db
+        .select({ stripeCustomerId: companiesTable.stripeCustomerId, name: companiesTable.name })
+        .from(companiesTable)
+        .where(eq(companiesTable.id, companyId));
 
-    awardBookingPoints(companyId, employeeEmail);
+      if (!company?.stripeCustomerId) {
+        return res.status(402).json({ error: "This company doesn't have a payment method on file. Please contact Soulful support." });
+      }
+
+      const paymentMethods = await stripe.paymentMethods.list({ customer: company.stripeCustomerId, type: "card" });
+      const paymentMethodId = paymentMethods.data[0]?.id;
+      if (!paymentMethodId) {
+        return res.status(402).json({ error: "No card on file for this company. Please update billing details before booking." });
+      }
+
+      let paymentIntent;
+      try {
+        paymentIntent = await stripe.paymentIntents.create({
+          amount: amountPence,
+          currency: "gbp",
+          customer: company.stripeCustomerId,
+          payment_method: paymentMethodId,
+          off_session: true,
+          confirm: true,
+          description: `Soulful session — ${practitionerForPricing.name} for ${employeeName}`,
+          metadata: { practitionerId: String(practitionerId), companyId: String(companyId), sessionType: sessionType ?? "" },
+          ...(canSplit
+            ? {
+                application_fee_amount: Math.round(amountPence * (commissionPct / 100)),
+                transfer_data: { destination: practitionerForPricing.stripeConnectAccountId! },
+              }
+            : {}),
+        });
+      } catch (err) {
+        logger.error({ err, companyId, practitionerId }, "Failed to charge company for corporate booking");
+        return res.status(402).json({ error: "Payment failed. Please check the company's card on file and try again." });
+      }
+
+      if (paymentIntent.status !== "succeeded") {
+        return res.status(402).json({ error: "Payment could not be completed. Please try again." });
+      }
+
+      const [booking] = await db
+        .insert(bookingsTable)
+        .values({
+          companyId, practitionerId, timeSlotId, sessionType, employeeName, employeeEmail, notes,
+          paymentType: "corporate", status: "confirmed", shareWithEmployer: effectiveShare,
+          priceGbp: String(rate),
+          commissionRatePct: String(commissionPct),
+          payoutStatus: canSplit ? "auto_paid" : "manual_pending",
+          stripeSessionId: paymentIntent.id,
+        })
+        .returning();
+
+      await db.update(timeSlotsTable).set({ isBooked: true }).where(eq(timeSlotsTable.id, timeSlotId));
+      const prevTb = (await db.select({ tb: companiesTable.totalBookings }).from(companiesTable).where(eq(companiesTable.id, companyId)))[0]?.tb ?? 0;
+      await db.update(companiesTable).set({ totalBookings: prevTb + 1 }).where(eq(companiesTable.id, companyId));
+
+      const [c] = await db.select({ name: companiesTable.name }).from(companiesTable).where(eq(companiesTable.id, companyId));
+      const [slot] = await db.select().from(timeSlotsTable).where(eq(timeSlotsTable.id, timeSlotId));
+
+      if (practitionerForPricing.googleRefreshToken && slot) {
+        try {
+          const eventId = await createEvent(practitionerForPricing.googleRefreshToken, {
+            summary: `Soulful session — ${employeeName}`,
+            description: `${sessionType ?? "Wellbeing session"} with ${employeeName} (${employeeEmail})${c?.name ? `, ${c.name}` : ""}.${notes ? `\n\nNotes: ${notes}` : ""}`,
+            start: slot.startTime,
+            end: slot.endTime,
+            attendeeEmail: employeeEmail,
+          });
+          await db.update(bookingsTable).set({ googleEventId: eventId }).where(eq(bookingsTable.id, booking.id));
+          booking.googleEventId = eventId;
+        } catch (err) {
+          logger.warn({ err, bookingId: booking.id }, "Failed to push booking to Google Calendar");
+        }
+      }
+
+      res.status(201).json(serializeBooking(booking, {
+        practitionerName: practitionerForPricing.name,
+        companyName: c?.name,
+        startTime: slot?.startTime?.toISOString(),
+        endTime: slot?.endTime?.toISOString(),
+      }));
+
+      awardBookingPoints(companyId, employeeEmail);
+      return;
+    }
+
+    // ── SELF-FUNDED: Stripe Checkout, split via destination charge ───────
+    const [pending] = await db
+      .insert(bookingsTable)
+      .values({
+        companyId, practitionerId, timeSlotId, sessionType, employeeName, employeeEmail, notes,
+        paymentType: "self", status: "pending", shareWithEmployer: effectiveShare,
+        priceGbp: String(rate),
+        commissionRatePct: String(commissionPct),
+        payoutStatus: canSplit ? "auto_pending" : "manual_pending",
+      })
+      .returning();
+
+    await db.update(timeSlotsTable).set({ isBooked: true }).where(eq(timeSlotsTable.id, timeSlotId));
+
+    const origin = baseUrl();
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      customer_email: employeeEmail,
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: "gbp",
+            unit_amount: amountPence,
+            product_data: {
+              name: `1:1 session with ${practitionerForPricing.name}`,
+              description: `${practitionerForPricing.specialism ?? sessionType} — 60 minute session`,
+            },
+          },
+        },
+      ],
+      ...(canSplit
+        ? {
+            payment_intent_data: {
+              application_fee_amount: Math.round(amountPence * (commissionPct / 100)),
+              transfer_data: { destination: practitionerForPricing.stripeConnectAccountId! },
+            },
+          }
+        : {}),
+      metadata: { bookingId: String(pending.id), practitionerId: String(practitionerId) },
+      success_url: `${origin}/practitioners/${practitionerId}?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/practitioners/${practitionerId}?checkout=cancelled`,
+    });
+
+    await db.update(bookingsTable).set({ stripeSessionId: session.id }).where(eq(bookingsTable.id, pending.id));
+
+    return res.status(201).json({
+      status: "payment_required",
+      checkoutUrl: session.url,
+      bookingId: pending.id,
+    });
   } catch (err) {
     logger.error({ err }, "Failed to create booking");
     res.status(500).json({ error: "Failed to create booking" });
@@ -307,5 +381,6 @@ router.patch("/bookings/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to update booking" });
   }
 });
+
 
 export default router;

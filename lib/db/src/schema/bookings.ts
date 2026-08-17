@@ -6,6 +6,9 @@ import { companiesTable } from "./companies";
 import { timeSlotsTable } from "./timeslots";
 
 export const bookingStatusEnum = pgEnum("booking_status", ["pending", "confirmed", "completed", "cancelled"]);
+export const payoutStatusEnum = pgEnum("payout_status", [
+  "auto_pending", "auto_paid", "manual_pending", "manual_paid",
+]);
 
 export const bookingsTable = pgTable("bookings", {
   id: serial("id").primaryKey(),
@@ -19,6 +22,8 @@ export const bookingsTable = pgTable("bookings", {
   notes: text("notes"),
   priceGbp: numeric("price_gbp", { precision: 10, scale: 2 }),
   commissionRatePct: numeric("commission_rate_pct", { precision: 5, scale: 2 }),
+  payoutStatus: payoutStatusEnum("payout_status").notNull().default("manual_pending"),
+  stripeTransferId: text("stripe_transfer_id"),
   googleEventId: text("google_event_id"),
   stripeSessionId: text("stripe_session_id"),
   paymentType: text("payment_type").notNull().default("corporate"),
