@@ -1,5 +1,6 @@
 import { OAuth2Client } from "google-auth-library";
 import { logger } from "./logger";
+import { baseUrl } from "./url";
 
 const SCOPES = [
   "https://www.googleapis.com/auth/calendar",
@@ -11,10 +12,12 @@ export function googleConfigured(): boolean {
   return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 }
 
+// Previously read process.env.REPLIT_DOMAINS, which only exists inside
+// Replit's own infrastructure — this threw "REPLIT_DOMAINS not set" on
+// Railway. baseUrl() (this same lib/url.ts used elsewhere) reads APP_URL
+// instead, which works on any host.
 export function getRedirectUri(callbackPath = "/api/practitioner/google/callback"): string {
-  const domain = process.env.REPLIT_DOMAINS?.split(",")[0];
-  if (!domain) throw new Error("REPLIT_DOMAINS not set");
-  return `https://${domain}${callbackPath}`;
+  return `${baseUrl()}${callbackPath}`;
 }
 
 function oauthClient(callbackPath?: string): OAuth2Client {
