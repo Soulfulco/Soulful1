@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { practitionersTable, googleBusyBlocksTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
+import { baseUrl } from "../lib/url";
 import { practitionerId } from "../lib/roles";
 import { isSameOrigin } from "../lib/csrf";
 import { logger } from "../lib/logger";
@@ -48,7 +49,7 @@ router.get("/practitioner/google/callback", async (req, res) => {
     state?: string;
     error?: string;
   };
-  const redirectBack = (status: string) => res.redirect(`${PORTAL_PATH}?google=${status}`);
+  const redirectBack = (status: string) => res.redirect(`${baseUrl()}${PORTAL_PATH}?google=${status}`);
 
   if (error || !code || !state) return redirectBack("error");
   if (!id) return res.status(401).json({ error: "Not authenticated" });
