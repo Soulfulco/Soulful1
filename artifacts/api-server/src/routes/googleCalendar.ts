@@ -137,5 +137,26 @@ export async function syncBusyBlocks(id: number, refreshToken: string): Promise<
   });
   return busy.length;
 }
+// GET /practitioner/google/busy-blocks — list stored busy periods so the
+// portal can show a visual calendar of which days/times are busy.
+router.get("/practitioner/google/busy-blocks", async (req, res) => {
+  const id = practitionerId(req);
+  if (!id) return res.status(401).json({ error: "Not authenticated" });
+  try {
+    const blocks = await db
+      .select()
+      .from(googleBusyBlocksTable)
+      .where(eq(googleBusyBlocksTable.practitionerId, id));
+    res.json(
+      blocks.map((b) => ({
+        startTime: b.startTime.toISOString(),
+        endTime: b.endTime.toISOString(),
+      })),
+    );
+  } catch (err) {
+    logger.error({ err, practitionerId: id }, "Failed to list Google busy blocks");
+    res.status(500).json({ error: "Failed to load busy times" });
+  }
+});
 
 export default router;

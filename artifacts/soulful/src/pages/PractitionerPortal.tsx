@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Loader2, AlertCircle, Plus, Trash2, CalendarClock, LogOut, CheckCircle2, RefreshCw,
   CreditCard, User, TrendingUp, PoundSterling, Star, Users2,
@@ -48,6 +49,9 @@ export default function PractitionerPortal() {
   const [googleBusy, setGoogleBusy] = useState(false);
   const [googleMsg, setGoogleMsg] = useState<string | null>(null);
 
+  const [busyBlocks, setBusyBlocks] = useState<{ startTime: string; endTime: string }[]>([]);
+  const [selectedDay, setSelectedDay] = useState<Date | undefined>(new Date());
+
   const [stripeStatus, setStripeStatus] = useState<{ connected: boolean; chargesEnabled: boolean; payoutsEnabled: boolean } | null>(null);
   const [stripeBusy, setStripeBusy] = useState(false);
 
@@ -70,6 +74,16 @@ export default function PractitionerPortal() {
       if (!res.ok) return;
       const data = (await res.json()) as { googleConnected?: boolean; googleEmail?: string | null };
       setGoogle({ connected: Boolean(data.googleConnected), email: data.googleEmail ?? null });
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const loadBusyBlocks = useCallback(async () => {
+    try {
+      const res = await fetch("/api/practitioner/google/busy-blocks", { credentials: "include" });
+      if (!res.ok) return;
+      setBusyBlocks(await res.json());
     } catch {
       /* ignore */
     }
@@ -112,6 +126,7 @@ export default function PractitionerPortal() {
 
   useEffect(() => {
     loadGoogle();
+    loadBusyBlocks();
     loadStripeStatus();
     loadProfile();
     loadStats();
@@ -123,7 +138,7 @@ export default function PractitionerPortal() {
       else setGoogleMsg("Couldn't connect Google Calendar. Please try again.");
       window.history.replaceState({}, "", window.location.pathname);
     }
-  }, [loadGoogle, loadStripeStatus, loadProfile, loadStats]);
+  }, [loadGoogle, loadBusyBlocks, loadStripeStatus, loadProfile, loadStats]);
 
   async function handleGoogleSync() {
     setGoogleBusy(true);
@@ -134,6 +149,7 @@ export default function PractitionerPortal() {
       if (!res.ok) throw new Error(data.error ?? "Sync failed");
       setGoogleMsg(`Synced. ${data.busyBlocks ?? 0} busy period(s) imported.`);
       await load();
+      await loadBusyBlocks();
     } catch (err) {
       setGoogleMsg(err instanceof Error ? err.message : "Sync failed");
     } finally {
@@ -148,6 +164,7 @@ export default function PractitionerPortal() {
       const res = await fetch("/api/practitioner/google/disconnect", { method: "POST", credentials: "include" });
       if (!res.ok) throw new Error("Failed to disconnect");
       setGoogle({ connected: false, email: null });
+      setBusyBlocks([]);
       setGoogleMsg("Google Calendar disconnected.");
       await load();
     } catch (err) {
@@ -373,6 +390,46 @@ export default function PractitionerPortal() {
               <Alert>
                 <AlertDescription>{googleMsg}</AlertDescription>
               </Alert>
+            )}
+            {google?.connected && (
+              <div className="pt-2 border-t">
+                <p className="text-sm font-medium mb-3">Busy times from your calendar</p>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDay}
+                    onSelect={setSelectedDay}
+                    modifiers={{
+                      busy: busyBlocks.map((b) => new Date(b.startTime)),
+                    }}
+                    modifiersClassNames={{
+                      busy: "bg-destructive/15 text-destructive font-semibold",
+                    }}
+                    className="rounded-md border"
+                  />
+                  <div className="flex-1 space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      {selectedDay?.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}
+                    </p>
+                    {(() => {
+                      const dayBlocks = busyBlocks.filter((b) => {
+                        const s = new Date(b.startTime);
+                        return selectedDay && s.toDateString() === selectedDay.toDateString();
+                      });
+                      if (dayBlocks.length === 0) {
+                        return <p className="text-sm text-muted-foreground">No busy times this day.</p>;
+                      }
+                      return dayBlocks.map((b, i) => (
+                        <div key={i} className="text-sm rounded-md bg-muted px-3 py-2">
+                          {new Date(b.startTime).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                          {" – "}
+                          {new Date(b.endTime).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
