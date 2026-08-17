@@ -366,7 +366,7 @@ export default function PractitionerPortal() {
               </>
             ) : (
               <Button asChild>
-                <a href="/api/practitioner/google/connect">Connect Google Calendar</a>
+                <a href="https://api.soulfulco.uk/api/practitioner/google/connect">Connect Google Calendar</a>
               </Button>
             )}
             {googleMsg && (
