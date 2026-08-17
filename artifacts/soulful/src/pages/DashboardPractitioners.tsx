@@ -23,21 +23,24 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { PhotoUpload } from "@/components/PhotoUpload";
-import { Plus, Pencil, Upload, FileSpreadsheet } from "lucide-react";
+import { DocumentUpload } from "@/components/DocumentUpload";
+import { Plus, Pencil, Upload, FileSpreadsheet, FileText, Phone } from "lucide-react";
 
 const EMPTY_FORM = {
   name: "",
   email: "",
+  phoneNumber: "",
   specialism: "",
   bio: "",
   inPersonRateGbp: "",
   onlineRateGbp: "",
   location: "",
   qualifications: "",
+  qualificationsFileUrl: "",
+  insuranceFileUrl: "",
   avatarUrl: "",
   subscriptionStatus: "trial" as "active" | "inactive" | "trial",
 };
-
 const HEADER_MAP: Record<string, keyof PractitionerBulkItem> = {
   name: "name",
   fullname: "name",
@@ -64,7 +67,6 @@ const HEADER_MAP: Record<string, keyof PractitionerBulkItem> = {
   qualification: "qualifications",
   quals: "qualifications",
 };
-
 const POSITIONAL: (keyof PractitionerBulkItem)[] = [
   "name",
   "email",
@@ -74,9 +76,7 @@ const POSITIONAL: (keyof PractitionerBulkItem)[] = [
   "location",
   "qualifications",
 ];
-
 const normalizeHeader = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-
 function splitRow(line: string, delim: string): string[] {
   if (delim === "\t") return line.split("\t").map((c) => c.trim());
   const out: string[] = [];
@@ -101,20 +101,16 @@ function splitRow(line: string, delim: string): string[] {
   out.push(cur.trim());
   return out;
 }
-
 function parseBulkInput(text: string): PractitionerBulkItem[] {
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length === 0) return [];
-
   const delim = lines[0].includes("\t") ? "\t" : ",";
   const firstCells = splitRow(lines[0], delim).map(normalizeHeader);
   const hasHeader = firstCells.some((c) => HEADER_MAP[c] !== undefined);
-
   const columns: (keyof PractitionerBulkItem | null)[] = hasHeader
     ? firstCells.map((c) => HEADER_MAP[c] ?? null)
     : POSITIONAL;
   const dataLines = hasHeader ? lines.slice(1) : lines;
-
   return dataLines.map((line) => {
     const cells = splitRow(line, delim);
     const row: Record<string, string> = {};
@@ -138,7 +134,6 @@ function parseBulkInput(text: string): PractitionerBulkItem[] {
     return item;
   });
 }
-
 export default function DashboardPractitioners() {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -147,49 +142,44 @@ export default function DashboardPractitioners() {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkText, setBulkText] = useState("");
   const [bulkResult, setBulkResult] = useState<PractitionerBulkResult | null>(null);
-
   const { data: specialisms } = useListSpecialisms({
     query: { queryKey: getListSpecialismsQueryKey() }
   });
   const SPECIALISMS = (specialisms ?? []).map((s) => s.name);
-
   const updatePractitioner = useUpdatePractitioner();
   const createPractitioner = useCreatePractitioner();
   const bulkCreate = useBulkCreatePractitioners();
-
   const parsedBulk = parseBulkInput(bulkText);
-
   const { data: practitioners, isLoading, refetch } = useListPractitioners(
     {},
     { query: { queryKey: getListPractitionersQueryKey() } }
   );
-
   const isEditing = editingId !== null;
   const pending = (practitioners ?? []).filter((p) => p.approvalStatus === "pending");
-
   const openAdd = () => {
     setEditingId(null);
     setForm(EMPTY_FORM);
     setOpen(true);
   };
-
   const openEdit = (p: NonNullable<typeof practitioners>[number]) => {
     setEditingId(p.id);
     setForm({
       name: p.name ?? "",
       email: p.email ?? "",
+      phoneNumber: p.phoneNumber ?? "",
       specialism: p.specialism ?? "",
       bio: p.bio ?? "",
       inPersonRateGbp: p.inPersonRateGbp != null ? String(p.inPersonRateGbp) : "",
       onlineRateGbp: p.onlineRateGbp != null ? String(p.onlineRateGbp) : "",
       location: p.location ?? "",
       qualifications: p.qualifications ?? "",
+      qualificationsFileUrl: p.qualificationsFileUrl ?? "",
+      insuranceFileUrl: p.insuranceFileUrl ?? "",
       avatarUrl: p.avatarUrl ?? "",
       subscriptionStatus: (p.subscriptionStatus ?? "trial") as "active" | "inactive" | "trial",
     });
     setOpen(true);
   };
-
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
     if (!next) {
@@ -197,7 +187,6 @@ export default function DashboardPractitioners() {
       setForm(EMPTY_FORM);
     }
   };
-
   const handleToggleActive = (id: number, currentStatus: boolean) => {
     updatePractitioner.mutate(
       { id, data: { isActive: !currentStatus } },
@@ -209,7 +198,6 @@ export default function DashboardPractitioners() {
       }
     );
   };
-
   const handleApproval = (id: number, name: string, decision: "approved" | "rejected") => {
     updatePractitioner.mutate(
       { id, data: { approvalStatus: decision } },
@@ -230,11 +218,9 @@ export default function DashboardPractitioners() {
       }
     );
   };
-
   const handleChange = (field: keyof typeof EMPTY_FORM, value: string) => {
     setForm((f) => ({ ...f, [field]: value }));
   };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const inPersonRate = form.inPersonRateGbp ? Number(form.inPersonRateGbp) : undefined;
@@ -251,7 +237,6 @@ export default function DashboardPractitioners() {
       return;
     }
     const baseRate = (inPersonRate ?? onlineRate)!;
-
     if (isEditing && editingId !== null) {
       updatePractitioner.mutate(
         {
@@ -260,6 +245,9 @@ export default function DashboardPractitioners() {
             name: form.name,
             specialism: form.specialism,
             bio: form.bio,
+            phoneNumber: form.phoneNumber,
+            qualificationsFileUrl: form.qualificationsFileUrl,
+            insuranceFileUrl: form.insuranceFileUrl,
             // Send null (not undefined) for a cleared rate so the API clears it;
             // the base sessionRateGbp is derived server-side from these two.
             inPersonRateGbp: inPersonRate ?? null,
@@ -282,12 +270,12 @@ export default function DashboardPractitioners() {
       );
       return;
     }
-
     createPractitioner.mutate(
       {
         data: {
           name: form.name,
           email: form.email,
+          phoneNumber: form.phoneNumber,
           specialism: form.specialism,
           bio: form.bio,
           sessionRateGbp: baseRate,
@@ -295,6 +283,8 @@ export default function DashboardPractitioners() {
           onlineRateGbp: onlineRate,
           location: form.location || undefined,
           qualifications: form.qualifications || undefined,
+          qualificationsFileUrl: form.qualificationsFileUrl || undefined,
+          insuranceFileUrl: form.insuranceFileUrl || undefined,
           avatarUrl: form.avatarUrl || undefined,
           subscriptionStatus: form.subscriptionStatus,
           isActive: true,
@@ -312,7 +302,6 @@ export default function DashboardPractitioners() {
       }
     );
   };
-
   const handleBulkOpenChange = (next: boolean) => {
     setBulkOpen(next);
     if (!next) {
@@ -320,14 +309,12 @@ export default function DashboardPractitioners() {
       setBulkResult(null);
     }
   };
-
   const handleBulkFile = (file: File | undefined) => {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => setBulkText(String(reader.result ?? ""));
     reader.readAsText(file);
   };
-
   const handleBulkSubmit = () => {
     if (parsedBulk.length === 0) {
       toast({ title: "Nothing to import", description: "Paste rows or upload a CSV first.", variant: "destructive" });
@@ -350,7 +337,6 @@ export default function DashboardPractitioners() {
       }
     );
   };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -358,7 +344,6 @@ export default function DashboardPractitioners() {
           <h1 className="text-2xl font-serif text-foreground">Practitioners Directory</h1>
           <p className="text-muted-foreground text-sm">Manage practitioner profiles and directory visibility.</p>
         </div>
-
         <div className="flex items-center gap-2">
         <Dialog open={bulkOpen} onOpenChange={handleBulkOpenChange}>
           <DialogTrigger asChild>
@@ -380,7 +365,6 @@ export default function DashboardPractitioners() {
                 </p>
                 <p>Duplicate emails (already in the directory or repeated in the file) are skipped automatically.</p>
               </div>
-
               <div className="space-y-1.5">
                 <Label htmlFor="bulk-file" className="flex items-center gap-2">
                   <Upload className="h-4 w-4" /> Upload CSV
@@ -392,7 +376,6 @@ export default function DashboardPractitioners() {
                   onChange={(e) => handleBulkFile(e.target.files?.[0])}
                 />
               </div>
-
               <div className="space-y-1.5">
                 <Label htmlFor="bulk-text">Or paste rows</Label>
                 <Textarea
@@ -404,7 +387,6 @@ export default function DashboardPractitioners() {
                   onChange={(e) => setBulkText(e.target.value)}
                 />
               </div>
-
               {parsedBulk.length > 0 && !bulkResult && (
                 <div className="rounded-md border border-border overflow-hidden">
                   <div className="bg-muted/50 px-3 py-2 text-sm font-medium">{parsedBulk.length} row{parsedBulk.length === 1 ? "" : "s"} ready to import</div>
@@ -432,7 +414,6 @@ export default function DashboardPractitioners() {
                   </div>
                 </div>
               )}
-
               {bulkResult && (
                 <div className="rounded-md border border-border p-3 text-sm space-y-2">
                   <div className="flex gap-4">
@@ -449,7 +430,6 @@ export default function DashboardPractitioners() {
                   )}
                 </div>
               )}
-
               <div className="flex justify-end gap-2 pt-2">
                 <Button variant="outline" onClick={() => handleBulkOpenChange(false)}>
                   {bulkResult ? "Close" : "Cancel"}
@@ -463,7 +443,6 @@ export default function DashboardPractitioners() {
             </div>
           </DialogContent>
         </Dialog>
-
         <Dialog open={open} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
             <Button className="gap-2" onClick={openAdd}>
@@ -487,7 +466,10 @@ export default function DashboardPractitioners() {
                   {isEditing && <p className="text-xs text-muted-foreground">Email can't be changed.</p>}
                 </div>
               </div>
-
+              <div className="space-y-1.5">
+                <Label htmlFor="phoneNumber">Phone</Label>
+                <Input id="phoneNumber" type="tel" placeholder="07123 456789" value={form.phoneNumber} onChange={(e) => handleChange("phoneNumber", e.target.value)} />
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label>Specialism <span className="text-destructive">*</span></Label>
@@ -511,12 +493,10 @@ export default function DashboardPractitioners() {
                   <Input id="onlineRate" type="number" min="0" step="5" placeholder="60" value={form.onlineRateGbp} onChange={(e) => handleChange("onlineRateGbp", e.target.value)} />
                 </div>
               </div>
-
               <div className="space-y-1.5">
                 <Label htmlFor="bio">Bio <span className="text-destructive">*</span></Label>
                 <Textarea id="bio" placeholder="A short description of the practitioner's background and approach..." rows={3} value={form.bio} onChange={(e) => handleChange("bio", e.target.value)} />
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="location">Location</Label>
@@ -538,18 +518,23 @@ export default function DashboardPractitioners() {
                   </div>
                 )}
               </div>
-
               <div className="space-y-1.5">
                 <Label htmlFor="qualifications">Qualifications</Label>
                 <Input id="qualifications" placeholder="e.g. REPs Level 3, YMCA Diploma" value={form.qualifications} onChange={(e) => handleChange("qualifications", e.target.value)} />
               </div>
-
+              <div className="space-y-1.5">
+                <Label>Qualification documents</Label>
+                <DocumentUpload label="qualification" value={form.qualificationsFileUrl} onChange={(url) => handleChange("qualificationsFileUrl", url)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Insurance document</Label>
+                <DocumentUpload label="insurance certificate" value={form.insuranceFileUrl} onChange={(url) => handleChange("insuranceFileUrl", url)} />
+              </div>
               <div className="space-y-1.5">
                 <Label>Profile photo</Label>
                 <PhotoUpload value={form.avatarUrl} onChange={(url) => handleChange("avatarUrl", url)} />
                 <p className="text-xs text-muted-foreground">Upload a headshot (JPG or PNG, up to 5MB).</p>
               </div>
-
               <div className="flex justify-end gap-3 pt-2">
                 <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>Cancel</Button>
                 <Button type="submit" disabled={isEditing ? updatePractitioner.isPending : createPractitioner.isPending}>
@@ -563,7 +548,6 @@ export default function DashboardPractitioners() {
         </Dialog>
         </div>
       </div>
-
       {pending.length > 0 && (
         <Card className="border border-secondary/30 bg-secondary/5 shadow-sm p-6 space-y-4">
           <div>
@@ -587,7 +571,27 @@ export default function DashboardPractitioners() {
                     <div className="text-xs text-muted-foreground truncate">
                       <span className="capitalize">{p.specialism}</span> · {rateSummary(p)}
                     </div>
-                    <a href={`mailto:${p.email}`} className="text-xs text-secondary hover:underline">{p.email}</a>
+                    <div className="flex items-center gap-3 mt-1 flex-wrap">
+                      <a href={`mailto:${p.email}`} className="text-xs text-secondary hover:underline">{p.email}</a>
+                      {p.phoneNumber && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Phone className="h-3 w-3" /> {p.phoneNumber}
+                        </span>
+                      )}
+                      {p.qualificationsFileUrl && (
+                        <a href={p.qualificationsFileUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-secondary hover:underline flex items-center gap-1">
+                          <FileText className="h-3 w-3" /> Qualifications
+                        </a>
+                      )}
+                      {p.insuranceFileUrl && (
+                        <a href={p.insuranceFileUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-secondary hover:underline flex items-center gap-1">
+                          <FileText className="h-3 w-3" /> Insurance
+                        </a>
+                      )}
+                      {!p.qualificationsFileUrl && !p.insuranceFileUrl && (
+                        <span className="text-xs text-amber-600">No documents uploaded yet</span>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -616,7 +620,6 @@ export default function DashboardPractitioners() {
           </div>
         </Card>
       )}
-
       <Card className="border-none shadow-sm overflow-hidden bg-card">
         <div className="overflow-x-auto">
           <Table>

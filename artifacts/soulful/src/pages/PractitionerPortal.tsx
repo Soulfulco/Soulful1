@@ -6,7 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, AlertCircle, Plus, Trash2, CalendarClock, LogOut, CheckCircle2, RefreshCw } from "lucide-react";
+import {
+  Loader2, AlertCircle, Plus, Trash2, CalendarClock, LogOut, CheckCircle2, RefreshCw,
+  CreditCard, User, TrendingUp, PoundSterling, Star, Users2,
+} from "lucide-react";
+import { DocumentUpload } from "@/components/DocumentUpload";
 
 type Slot = {
   id: number;
@@ -44,6 +48,22 @@ export default function PractitionerPortal() {
   const [googleBusy, setGoogleBusy] = useState(false);
   const [googleMsg, setGoogleMsg] = useState<string | null>(null);
 
+  const [stripeStatus, setStripeStatus] = useState<{ connected: boolean; chargesEnabled: boolean; payoutsEnabled: boolean } | null>(null);
+  const [stripeBusy, setStripeBusy] = useState(false);
+
+  const [profile, setProfile] = useState({ phoneNumber: "", qualificationsFileUrl: "", insuranceFileUrl: "" });
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileMsg, setProfileMsg] = useState<string | null>(null);
+
+  const [stats, setStats] = useState<{
+    earningsThisMonthGbp: number;
+    bookingsThisMonth: number;
+    upcomingBookings: number;
+    avgCapacityFilledPct: number | null;
+    ratingOutOf5: number | null;
+    totalReviews: number;
+  } | null>(null);
+
   const loadGoogle = useCallback(async () => {
     try {
       const res = await fetch("/api/practitioner/me", { credentials: "include" });
@@ -55,8 +75,46 @@ export default function PractitionerPortal() {
     }
   }, []);
 
+  const loadStripeStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/practitioner/stripe/status", { credentials: "include" });
+      if (!res.ok) return;
+      setStripeStatus(await res.json());
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const loadProfile = useCallback(async () => {
+    try {
+      const res = await fetch("/api/practitioner/me", { credentials: "include" });
+      if (!res.ok) return;
+      const data = await res.json();
+      setProfile({
+        phoneNumber: data.phoneNumber ?? "",
+        qualificationsFileUrl: data.qualificationsFileUrl ?? "",
+        insuranceFileUrl: data.insuranceFileUrl ?? "",
+      });
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const loadStats = useCallback(async () => {
+    try {
+      const res = await fetch("/api/practitioner/dashboard-stats", { credentials: "include" });
+      if (!res.ok) return;
+      setStats(await res.json());
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   useEffect(() => {
     loadGoogle();
+    loadStripeStatus();
+    loadProfile();
+    loadStats();
     const params = new URLSearchParams(window.location.search);
     const status = params.get("google");
     if (status) {
@@ -65,7 +123,7 @@ export default function PractitionerPortal() {
       else setGoogleMsg("Couldn't connect Google Calendar. Please try again.");
       window.history.replaceState({}, "", window.location.pathname);
     }
-  }, [loadGoogle]);
+  }, [loadGoogle, loadStripeStatus, loadProfile, loadStats]);
 
   async function handleGoogleSync() {
     setGoogleBusy(true);
@@ -96,6 +154,37 @@ export default function PractitionerPortal() {
       setGoogleMsg(err instanceof Error ? err.message : "Failed to disconnect");
     } finally {
       setGoogleBusy(false);
+    }
+  }
+
+  async function handleStripeConnect() {
+    setStripeBusy(true);
+    try {
+      const res = await fetch("/api/practitioner/stripe/connect", { method: "POST", credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to start onboarding");
+      window.location.href = data.url;
+    } catch {
+      setStripeBusy(false);
+    }
+  }
+
+  async function handleProfileSave() {
+    setProfileSaving(true);
+    setProfileMsg(null);
+    try {
+      const res = await fetch("/api/practitioner/profile", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profile),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      setProfileMsg("Saved.");
+    } catch {
+      setProfileMsg("Couldn't save — please try again.");
+    } finally {
+      setProfileSaving(false);
     }
   }
 
@@ -196,6 +285,61 @@ export default function PractitionerPortal() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
+              <TrendingUp className="h-5 w-5" /> Your performance
+            </CardTitle>
+            <CardDescription>Real figures from your actual bookings — no estimates.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!stats ? (
+              <div className="flex justify-center py-6">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <div className="rounded-lg border p-3">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                    <PoundSterling className="h-3.5 w-3.5" /> Earnings this month
+                  </div>
+                  <p className="text-xl font-semibold">£{stats.earningsThisMonthGbp.toFixed(2)}</p>
+                  <p className="text-xs text-muted-foreground">After commission</p>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                    <CalendarClock className="h-3.5 w-3.5" /> Bookings this month
+                  </div>
+                  <p className="text-xl font-semibold">{stats.bookingsThisMonth}</p>
+                </div>
+                <div className="rounded-lg border p-3">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                    <Users2 className="h-3.5 w-3.5" /> Upcoming
+                  </div>
+                  <p className="text-xl font-semibold">{stats.upcomingBookings}</p>
+                </div>
+                {stats.avgCapacityFilledPct !== null && (
+                  <div className="rounded-lg border p-3">
+                    <div className="text-xs text-muted-foreground mb-1">Group session capacity</div>
+                    <p className="text-xl font-semibold">{stats.avgCapacityFilledPct}%</p>
+                    <p className="text-xs text-muted-foreground">Last 30 days</p>
+                  </div>
+                )}
+                {stats.ratingOutOf5 !== null && (
+                  <div className="rounded-lg border p-3">
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                      <Star className="h-3.5 w-3.5" /> Rating
+                    </div>
+                    <p className="text-xl font-semibold">
+                      {stats.ratingOutOf5.toFixed(1)} <span className="text-sm text-muted-foreground">({stats.totalReviews})</span>
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
               <CalendarClock className="h-5 w-5" /> Google Calendar
             </CardTitle>
             <CardDescription>
@@ -208,9 +352,7 @@ export default function PractitionerPortal() {
               <>
                 <div className="flex items-center gap-2 text-sm">
                   <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  <span>
-                    Connected{google.email ? ` as ${google.email}` : ""}
-                  </span>
+                  <span>Connected{google.email ? ` as ${google.email}` : ""}</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outline" size="sm" onClick={handleGoogleSync} disabled={googleBusy}>
@@ -238,87 +380,4 @@ export default function PractitionerPortal() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <Plus className="h-5 w-5" /> Add availability
-            </CardTitle>
-            <CardDescription>Create a time slot clients can book.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleAdd} className="grid gap-4 sm:grid-cols-5 sm:items-end">
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="date">Date</Label>
-                <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="start">Start</Label>
-                <Input id="start" type="time" value={start} onChange={(e) => setStart(e.target.value)} required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="end">End</Label>
-                <Input id="end" type="time" value={end} onChange={(e) => setEnd(e.target.value)} required />
-              </div>
-              <Button type="submit" disabled={adding} className="w-full">
-                {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add"}
-              </Button>
-              {formError && (
-                <Alert variant="destructive" className="sm:col-span-5">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{formError}</AlertDescription>
-                </Alert>
-              )}
-            </form>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <CalendarClock className="h-5 w-5" /> Your availability
-            </CardTitle>
-            <CardDescription>Upcoming and existing time slots.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : error ? (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            ) : slots.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-6 text-center">
-                No availability yet. Add a slot above to get started.
-              </p>
-            ) : (
-              <ul className="divide-y">
-                {slots.map((s) => (
-                  <li key={s.id} className="flex items-center justify-between py-3">
-                    <div className="flex items-center gap-3">
-                      <div>
-                        <p className="text-sm font-medium">
-                          {fmt(s.startTime)} – {new Date(s.endTime).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
-                        </p>
-                        {s.sessionType && (
-                          <p className="text-xs text-muted-foreground">{s.sessionType}</p>
-                        )}
-                      </div>
-                      {s.isBooked && <Badge variant="secondary">Booked</Badge>}
-                    </div>
-                    {s.isBooked ? (
-                      <span className="text-xs text-muted-foreground">Cannot remove</span>
-                    ) : (
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(s.id)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      </main>
-    </div>
-  );
-}
+              <User className="h-5 w-5" /> Profile

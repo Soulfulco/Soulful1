@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { CheckCircle2, User } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PhotoUpload } from "@/components/PhotoUpload";
+import { DocumentUpload } from "@/components/DocumentUpload";
 
 export default function ForPractitioners() {
   const c = useSiteContent();
@@ -20,11 +21,11 @@ export default function ForPractitioners() {
     query: { queryKey: getListSpecialismsQueryKey() }
   });
   const SPECIALISMS = (specialismsData ?? []).map((s) => s.name);
-  
+
   const { data: plans, isLoading: plansLoading } = useListSubscriptions({
     query: { queryKey: getListSubscriptionsQueryKey() }
   });
-  
+
   const practitionerPlans = plans?.filter(p => p.planType === 'practitioner') || [];
 
   const { data: companies } = useListCompanyShowcase();
@@ -33,16 +34,19 @@ export default function ForPractitioners() {
   const createPractitioner = useCreatePractitioner();
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    phoneNumber: "",
     specialism: "",
     bio: "",
     inPersonRateGbp: "",
     onlineRateGbp: "",
     location: "",
     qualifications: "",
+    qualificationsFileUrl: "",
+    insuranceFileUrl: "",
     avatarUrl: "",
     password: "",
   });
@@ -72,6 +76,7 @@ export default function ForPractitioners() {
       data: {
         name: formData.name,
         email: formData.email,
+        phoneNumber: formData.phoneNumber,
         specialism: formData.specialism,
         bio: formData.bio,
         sessionRateGbp: (inPersonRate ?? onlineRate)!,
@@ -79,13 +84,13 @@ export default function ForPractitioners() {
         onlineRateGbp: onlineRate,
         location: formData.location,
         qualifications: formData.qualifications,
+        qualificationsFileUrl: formData.qualificationsFileUrl || undefined,
+        insuranceFileUrl: formData.insuranceFileUrl || undefined,
         avatarUrl: formData.avatarUrl || undefined,
         password: formData.password,
       }
     }, {
       onSuccess: () => {
-        // New practitioners are not listed instantly: their application goes to the
-        // Soulful team for review and an onboarding call before the profile goes live.
         setSubmitted(true);
         window.scrollTo({ top: 0, behavior: "smooth" });
         toast({ title: "Application received", description: "Thanks! Our team will review your application and arrange a call before your profile goes live." });
@@ -129,7 +134,7 @@ export default function ForPractitioners() {
           {/* Left col: Plans */}
           <div>
             <h2 className="text-2xl font-serif mb-8">Listing Plans</h2>
-            
+
             <div className="space-y-6">
               {plansLoading ? (
                 <div className="animate-pulse space-y-6">
@@ -174,11 +179,11 @@ export default function ForPractitioners() {
                 ))
               )}
             </div>
-            
+
             <div className="mt-12 bg-muted/50 p-6 rounded-2xl border border-border/50">
               <h3 className="font-serif text-lg mb-4">Why join Soulful?</h3>
               <div className="space-y-4 text-sm text-muted-foreground">
-                <p><strong className="text-foreground">Keep 100% of your rate.</strong> We charge a flat monthly listing fee, not a percentage of your hard-earned session fee.</p>
+                <p><strong className="text-foreground">Keep 90% of your rate.</strong> No monthly fee — we only take a small commission when you're actually booked.</p>
                 <p><strong className="text-foreground">High intent clients.</strong> Corporate employees have a wellbeing allowance ready to spend on your services.</p>
                 <p><strong className="text-foreground">Automated booking.</strong> Our built-in calendar system means less back-and-forth email scheduling.</p>
               </div>
@@ -249,6 +254,19 @@ export default function ForPractitioners() {
                         onChange={(e) => setFormData({...formData, email: e.target.value})}
                       />
                     </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="phoneNumber">Phone Number</Label>
+                    <Input
+                      id="phoneNumber"
+                      type="tel"
+                      required
+                      className="bg-background h-11"
+                      value={formData.phoneNumber}
+                      onChange={(e) => setFormData({...formData, phoneNumber: e.target.value})}
+                      placeholder="07123 456789"
+                    />
                   </div>
 
                   <div className="grid gap-2">
@@ -325,6 +343,26 @@ export default function ForPractitioners() {
                       onChange={(e) => setFormData({...formData, qualifications: e.target.value})}
                       placeholder="e.g. 500h YTT, BSc Nutrition"
                     />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label>Qualification documents</Label>
+                    <DocumentUpload
+                      label="qualification"
+                      value={formData.qualificationsFileUrl}
+                      onChange={(url) => setFormData({...formData, qualificationsFileUrl: url})}
+                    />
+                    <p className="text-xs text-muted-foreground">Certificates or proof of your qualifications (PDF, Word, or image).</p>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label>Insurance document</Label>
+                    <DocumentUpload
+                      label="insurance certificate"
+                      value={formData.insuranceFileUrl}
+                      onChange={(url) => setFormData({...formData, insuranceFileUrl: url})}
+                    />
+                    <p className="text-xs text-muted-foreground">Your current professional indemnity / public liability insurance certificate.</p>
                   </div>
 
                   <div className="grid gap-2">
