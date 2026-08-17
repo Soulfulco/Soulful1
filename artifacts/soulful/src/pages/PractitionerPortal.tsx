@@ -380,4 +380,157 @@ export default function PractitionerPortal() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <User className="h-5 w-5" /> Profile
+              <User className="h-5 w-5" /> Profile & documents
+            </CardTitle>
+            <CardDescription>Keep your contact details and documents up to date.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="phoneNumber">Phone number</Label>
+              <Input
+                id="phoneNumber"
+                type="tel"
+                value={profile.phoneNumber}
+                onChange={(e) => setProfile((p) => ({ ...p, phoneNumber: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Qualification documents</Label>
+              <DocumentUpload
+                label="qualification"
+                value={profile.qualificationsFileUrl}
+                onChange={(url) => setProfile((p) => ({ ...p, qualificationsFileUrl: url }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Insurance document</Label>
+              <DocumentUpload
+                label="insurance certificate"
+                value={profile.insuranceFileUrl}
+                onChange={(url) => setProfile((p) => ({ ...p, insuranceFileUrl: url }))}
+              />
+            </div>
+            <Button onClick={handleProfileSave} disabled={profileSaving} size="sm">
+              {profileSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save changes"}
+            </Button>
+            {profileMsg && <p className="text-xs text-muted-foreground">{profileMsg}</p>}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <CreditCard className="h-5 w-5" /> Payments
+            </CardTitle>
+            <CardDescription>
+              Connect a Stripe account so Soulful can pay out your share of each booking directly to you.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {stripeStatus?.payoutsEnabled ? (
+              <div className="flex items-center gap-2 text-sm">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <span>Connected and ready to receive payouts.</span>
+              </div>
+            ) : stripeStatus?.connected ? (
+              <>
+                <Alert>
+                  <AlertDescription>Almost there — Stripe needs a bit more information before payouts can start.</AlertDescription>
+                </Alert>
+                <Button onClick={handleStripeConnect} disabled={stripeBusy} size="sm">
+                  {stripeBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Finish setup"}
+                </Button>
+              </>
+            ) : (
+              <Button onClick={handleStripeConnect} disabled={stripeBusy}>
+                {stripeBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Connect Stripe account"}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Plus className="h-5 w-5" /> Add availability
+            </CardTitle>
+            <CardDescription>Create a time slot clients can book.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleAdd} className="grid gap-4 sm:grid-cols-5 sm:items-end">
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="date">Date</Label>
+                <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="start">Start</Label>
+                <Input id="start" type="time" value={start} onChange={(e) => setStart(e.target.value)} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="end">End</Label>
+                <Input id="end" type="time" value={end} onChange={(e) => setEnd(e.target.value)} required />
+              </div>
+              <Button type="submit" disabled={adding} className="w-full">
+                {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add"}
+              </Button>
+              {formError && (
+                <Alert variant="destructive" className="sm:col-span-5">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{formError}</AlertDescription>
+                </Alert>
+              )}
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <CalendarClock className="h-5 w-5" /> Your availability
+            </CardTitle>
+            <CardDescription>Upcoming and existing time slots.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : error ? (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            ) : slots.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">
+                No availability yet. Add a slot above to get started.
+              </p>
+            ) : (
+              <ul className="divide-y">
+                {slots.map((s) => (
+                  <li key={s.id} className="flex items-center justify-between py-3">
+                    <div className="flex items-center gap-3">
+                      <div>
+                        <p className="text-sm font-medium">
+                          {fmt(s.startTime)} – {new Date(s.endTime).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                        {s.sessionType && <p className="text-xs text-muted-foreground">{s.sessionType}</p>}
+                      </div>
+                      {s.isBooked && <Badge variant="secondary">Booked</Badge>}
+                    </div>
+                    {s.isBooked ? (
+                      <span className="text-xs text-muted-foreground">Cannot remove</span>
+                    ) : (
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(s.id)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </main>
+    </div>
+  );
+}
