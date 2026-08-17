@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, timestamp, boolean, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, timestamp, boolean, pgEnum, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { practitionersTable } from "./practitioners";
@@ -17,6 +17,8 @@ export const bookingsTable = pgTable("bookings", {
   employeeName: text("employee_name").notNull(),
   employeeEmail: text("employee_email").notNull(),
   notes: text("notes"),
+  priceGbp: numeric("price_gbp", { precision: 10, scale: 2 }),
+  commissionRatePct: numeric("commission_rate_pct", { precision: 5, scale: 2 }),
   googleEventId: text("google_event_id"),
   stripeSessionId: text("stripe_session_id"),
   paymentType: text("payment_type").notNull().default("corporate"),

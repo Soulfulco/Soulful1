@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import app from "./app";
 import { logger } from "./lib/logger";
+import { baseUrl } from "./lib/url";
 import { getStripeSync } from "./stripeClient";
 import { reconcileStripeToApp } from "./stripeReconcile";
 
@@ -52,17 +53,21 @@ async function initStripe(): Promise<void> {
     await runMigrations({ databaseUrl, schema: "stripe" });
     const stripeSync = await getStripeSync();
 
-    const domain = process.env.REPLIT_DOMAINS?.split(",")[0];
-    if (domain) {
-      const webhookResult = await stripeSync.findOrCreateManagedWebhook(
-        `https://${domain}/api/stripe/webhook`,
-      );
+    // Previously used process.env.REPLIT_DOMAINS, which only exists inside
+    // Replit's own infrastructure — this silently skipped webhook setup on
+    // every deploy to Railway. baseUrl() (lib/url.ts) reads APP_URL instead,
+    // which works on any host. Wrapped in its own try/catch since baseUrl()
+    // throws if APP_URL isn't set, and this whole function must never crash
+    // the server even if Stripe/webhook setup fails.
+    try {
+      const webhookUrl = `${baseUrl()}/api/stripe/webhook`;
+      const webhookResult = await stripeSync.findOrCreateManagedWebhook(webhookUrl);
       logger.info(
-        { url: webhookResult?.webhook?.url ?? "configured" },
+        { url: webhookResult?.webhook?.url ?? webhookUrl },
         "Stripe managed webhook ready",
       );
-    } else {
-      logger.warn("Stripe webhook setup skipped: REPLIT_DOMAINS not set");
+    } catch (err) {
+      logger.warn({ err }, "Stripe webhook setup skipped: APP_URL not set or webhook creation failed");
     }
 
     // Backfill and reconcile in the background so startup isn't blocked.
@@ -79,15 +84,12 @@ async function initStripe(): Promise<void> {
 }
 
 const rawPort = process.env["PORT"];
-
 if (!rawPort) {
   throw new Error(
     "PORT environment variable is required but was not provided.",
   );
 }
-
 const port = Number(rawPort);
-
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
@@ -97,9 +99,7 @@ app.listen(port, (err) => {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
   }
-
   logger.info({ port }, "Server listening");
-
   // Initialize Stripe in the background; never block or crash the server.
   initStripe().catch((err) => logger.error({ err }, "initStripe threw unexpectedly"));
 });
