@@ -17,3 +17,12 @@ export function baseUrl(): string {
   }
   return url.replace(/\/$/, "");
 }
+export function apiBaseUrl(): string {
+  const url = process.env.API_URL;
+  if (!url) {
+    throw new Error(
+      "API_URL environment variable is not set. Set it to your API server's public URL, e.g. https://api.soulfulco.uk",
+    );
+  }
+  return url.replace(/\/$/, "");
+}

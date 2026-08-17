@@ -1,6 +1,6 @@
 import { OAuth2Client } from "google-auth-library";
 import { logger } from "./logger";
-import { baseUrl } from "./url";
+import { apiBaseUrl } from "./url";
 
 const SCOPES = [
   "https://www.googleapis.com/auth/calendar",
@@ -17,8 +17,8 @@ export function googleConfigured(): boolean {
 // Railway. baseUrl() (this same lib/url.ts used elsewhere) reads APP_URL
 // instead, which works on any host.
 export function getRedirectUri(callbackPath = "/api/practitioner/google/callback"): string {
-  return `${baseUrl()}${callbackPath}`;
-}
+    return `${apiBaseUrl()}${callbackPath}`;
+  }
 
 function oauthClient(callbackPath?: string): OAuth2Client {
   return new OAuth2Client({
