@@ -391,10 +391,9 @@ router.get("/company/payment-method", async (req, res) => {
       brand: card?.brand ?? null,
     });
   } catch (err) {
-    logger.error({ err }, "Failed to fetch company payment method");
-    res.status(500).json({ error: "Failed to fetch payment method" });
+      logger.error({ err }, "Failed to start payment method setup");
+      res.status(500).json({ error: err instanceof Error ? err.message : "Failed to start payment method setup" });
   }
-});
 
 // POST /company/payment-method/setup — creates a Stripe customer if the
 // company doesn't have one yet, then returns a Stripe-hosted Checkout URL
