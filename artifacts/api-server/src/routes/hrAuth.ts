@@ -2,9 +2,9 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { companiesTable } from "@workspace/db";
 import { sql, eq } from "drizzle-orm";
-import crypto from "crypto";
+import bcrypt from "bcryptjs";
 import { createSession, clearSession, getSessionId, SESSION_COOKIE, SESSION_TTL } from "../lib/auth";
-import { isAdmin } from "../lib/roles";
+import { isAdmin, isHr, resolveHrCompanyId } from "../lib/roles";
 import { resolveReferralCode, generateUniqueReferralCode, generateUniqueInviteCode } from "../lib/referrals";
 import { logger } from "../lib/logger";
 import { getUncachableStripeClient } from "../stripeClient";
@@ -13,7 +13,10 @@ import { baseUrl } from "../lib/url";
 const router = Router();
 
 function hashPassword(password: string): string {
-  return crypto.createHash("sha256").update(password + process.env.REPL_ID).digest("hex");
+  return bcrypt.hashSync(password, 10);
+}
+function verifyPassword(password: string, hash: string): boolean {
+  return bcrypt.compareSync(password, hash);
 }
 
 function setSessionCookie(res: any, sid: string) {
@@ -44,8 +47,9 @@ router.post("/hr/login", async (req, res) => {
 
     if (!hrUser) return res.status(401).json({ error: "Invalid credentials" });
 
-    const hash = hashPassword(password);
-    if (hash !== hrUser.password_hash) return res.status(401).json({ error: "Invalid credentials" });
+    if (!verifyPassword(password, hrUser.password_hash)) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
 
     const sessionData = {
       user: {
@@ -357,6 +361,81 @@ router.get("/hr/users", async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: "Failed to list HR users" });
+  }
+});
+
+// ── Payment method (self-service, for logged-in HR users) ──────────────
+
+// GET /company/payment-method — does the logged-in HR user's company have a card on file?
+router.get("/company/payment-method", async (req, res) => {
+  if (!isHr(req)) return res.status(403).json({ error: "Not an HR account" });
+  try {
+    const companyId = await resolveHrCompanyId(req);
+    if (!companyId) return res.status(403).json({ error: "No company associated with this account" });
+
+    const [company] = await db
+      .select({ stripeCustomerId: companiesTable.stripeCustomerId })
+      .from(companiesTable)
+      .where(eq(companiesTable.id, companyId));
+
+    if (!company?.stripeCustomerId) {
+      return res.json({ hasPaymentMethod: false, last4: null, brand: null });
+    }
+
+    const stripe = await getUncachableStripeClient();
+    const methods = await stripe.paymentMethods.list({ customer: company.stripeCustomerId, type: "card" });
+    const card = methods.data[0]?.card;
+    res.json({
+      hasPaymentMethod: Boolean(card),
+      last4: card?.last4 ?? null,
+      brand: card?.brand ?? null,
+    });
+  } catch (err) {
+    logger.error({ err }, "Failed to fetch company payment method");
+    res.status(500).json({ error: "Failed to fetch payment method" });
+  }
+});
+
+// POST /company/payment-method/setup — creates a Stripe customer if the
+// company doesn't have one yet, then returns a Stripe-hosted Checkout URL
+// (mode: "setup") to add or replace a card, with no charge involved.
+router.post("/company/payment-method/setup", async (req, res) => {
+  if (!isHr(req)) return res.status(403).json({ error: "Not an HR account" });
+  try {
+    const companyId = await resolveHrCompanyId(req);
+    if (!companyId) return res.status(403).json({ error: "No company associated with this account" });
+
+    const [company] = await db
+      .select({ stripeCustomerId: companiesTable.stripeCustomerId, name: companiesTable.name, email: companiesTable.email })
+      .from(companiesTable)
+      .where(eq(companiesTable.id, companyId));
+    if (!company) return res.status(404).json({ error: "Company not found" });
+
+    const stripe = await getUncachableStripeClient();
+    let customerId = company.stripeCustomerId;
+
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: company.email,
+        name: company.name,
+        metadata: { appCompanyId: String(companyId) },
+      });
+      customerId = customer.id;
+      await db.update(companiesTable).set({ stripeCustomerId: customerId }).where(eq(companiesTable.id, companyId));
+    }
+
+    const origin = baseUrl();
+    const session = await stripe.checkout.sessions.create({
+      mode: "setup",
+      customer: customerId,
+      success_url: `${origin}/dashboard?payment_method=success`,
+      cancel_url: `${origin}/dashboard?payment_method=cancelled`,
+    });
+
+    res.json({ url: session.url });
+  } catch (err) {
+    logger.error({ err }, "Failed to start payment method setup");
+    res.status(500).json({ error: "Failed to start payment method setup" });
   }
 });
 

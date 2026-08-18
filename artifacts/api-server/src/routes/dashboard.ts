@@ -15,8 +15,61 @@ import { isHr, isAdmin, isPractitioner, resolveHrCompanyId } from "../lib/roles"
 
 const router = Router();
 
-router.get("/dashboard/summary", async (_req, res) => {
+router.get("/dashboard/summary", async (req, res) => {
   try {
+    // HR sessions get a genuinely different, company-scoped view: their own
+    // expenditure (subscription + what they've actually spent on bookings),
+    // not platform-wide revenue. Everyone else (admin) keeps the existing
+    // marketplace-wide totals.
+    if (isHr(req)) {
+      const companyId = await resolveHrCompanyId(req);
+      if (companyId == null) {
+        return res.status(403).json({ error: "No company associated with this account" });
+      }
+
+      const [activeSub] = await db
+        .select({ planId: companySubscriptionsTable.planId })
+        .from(companySubscriptionsTable)
+        .where(sql`${companySubscriptionsTable.companyId} = ${companyId} AND ${companySubscriptionsTable.status} = 'active'`);
+
+      let subscriptionPriceGbp = 0;
+      if (activeSub) {
+        const [plan] = await db
+          .select({ priceGbp: subscriptionPlansTable.priceGbp })
+          .from(subscriptionPlansTable)
+          .where(eq(subscriptionPlansTable.id, activeSub.planId));
+        subscriptionPriceGbp = plan ? Number(plan.priceGbp) : 0;
+      }
+
+      const companyBookings = await db
+        .select({ priceGbp: bookingsTable.priceGbp, createdAt: bookingsTable.createdAt, status: bookingsTable.status })
+        .from(bookingsTable)
+        .where(eq(bookingsTable.companyId, companyId));
+
+      const bookingsSpendGbp = companyBookings
+        .filter((b) => b.status === "confirmed" || b.status === "completed")
+        .reduce((sum, b) => sum + (b.priceGbp ? Number(b.priceGbp) : 0), 0);
+
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const bookingsThisMonth = companyBookings.filter((b) => b.createdAt >= monthStart).length;
+
+      const [{ totalBookings }] = await db
+        .select({ totalBookings: count() })
+        .from(bookingsTable)
+        .where(eq(bookingsTable.companyId, companyId));
+
+      return res.json({
+        isHrView: true,
+        totalExpenditure: Math.round((subscriptionPriceGbp + bookingsSpendGbp) * 100) / 100,
+        subscriptionPriceGbp,
+        bookingsSpendGbp: Math.round(bookingsSpendGbp * 100) / 100,
+        totalBookings: Number(totalBookings),
+        bookingsThisMonth,
+      });
+    }
+
+    // ── Admin view — unchanged, platform-wide ─────────────────────────
     const [{ totalPractitioners }] = await db.select({ totalPractitioners: count() }).from(practitionersTable);
     const [{ totalCompanies }] = await db.select({ totalCompanies: count() }).from(companiesTable);
     const [{ totalBookings }] = await db.select({ totalBookings: count() }).from(bookingsTable);
@@ -29,23 +82,21 @@ router.get("/dashboard/summary", async (_req, res) => {
       .from(companiesTable)
       .where(eq(companiesTable.subscriptionStatus, "active"));
 
-    // Revenue = sum of all subscription prices
     const corpSubs = await db.select({ planId: companySubscriptionsTable.planId }).from(companySubscriptionsTable).where(eq(companySubscriptionsTable.status, "active"));
     const practSubs = await db.select({ planId: practitionerSubscriptionsTable.planId }).from(practitionerSubscriptionsTable).where(eq(practitionerSubscriptionsTable.status, "active"));
     const plans = await db.select().from(subscriptionPlansTable);
     const planPriceMap = Object.fromEntries(plans.map((p) => [p.id, Number(p.priceGbp)]));
     const totalRevenue = [...corpSubs, ...practSubs].reduce((sum, s) => sum + (planPriceMap[s.planId] ?? 0), 0);
 
-    // Bookings this month
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const allBookings = await db.select({ createdAt: bookingsTable.createdAt }).from(bookingsTable);
     const bookingsThisMonth = allBookings.filter((b) => b.createdAt >= monthStart).length;
 
-    // Average rating
     const [{ avgRating }] = await db.select({ avgRating: avg(reviewsTable.rating) }).from(reviewsTable);
 
     res.json({
+      isHrView: false,
       totalPractitioners: Number(totalPractitioners),
       totalCompanies: Number(totalCompanies),
       totalBookings: Number(totalBookings),
