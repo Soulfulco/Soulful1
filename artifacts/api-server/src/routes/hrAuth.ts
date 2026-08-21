@@ -399,10 +399,6 @@ router.get("/company/payment-method", async (req, res) => {
 // POST /company/payment-method/setup — creates a Stripe customer if the
 // company doesn't have one yet, then returns a Stripe-hosted Checkout URL
 // (mode: "setup") to add or replace a card, with no charge involved.
-//
-// TEMPORARY DEBUGGING: the catch block below exposes the real err.message
-// to the frontend instead of a generic string, to diagnose a live 500.
-// Revert this once the root cause is found and fixed.
 router.post("/company/payment-method/setup", async (req, res) => {
   if (!isHr(req)) return res.status(403).json({ error: "Not an HR account" });
   try {
@@ -432,6 +428,7 @@ router.post("/company/payment-method/setup", async (req, res) => {
     const session = await stripe.checkout.sessions.create({
       mode: "setup",
       customer: customerId,
+      currency: "gbp",
       success_url: `${origin}/dashboard?payment_method=success`,
       cancel_url: `${origin}/dashboard?payment_method=cancelled`,
     });
@@ -439,7 +436,7 @@ router.post("/company/payment-method/setup", async (req, res) => {
     res.json({ url: session.url });
   } catch (err) {
     logger.error({ err }, "Failed to start payment method setup");
-    res.status(500).json({ error: err instanceof Error ? err.message : "Failed to start payment method setup" });
+    res.status(500).json({ error: "Failed to start payment method setup" });
   }
 });
 
