@@ -24,6 +24,8 @@ const Join = lazy(() => import("@/pages/Join"));
 const SignIn = lazy(() => import("@/pages/SignIn"));
 const EmployeePortal = lazy(() => import("@/pages/EmployeePortal"));
 const DashboardLogin = lazy(() => import("@/pages/DashboardLogin"));
+const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const PractitionerLogin = lazy(() => import("@/pages/PractitionerLogin"));
 const PractitionerPortal = lazy(() => import("@/pages/PractitionerPortal"));
 
@@ -222,6 +224,12 @@ function Router() {
         </Route>
 
         <Route path="/dashboard/events">
+          <Route path="/forgot-password">
+            <ForgotPassword />
+          </Route>
+          <Route path="/reset-password">
+            <ResetPassword />
+          </Route>
           <ProtectedRoute requireAdmin>
             <DashboardLayout><DashboardEvents /></DashboardLayout>
           </ProtectedRoute>
