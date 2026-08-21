@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,7 +38,6 @@ export default function PractitionerLogin() {
           <h1 className="font-serif text-3xl font-bold text-foreground">Soulful</h1>
           <p className="text-muted-foreground text-sm mt-1">Practitioner Portal</p>
         </div>
-
         <Card>
           <CardHeader className="pb-4">
             <CardDescription className="text-xs text-muted-foreground">
@@ -82,9 +81,13 @@ export default function PractitionerLogin() {
                 Sign in
               </Button>
             </form>
+            <p className="text-center text-sm mt-4">
+              <Link href="/forgot-password?type=practitioner" className="text-muted-foreground hover:underline">
+                Forgot password?
+              </Link>
+            </p>
           </CardContent>
         </Card>
-
         <p className="text-center text-xs text-muted-foreground">
           © {new Date().getFullYear()} Soulful. All rights reserved.
         </p>

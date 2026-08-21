@@ -53,6 +53,25 @@ employeesRouter.post("/employees", async (req, res) => {
     if (!name || !email || !companyId) {
       return res.status(400).json({ error: "name, email, and companyId are required" });
     }
+    // GET /employees/lookup?email= — find which company an employee belongs to,
+    // so the login page can authenticate them without asking for the invite
+    // code again. Returns minimal info only (no password/session details).
+    employeesRouter.get("/employees/lookup", async (req, res) => {
+      try {
+        const email = String(req.query.email ?? "").toLowerCase().trim();
+        if (!email) return res.status(400).json({ error: "email is required" });
+        const [employee] = await db
+          .select({ companyId: employeesTable.companyId })
+          .from(employeesTable)
+          .where(eq(employeesTable.email, email))
+          .limit(1);
+        if (!employee) return res.status(404).json({ error: "No account found with that email" });
+        res.json({ companyId: employee.companyId });
+      } catch {
+        res.status(500).json({ error: "Failed to look up account" });
+      }
+    });
+    
     const existing = await db
       .select()
       .from(employeesTable)

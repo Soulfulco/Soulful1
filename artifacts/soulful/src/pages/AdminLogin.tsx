@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -92,6 +92,11 @@ export default function AdminLogin() {
                 Sign In
               </Button>
             </form>
+            <p className="text-center text-sm mt-4">
+              <Link href="/forgot-password?type=admin" className="text-muted-foreground hover:underline">
+                Forgot password?
+              </Link>
+            </p>
           </CardContent>
         </Card>
       </div>

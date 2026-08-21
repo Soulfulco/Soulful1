@@ -1,41 +1,49 @@
 import { useState } from "react";
 import { useLocation, Link } from "wouter";
-import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, Leaf } from "lucide-react";
 
-export default function DashboardLogin() {
-  const { refetch } = useAuth();
+export default function EmployeeLogin() {
   const [, navigate] = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function handleHrLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      const res = await fetch("/api/hr/login", {
+      // Employees are scoped by company, but we don't ask for the invite
+      // code again here — look up their existing record by email alone
+      // to find which company they belong to before logging in.
+      const lookupRes = await fetch(`/api/employees/lookup?email=${encodeURIComponent(email)}`);
+      if (!lookupRes.ok) {
+        throw new Error("No account found with that email. Have you joined with your invite code yet?");
+      }
+      const { companyId } = await lookupRes.json();
+
+      const res = await fetch("/api/employees/login", {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, companyId, password }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Login failed");
-        return;
+        throw new Error(data.error ?? "Login failed");
       }
-      await refetch();
-      navigate("/dashboard");
-    } catch {
-      setError("Network error – please try again");
+      localStorage.setItem(
+        "soulful_employee",
+        JSON.stringify({ id: data.user.id.replace("employee:", ""), companyId, name: data.user.firstName, email }),
+      );
+      navigate("/employee");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login failed");
     } finally {
       setLoading(false);
     }
@@ -45,21 +53,20 @@ export default function DashboardLogin() {
     <div className="min-h-screen flex items-center justify-center bg-muted/40 p-4">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
-          <img src="/images/logo.png" alt="Soulful" className="h-12 w-12 rounded-xl mx-auto mb-3 object-cover" />
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 mb-3">
+            <Leaf className="h-6 w-6 text-primary" />
+          </div>
           <h1 className="font-serif text-3xl font-bold text-foreground">Soulful</h1>
-          <p className="text-muted-foreground text-sm mt-1">Corporate Wellbeing Platform</p>
+          <p className="text-muted-foreground text-sm mt-1">Employee Portal</p>
         </div>
-
         <Card>
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg">HR Portal</CardTitle>
+            <CardDescription className="text-xs text-muted-foreground">
+              Sign in to access your wellbeing sessions
+            </CardDescription>
           </CardHeader>
-
           <CardContent>
-            <form onSubmit={handleHrLogin} className="space-y-4">
-              <CardDescription className="text-xs text-muted-foreground mb-2">
-                Log in with your company HR credentials
-              </CardDescription>
+            <form onSubmit={handleLogin} className="space-y-4">
               {error && (
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
@@ -67,11 +74,11 @@ export default function DashboardLogin() {
                 </Alert>
               )}
               <div className="space-y-2">
-                <Label htmlFor="email">Work Email</Label>
+                <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="hr@yourcompany.com"
+                  placeholder="you@company.co.uk"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -92,17 +99,22 @@ export default function DashboardLogin() {
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Sign in to HR Portal
+                Sign in
               </Button>
             </form>
             <p className="text-center text-sm mt-4">
-              <Link href="/forgot-password?type=hr" className="text-muted-foreground hover:underline">
+              <Link href="/forgot-password?type=employee" className="text-muted-foreground hover:underline">
                 Forgot password?
+              </Link>
+            </p>
+            <p className="text-center text-sm mt-2 text-muted-foreground">
+              New here?{" "}
+              <Link href="/join" className="text-primary underline underline-offset-4 hover:no-underline">
+                Join with your invite code
               </Link>
             </p>
           </CardContent>
         </Card>
-
         <p className="text-center text-xs text-muted-foreground">
           © {new Date().getFullYear()} Soulful. All rights reserved.
         </p>

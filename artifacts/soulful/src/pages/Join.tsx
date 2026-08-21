@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { useResolveInviteCode, useRegisterEmployee, useLoginEmployee } from "@workspace/api-client-react";
+import { useResolveInviteCode } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Leaf, ArrowRight, CheckCircle2, Building2 } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Leaf, ArrowRight, CheckCircle2, Building2, AlertCircle, Loader2 } from "lucide-react";
 import { Link } from "wouter";
 
-type Step = "code" | "register" | "done";
+type Step = "code" | "register";
 
 export default function Join() {
   const [, navigate] = useLocation();
@@ -18,14 +19,12 @@ export default function Join() {
   const [company, setCompany] = useState<{ id: number; name: string; inviteCode: string } | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [isReturning, setIsReturning] = useState(false);
+  const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const resolveCode = useResolveInviteCode(code.toUpperCase(), {
     query: { enabled: false }
   });
-
-  const registerEmployee = useRegisterEmployee();
-  const loginEmployee = useLoginEmployee();
 
   const handleCodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,31 +45,41 @@ export default function Join() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!company || !name.trim() || !email.trim()) return;
-
-    if (isReturning) {
-      loginEmployee.mutate(
-        { data: { email, companyId: company.id } },
-        {
-          onSuccess: (employee) => {
-            localStorage.setItem("soulful_employee", JSON.stringify({ id: employee.id, companyId: employee.companyId, name: employee.name, email: employee.email }));
-            navigate("/employee");
-          },
-          onError: () => {
-            setCodeError("No account found with that email for this company.");
-          }
-        }
+    if (!company || !name.trim() || !email.trim() || !password) return;
+    if (password.length < 8) {
+      setCodeError("Password must be at least 8 characters.");
+      return;
+    }
+    setCodeError("");
+    setSubmitting(true);
+    try {
+      // Ensure an employee record exists for this email + company (idempotent —
+      // returns the existing record if HR already imported them, or creates a
+      // fresh one otherwise), then set their password on it in one flow.
+      await fetch("/api/employees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, companyId: company.id }),
+      });
+      const claimRes = await fetch("/api/employees/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, companyId: company.id, password }),
+      });
+      const claimData = await claimRes.json();
+      if (!claimRes.ok) {
+        setCodeError(claimData.error ?? "Something went wrong. Please try again.");
+        setSubmitting(false);
+        return;
+      }
+      localStorage.setItem(
+        "soulful_employee",
+        JSON.stringify({ id: claimData.user.id.replace("employee:", ""), companyId: company.id, name, email }),
       );
-    } else {
-      registerEmployee.mutate(
-        { data: { name, email, companyId: company.id } },
-        {
-          onSuccess: (employee) => {
-            localStorage.setItem("soulful_employee", JSON.stringify({ id: employee.id, companyId: employee.companyId, name: employee.name, email: employee.email }));
-            navigate("/employee");
-          }
-        }
-      );
+      navigate("/employee");
+    } catch {
+      setCodeError("Something went wrong. Please try again.");
+      setSubmitting(false);
     }
   };
 
@@ -125,6 +134,13 @@ export default function Join() {
                 </CardContent>
               </Card>
 
+              <p className="text-center text-sm text-muted-foreground">
+                Already set up your account?{" "}
+                <Link href="/employee/login" className="text-primary underline underline-offset-4 hover:no-underline">
+                  Sign in here
+                </Link>
+              </p>
+
               <div className="bg-muted/50 rounded-2xl p-4 space-y-2">
                 <p className="text-sm font-medium text-foreground">Demo invite codes</p>
                 <div className="flex flex-wrap gap-2">
@@ -153,33 +169,32 @@ export default function Join() {
                   <CheckCircle2 className="h-4 w-4" />
                   {company.name}
                 </div>
-                <h1 className="text-3xl font-serif text-foreground">
-                  {isReturning ? "Welcome back" : "Create your account"}
-                </h1>
+                <h1 className="text-3xl font-serif text-foreground">Create your account</h1>
                 <p className="text-muted-foreground">
-                  {isReturning
-                    ? "Enter your work email to access your sessions."
-                    : "Set up your employee wellbeing account to start booking sessions."
-                  }
+                  Set up your employee wellbeing account to start booking sessions.
                 </p>
               </div>
 
               <Card className="border-none shadow-md">
                 <CardContent className="pt-6">
                   <form onSubmit={handleRegister} className="space-y-4">
-                    {!isReturning && (
-                      <div className="space-y-2">
-                        <Label htmlFor="name">Your name</Label>
-                        <Input
-                          id="name"
-                          value={name}
-                          onChange={e => setName(e.target.value)}
-                          placeholder="Your full name"
-                          className="h-12"
-                          required
-                        />
-                      </div>
+                    {codeError && (
+                      <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>{codeError}</AlertDescription>
+                      </Alert>
                     )}
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Your name</Label>
+                      <Input
+                        id="name"
+                        value={name}
+                        onChange={e => setName(e.target.value)}
+                        placeholder="Your full name"
+                        className="h-12"
+                        required
+                      />
+                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="email">Work email</Label>
                       <Input
@@ -191,32 +206,33 @@ export default function Join() {
                         className="h-12"
                         required
                       />
-                      {codeError && <p className="text-sm text-destructive">{codeError}</p>}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="password">Set a password</Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        value={password}
+                        onChange={e => { setPassword(e.target.value); setCodeError(""); }}
+                        placeholder="At least 8 characters"
+                        className="h-12"
+                        minLength={8}
+                        required
+                      />
                     </div>
                     <Button
                       type="submit"
                       className="w-full h-12 rounded-full text-base"
-                      disabled={registerEmployee.isPending || loginEmployee.isPending}
+                      disabled={submitting}
                     >
-                      {registerEmployee.isPending || loginEmployee.isPending
-                        ? "Please wait..."
-                        : isReturning ? "Sign in" : "Get started"
-                      }
+                      {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                      Get started
                       <ArrowRight className="h-4 w-4 ml-2" />
                     </Button>
                   </form>
                 </CardContent>
               </Card>
 
-              <p className="text-center text-sm text-muted-foreground">
-                {isReturning ? "New to Soulful?" : "Already have an account?"}{" "}
-                <button
-                  onClick={() => { setIsReturning(!isReturning); setCodeError(""); }}
-                  className="text-primary underline underline-offset-4 hover:no-underline"
-                >
-                  {isReturning ? "Create an account" : "Sign in instead"}
-                </button>
-              </p>
               <p className="text-center">
                 <button
                   onClick={() => { setStep("code"); setCompany(null); setCodeError(""); }}

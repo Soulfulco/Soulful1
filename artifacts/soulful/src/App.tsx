@@ -16,6 +16,7 @@ const Home = lazy(() => import("@/pages/Home"));
 const Practitioners = lazy(() => import("@/pages/Practitioners"));
 const Events = lazy(() => import("@/pages/Events"));
 const Volunteering = lazy(() => import("@/pages/Volunteering"));
+const EmployeeLogin = lazy(() => import("@/pages/EmployeeLogin"));
 const PractitionerProfile = lazy(() => import("@/pages/PractitionerProfile"));
 const ForCorporates = lazy(() => import("@/pages/ForCorporates"));
 const ForPractitioners = lazy(() => import("@/pages/ForPractitioners"));
@@ -87,6 +88,9 @@ function Router() {
         </Route>
         <Route path="/practitioners/:id">
           {(params) => <MainLayout><PractitionerProfile id={params.id!} /></MainLayout>}
+        </Route>
+        <Route path="/employee/login">
+          <EmployeeLogin />
         </Route>
         <Route path="/events">
           <MainLayout><Events /></MainLayout>
