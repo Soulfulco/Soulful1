@@ -24,3 +24,4 @@ export * from "./sessionProposals";
 export * from "./siteContent";
 export * from "./socialEvents";
 export * from "./wellbeingSurveys";
+export * from "./passwordResetTokens";

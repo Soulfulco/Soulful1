@@ -26,6 +26,7 @@ import eventsRouter from "./events";
 import googleCalendarRouter from "./googleCalendar";
 import mailingListRouter from "./mailingList";
 import employeePreferencesRouter from "./employeePreferences";
+import passwordResetRouter from "./passwordReset";
 import gamificationRouter from "./gamification";
 import wellbeingPlanRouter from "./wellbeingPlan";
 import referralsRouter from "./referrals";
@@ -33,6 +34,7 @@ const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(authRouter);
+router.use(passwordResetRouter);
 router.use(practitionersRouter);
 router.use(companiesRouter);
 router.use(companyEmployeesRouter);
