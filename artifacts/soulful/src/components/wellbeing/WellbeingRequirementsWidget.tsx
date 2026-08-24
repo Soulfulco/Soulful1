@@ -79,6 +79,13 @@ export default function WellbeingRequirementsWidget({ employeeId }: { employeeId
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ employeeId, mood }),
       });
+      // Still record the check-in as usual, but if someone tells us they're
+      // struggling, take them straight to support resources rather than just
+      // silently marking the weekly requirement complete like any other mood.
+      if (mood === "struggling") {
+        window.location.href = "https://www.soulfulco.uk/signposting";
+        return;
+      }
       loadRequirements();
     } catch {}
     setSubmittingMood(null);
