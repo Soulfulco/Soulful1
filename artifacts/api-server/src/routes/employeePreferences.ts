@@ -7,6 +7,7 @@ import { isSameOrigin } from "../lib/csrf";
 import { googleConfigured, getAuthUrl, exchangeCode, createEvent } from "../lib/googleCalendar";
 import { awardPoints } from "../lib/gamification";
 import { employeeId as getEmployeeIdFromSession } from "../lib/roles";
+import { baseUrl } from "../lib/url";
 
 const router: IRouter = Router();
 
@@ -139,7 +140,8 @@ router.get("/employee/google/connect", (req, res) => {
 
 router.get("/employee/google/callback", async (req, res) => {
   const { code, state, error } = req.query as { code?: string; state?: string; error?: string };
-  const redirectBack = (status: string) => res.redirect(`${PORTAL_PATH}?google=${status}`);
+  const redirectBack = (status: string) => res.redirect(`${baseUrl()}${PORTAL_PATH}?google=${status}`);
+  
 
   if (error || !code || !state) return redirectBack("error");
 
