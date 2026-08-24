@@ -228,17 +228,17 @@ function Router() {
         </Route>
 
         <Route path="/dashboard/events">
-          <Route path="/forgot-password">
-            <ForgotPassword />
-          </Route>
-          <Route path="/reset-password">
-            <ResetPassword />
-          </Route>
           <ProtectedRoute requireAdmin>
             <DashboardLayout><DashboardEvents /></DashboardLayout>
           </ProtectedRoute>
         </Route>
-
+        <Route path="/forgot-password">
+          <ForgotPassword />
+        </Route>
+        <Route path="/reset-password">
+          <ResetPassword />
+        </Route>
+        
         <Route path="/dashboard/mailing-list">
           <ProtectedRoute requireAdmin>
             <DashboardLayout><DashboardMailingList /></DashboardLayout>
