@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import app from "./app";
 import { logger } from "./lib/logger";
-import { baseUrl } from "./lib/url";
+import { baseUrl, apiBaseUrl } from "./lib/url";
 import { getStripeSync } from "./stripeClient";
 import { reconcileStripeToApp } from "./stripeReconcile";
 
@@ -60,8 +60,8 @@ async function initStripe(): Promise<void> {
     // throws if APP_URL isn't set, and this whole function must never crash
     // the server even if Stripe/webhook setup fails.
     try {
-      const webhookUrl = `${baseUrl()}/api/stripe/webhook`;
-      const webhookResult = await stripeSync.findOrCreateManagedWebhook(webhookUrl);
+      const webhookUrl = `${apiBaseUrl()}/api/stripe/webhook`;
+      
       logger.info(
         { url: webhookResult?.webhook?.url ?? webhookUrl },
         "Stripe managed webhook ready",
