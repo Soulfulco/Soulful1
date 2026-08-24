@@ -168,7 +168,7 @@ export default function EmployeePortal() {
     setLoaded(true);
     // Check survey status
     if (parsed?.id) {
-      fetch(`/api/wellbeing/surveys/status?employeeId=${parsed.id}`)
+      fetch(`https://api.soulfulco.uk/api/wellbeing/surveys/status?employeeId=${parsed.id}`)
         .then(r => r.json())
         .then(data => {
           if (data.required) {
@@ -183,7 +183,7 @@ export default function EmployeePortal() {
   // Load preferences
   useEffect(() => {
     if (!stored?.id) return;
-    fetch(`/api/employee/preferences?employeeId=${stored.id}`)
+    fetch(`https://api.soulfulco.uk/api/employee/preferences?employeeId=${stored.id}`)
       .then(r => r.json())
       .then((data: EmployeePreferences) => {
         setPrefs(data);
@@ -222,7 +222,7 @@ export default function EmployeePortal() {
     }
     window.history.replaceState({}, "", window.location.pathname);
     if (stored?.id) {
-      fetch(`/api/employee/preferences?employeeId=${stored.id}`).then(r => r.json()).then(setPrefs).catch(() => {});
+      fetch(`https://api.soulfulco.uk/api/employee/preferences?employeeId=${stored.id}`).then(r => r.json()).then(setPrefs).catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stored?.id]);
@@ -241,14 +241,14 @@ export default function EmployeePortal() {
   useEffect(() => {
     if (!stored?.companyId) return;
     setLoadingGroup(true);
-    fetch(`/api/group-sessions?companyId=${stored.companyId}`)
+    fetch(`https://api.soulfulco.uk/api/group-sessions?companyId=${stored.companyId}`)
       .then(r => r.json())
       .then((data: GroupSession[]) => {
         const upcoming = data.filter(s => new Date(s.start_time) >= new Date() && s.status !== "cancelled");
         setGroupSessions(upcoming);
         return Promise.all(
           upcoming.map(s =>
-            fetch(`/api/group-sessions/${s.id}`)
+            fetch(`https://api.soulfulco.uk/api/group-sessions/${s.id}`)
               .then(r => r.json())
               .then(d => ({ id: s.id, attendees: d.attendees as { employee_email: string }[] }))
           )
@@ -268,7 +268,7 @@ export default function EmployeePortal() {
   useEffect(() => {
     if (!stored?.companyId) return;
     setLoadingSocial(true);
-    fetch(`/api/social-events?companyId=${stored.companyId}`)
+    fetch(`https://api.soulfulco.uk/api/social-events?companyId=${stored.companyId}`)
       .then(r => r.json())
       .then((data: SocialEvent[]) => {
         const upcoming = data.filter(e => new Date(e.start_time) >= new Date() && e.status === "active");
@@ -276,7 +276,7 @@ export default function EmployeePortal() {
         // Check which ones this employee has RSVPed to
         return Promise.all(
           upcoming.map(e =>
-            fetch(`/api/social-events/${e.id}`)
+            fetch(`https://api.soulfulco.uk/api/social-events/${e.id}`)
               .then(r => r.json())
               .then(d => ({ id: e.id, rsvps: d.rsvps as { employee_email: string }[] }))
           )
@@ -297,7 +297,7 @@ export default function EmployeePortal() {
     if (!stored) return;
     setSigningUp(sessionId);
     try {
-      const res = await fetch(`/api/group-sessions/${sessionId}/attend`, {
+      const res = await fetch(`https://api.soulfulco.uk/api/group-sessions/${sessionId}/attend`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ employeeId: stored.id, employeeName: stored.name, employeeEmail: stored.email }),
@@ -314,7 +314,7 @@ export default function EmployeePortal() {
     if (!stored) return;
     setSigningUp(sessionId);
     try {
-      const res = await fetch(`/api/group-sessions/${sessionId}/attend`, {
+      const res = await fetch(`https://api.soulfulco.uk/api/group-sessions/${sessionId}/attend`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ employeeEmail: stored.email }),
@@ -332,7 +332,7 @@ export default function EmployeePortal() {
     if (!stored) return;
     setRsvping(eventId);
     try {
-      const res = await fetch(`/api/social-events/${eventId}/rsvp`, {
+      const res = await fetch(`https://api.soulfulco.uk/api/social-events/${eventId}/rsvp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ employeeId: stored.id, employeeName: stored.name, employeeEmail: stored.email }),
@@ -349,7 +349,7 @@ export default function EmployeePortal() {
     if (!stored) return;
     setRsvping(eventId);
     try {
-      const res = await fetch(`/api/social-events/${eventId}/rsvp`, {
+      const res = await fetch(`https://api.soulfulco.uk/api/social-events/${eventId}/rsvp`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ employeeEmail: stored.email }),
@@ -394,7 +394,7 @@ export default function EmployeePortal() {
     if (!stored) return;
     setSavingPrefs(true);
     try {
-      const res = await fetch("/api/employee/preferences", {
+      const res = await fetch("https://api.soulfulco.uk/api/employee/preferences", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -430,7 +430,7 @@ export default function EmployeePortal() {
     if (!stored) return;
     setGoogleActing(true);
     try {
-      const res = await fetch("/api/employee/google/disconnect", {
+      const res = await fetch("https://api.soulfulco.uk/api/employee/google/disconnect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ employeeId: stored.id }),
@@ -447,7 +447,7 @@ export default function EmployeePortal() {
     if (!stored) return;
     setGoogleSyncing(true);
     try {
-      const res = await fetch("/api/employee/google/sync", {
+      const res = await fetch("https://api.soulfulco.uk/api/employee/google/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ employeeId: stored.id }),
