@@ -9,7 +9,15 @@ import { Loader2, AlertCircle, Leaf } from "lucide-react";
 
 export default function EmployeeLogin() {
   const [, navigate] = useLocation();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => {
+    try {
+      const stored = localStorage.getItem("soulful_employee");
+      if (stored) return JSON.parse(stored).email ?? "";
+    } catch {
+      /* ignore */
+    }
+    return "";
+  });
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -22,14 +30,15 @@ export default function EmployeeLogin() {
       // Employees are scoped by company, but we don't ask for the invite
       // code again here — look up their existing record by email alone
       // to find which company they belong to before logging in.
-      const lookupRes = await fetch(`/api/employees/lookup?email=${encodeURIComponent(email)}`);
+      const lookupRes = await fetch(`https://api.soulfulco.uk/api/employees/lookup?email=${encodeURIComponent(email)}`);
       if (!lookupRes.ok) {
         throw new Error("No account found with that email. Have you joined with your invite code yet?");
       }
       const { companyId } = await lookupRes.json();
 
-      const res = await fetch("/api/employees/login", {
+      const res = await fetch("https://api.soulfulco.uk/api/employees/login", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, companyId, password }),
       });

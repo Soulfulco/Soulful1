@@ -168,7 +168,7 @@ export default function EmployeePortal() {
     setLoaded(true);
     // Check survey status
     if (parsed?.id) {
-      fetch(`https://api.soulfulco.uk/api/wellbeing/surveys/status?employeeId=${parsed.id}`)
+      fetch(`https://api.soulfulco.uk/api/wellbeing/surveys/status?employeeId=${parsed.id}`, { credentials: "include" })
         .then(r => r.json())
         .then(data => {
           if (data.required) {
@@ -183,7 +183,7 @@ export default function EmployeePortal() {
   // Load preferences
   useEffect(() => {
     if (!stored?.id) return;
-    fetch(`https://api.soulfulco.uk/api/employee/preferences?employeeId=${stored.id}`)
+    fetch(`https://api.soulfulco.uk/api/employee/preferences?employeeId=${stored.id}`, { credentials: "include" })
       .then(r => r.json())
       .then((data: EmployeePreferences) => {
         setPrefs(data);
@@ -222,7 +222,7 @@ export default function EmployeePortal() {
     }
     window.history.replaceState({}, "", window.location.pathname);
     if (stored?.id) {
-      fetch(`https://api.soulfulco.uk/api/employee/preferences?employeeId=${stored.id}`).then(r => r.json()).then(setPrefs).catch(() => {});
+      fetch(`https://api.soulfulco.uk/api/employee/preferences?employeeId=${stored.id}`, { credentials: "include" }).then(r => r.json()).then(setPrefs).catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stored?.id]);
@@ -241,14 +241,14 @@ export default function EmployeePortal() {
   useEffect(() => {
     if (!stored?.companyId) return;
     setLoadingGroup(true);
-    fetch(`https://api.soulfulco.uk/api/group-sessions?companyId=${stored.companyId}`)
+    fetch(`https://api.soulfulco.uk/api/group-sessions?companyId=${stored.companyId}`, { credentials: "include" })
       .then(r => r.json())
       .then((data: GroupSession[]) => {
         const upcoming = data.filter(s => new Date(s.start_time) >= new Date() && s.status !== "cancelled");
         setGroupSessions(upcoming);
         return Promise.all(
           upcoming.map(s =>
-            fetch(`https://api.soulfulco.uk/api/group-sessions/${s.id}`)
+            fetch(`https://api.soulfulco.uk/api/group-sessions/${s.id}`, { credentials: "include" })
               .then(r => r.json())
               .then(d => ({ id: s.id, attendees: d.attendees as { employee_email: string }[] }))
           )
@@ -268,7 +268,7 @@ export default function EmployeePortal() {
   useEffect(() => {
     if (!stored?.companyId) return;
     setLoadingSocial(true);
-    fetch(`https://api.soulfulco.uk/api/social-events?companyId=${stored.companyId}`)
+    fetch(`https://api.soulfulco.uk/api/social-events?companyId=${stored.companyId}`, { credentials: "include" })
       .then(r => r.json())
       .then((data: SocialEvent[]) => {
         const upcoming = data.filter(e => new Date(e.start_time) >= new Date() && e.status === "active");
@@ -276,7 +276,7 @@ export default function EmployeePortal() {
         // Check which ones this employee has RSVPed to
         return Promise.all(
           upcoming.map(e =>
-            fetch(`https://api.soulfulco.uk/api/social-events/${e.id}`)
+            fetch(`https://api.soulfulco.uk/api/social-events/${e.id}`, { credentials: "include" })
               .then(r => r.json())
               .then(d => ({ id: e.id, rsvps: d.rsvps as { employee_email: string }[] }))
           )
@@ -298,6 +298,7 @@ export default function EmployeePortal() {
     setSigningUp(sessionId);
     try {
       const res = await fetch(`https://api.soulfulco.uk/api/group-sessions/${sessionId}/attend`, {
+        credentials: "include",
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ employeeId: stored.id, employeeName: stored.name, employeeEmail: stored.email }),
@@ -315,6 +316,7 @@ export default function EmployeePortal() {
     setSigningUp(sessionId);
     try {
       const res = await fetch(`https://api.soulfulco.uk/api/group-sessions/${sessionId}/attend`, {
+        credentials: "include",
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ employeeEmail: stored.email }),
@@ -333,6 +335,7 @@ export default function EmployeePortal() {
     setRsvping(eventId);
     try {
       const res = await fetch(`https://api.soulfulco.uk/api/social-events/${eventId}/rsvp`, {
+        credentials: "include",
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ employeeId: stored.id, employeeName: stored.name, employeeEmail: stored.email }),
@@ -350,6 +353,7 @@ export default function EmployeePortal() {
     setRsvping(eventId);
     try {
       const res = await fetch(`https://api.soulfulco.uk/api/social-events/${eventId}/rsvp`, {
+        credentials: "include",
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ employeeEmail: stored.email }),
@@ -395,6 +399,7 @@ export default function EmployeePortal() {
     setSavingPrefs(true);
     try {
       const res = await fetch("https://api.soulfulco.uk/api/employee/preferences", {
+        credentials: "include",
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -431,6 +436,7 @@ export default function EmployeePortal() {
     setGoogleActing(true);
     try {
       const res = await fetch("https://api.soulfulco.uk/api/employee/google/disconnect", {
+        credentials: "include",
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ employeeId: stored.id }),
@@ -448,6 +454,7 @@ export default function EmployeePortal() {
     setGoogleSyncing(true);
     try {
       const res = await fetch("https://api.soulfulco.uk/api/employee/google/sync", {
+        credentials: "include",
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ employeeId: stored.id }),

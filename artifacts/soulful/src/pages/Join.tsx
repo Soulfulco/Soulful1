@@ -56,13 +56,14 @@ export default function Join() {
       // Ensure an employee record exists for this email + company (idempotent —
       // returns the existing record if HR already imported them, or creates a
       // fresh one otherwise), then set their password on it in one flow.
-      await fetch("/api/employees", {
+      await fetch("https://api.soulfulco.uk/api/employees", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, companyId: company.id }),
       });
-      const claimRes = await fetch("/api/employees/claim", {
+      const claimRes = await fetch("https://api.soulfulco.uk/api/employees/claim", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, companyId: company.id, password }),
       });
