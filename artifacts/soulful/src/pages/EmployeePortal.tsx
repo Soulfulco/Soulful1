@@ -423,7 +423,7 @@ export default function EmployeePortal() {
 
   const handleConnectGoogle = () => {
     if (!stored) return;
-    window.location.href = `/api/employee/google/connect?employeeId=${stored.id}`;
+    window.location.href = `https://api.soulfulco.uk/api/employee/google/connect?employeeId=${stored.id}`;
   };
 
   const handleDisconnectGoogle = async () => {
