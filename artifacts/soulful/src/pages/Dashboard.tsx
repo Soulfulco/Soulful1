@@ -7,10 +7,18 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Users, Building2, Calendar, PoundSterling, Clock, ArrowUpRight, CreditCard, CheckCircle2, Loader2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Users, Building2, Calendar, PoundSterling, Clock, ArrowUpRight, CreditCard, CheckCircle2, Loader2, ClipboardList } from "lucide-react";
 import { format } from "date-fns";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 
 const COLORS = ['hsl(153 18% 45%)', 'hsl(15 45% 65%)', 'hsl(40 50% 70%)', 'hsl(200 20% 60%)', 'hsl(330 20% 60%)', 'hsl(20 20% 40%)'];
@@ -89,6 +97,54 @@ function PaymentMethodCard() {
   );
 }
 
+// Shown to HR when their company has never submitted a Wellbeing Action
+// Plan. Employees genuinely can't join via the invite code until this is
+// done (enforced server-side) — this modal is the visible reminder of that,
+// not the enforcement itself.
+function WellbeingActionPlanReminder({ companyId }: { companyId: number }) {
+  const [, navigate] = useLocation();
+  const [open, setOpen] = useState(false);
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/wellbeing/action-plan/${companyId}`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((plan) => {
+        if (!plan) setOpen(true);
+      })
+      .catch(() => {})
+      .finally(() => setChecked(true));
+  }, [companyId]);
+
+  if (!checked) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center mb-2">
+            <ClipboardList className="h-5 w-5 text-primary" />
+          </div>
+          <DialogTitle className="font-serif text-xl">Set up your Wellbeing Action Plan</DialogTitle>
+          <DialogDescription className="text-sm leading-relaxed pt-1">
+            Before your employees can join Soulful using your invite code, we need a few quarterly figures —
+            short and long-term absence, cost, and retention — so we can show the impact your wellbeing
+            programme is having over time.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            I'll do this later
+          </Button>
+          <Button onClick={() => navigate("/dashboard/wellbeing-plan")}>
+            Set up now
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Dashboard() {
   const { isHrUser, hrSession } = useAuth();
 
@@ -116,6 +172,8 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
+      {isHrUser && hrSession?.companyId && <WellbeingActionPlanReminder companyId={hrSession.companyId} />}
+
       <div>
         <h1 className="text-3xl font-serif text-foreground mb-2">
           {isHrUser ? `${hrSession?.companyName ?? "Your"} Overview` : "Platform Overview"}
