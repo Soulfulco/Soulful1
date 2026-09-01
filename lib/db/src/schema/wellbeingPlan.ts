@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, timestamp, numeric, unique, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { companiesTable } from "./companies";
@@ -16,20 +16,37 @@ export type WellbeingRequirementKey = (typeof wellbeingRequirementKeys)[number];
 
 export const wellbeingRequirementSourceEnum = pgEnum("wellbeing_requirement_source", ["auto", "manual"]);
 
-export const wellbeingActionPlansTable = pgTable("wellbeing_action_plans", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id")
-    .notNull()
-    .references(() => companiesTable.id, { onDelete: "cascade" }),
-  fileUrl: text("file_url").notNull(),
-  fileName: text("file_name").notNull(),
-  uploadedBy: text("uploaded_by"),
-  uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
-});
+// Wellbeing Action Plan: a structured quarterly form HR fills in directly
+// (not a document upload) — short/long-term absence, cost, and retention,
+// so Soulful can show its own impact on these figures over time. One row
+// per company per quarter.
+export const wellbeingActionPlansTable = pgTable(
+  "wellbeing_action_plans",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id")
+      .notNull()
+      .references(() => companiesTable.id, { onDelete: "cascade" }),
+    // e.g. "2026-Q3" — kept as a simple sortable string rather than a date,
+    // since this represents a whole quarter, not a specific day.
+    quarter: text("quarter").notNull(),
+    shortTermAbsenceDays: numeric("short_term_absence_days", { precision: 10, scale: 1 }).notNull(),
+    longTermAbsenceDays: numeric("long_term_absence_days", { precision: 10, scale: 1 }).notNull(),
+    absenceCostGbp: numeric("absence_cost_gbp", { precision: 10, scale: 2 }),
+    retentionRatePct: numeric("retention_rate_pct", { precision: 5, scale: 2 }),
+    submittedBy: text("submitted_by"),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    // One entry per company per quarter — resubmitting the same quarter
+    // should update the existing row, not create a duplicate.
+    uniqueCompanyQuarter: unique().on(table.companyId, table.quarter),
+  }),
+);
 
 export const insertWellbeingActionPlanSchema = createInsertSchema(wellbeingActionPlansTable).omit({
   id: true,
-  uploadedAt: true,
+  submittedAt: true,
 });
 export type InsertWellbeingActionPlan = z.infer<typeof insertWellbeingActionPlanSchema>;
 export type WellbeingActionPlan = typeof wellbeingActionPlansTable.$inferSelect;

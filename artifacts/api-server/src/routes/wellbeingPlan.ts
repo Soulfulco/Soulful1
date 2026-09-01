@@ -20,7 +20,9 @@ router.get("/wellbeing/requirements", (_req, res) => {
   res.json(REQUIREMENTS);
 });
 
-// GET /wellbeing/action-plan/:companyId — fetch the current agreed action plan for a company.
+// GET /wellbeing/action-plan/:companyId — fetch the most recent quarterly
+// entry for a company (used both to display current status and to power
+// the onboarding gate check elsewhere in the app).
 router.get("/wellbeing/action-plan/:companyId", async (req, res) => {
   try {
     const companyId = Number(req.params.companyId);
@@ -31,7 +33,7 @@ router.get("/wellbeing/action-plan/:companyId", async (req, res) => {
       .select()
       .from(wellbeingActionPlansTable)
       .where(eq(wellbeingActionPlansTable.companyId, companyId))
-      .orderBy(desc(wellbeingActionPlansTable.uploadedAt))
+      .orderBy(desc(wellbeingActionPlansTable.quarter))
       .limit(1);
     res.json(plan ?? null);
   } catch (err) {
@@ -40,20 +42,75 @@ router.get("/wellbeing/action-plan/:companyId", async (req, res) => {
   }
 });
 
-// POST /wellbeing/action-plan — HR uploads (or replaces) the agreed action plan document.
+// GET /wellbeing/action-plan/:companyId/history — every quarterly entry for
+// a company, oldest first, for the annual trend/review view.
+router.get("/wellbeing/action-plan/:companyId/history", async (req, res) => {
+  try {
+    const companyId = Number(req.params.companyId);
+    if (await isTrialLocked(companyId)) {
+      return res.status(402).json({ error: TRIAL_LOCKED_MESSAGE, locked: true });
+    }
+    const plans = await db
+      .select()
+      .from(wellbeingActionPlansTable)
+      .where(eq(wellbeingActionPlansTable.companyId, companyId))
+      .orderBy(wellbeingActionPlansTable.quarter);
+    res.json(plans);
+  } catch (err) {
+    logger.error({ err }, "Failed to fetch wellbeing action plan history");
+    res.status(500).json({ error: "Failed to fetch wellbeing action plan history" });
+  }
+});
+
+// POST /wellbeing/action-plan — HR submits (or updates) their quarterly
+// entry: short/long-term absence, cost, and retention. One entry per
+// company per quarter — resubmitting the same quarter updates it rather
+// than creating a duplicate (enforced by the unique companyId+quarter
+// constraint, upserted here).
 router.post("/wellbeing/action-plan", async (req, res) => {
   try {
-    const { companyId, fileUrl, fileName, uploadedBy } = req.body;
-    if (!companyId || !fileUrl || !fileName) {
-      return res.status(400).json({ error: "companyId, fileUrl and fileName are required" });
+    const {
+      companyId,
+      quarter,
+      shortTermAbsenceDays,
+      longTermAbsenceDays,
+      absenceCostGbp,
+      retentionRatePct,
+      submittedBy,
+    } = req.body ?? {};
+
+    if (!companyId || !quarter || shortTermAbsenceDays === undefined || longTermAbsenceDays === undefined) {
+      return res.status(400).json({
+        error: "companyId, quarter, shortTermAbsenceDays, and longTermAbsenceDays are required",
+      });
     }
     if (await isTrialLocked(Number(companyId))) {
       return res.status(402).json({ error: TRIAL_LOCKED_MESSAGE, locked: true });
     }
+
     const [plan] = await db
       .insert(wellbeingActionPlansTable)
-      .values({ companyId, fileUrl, fileName, uploadedBy: uploadedBy ?? null })
+      .values({
+        companyId,
+        quarter,
+        shortTermAbsenceDays: String(shortTermAbsenceDays),
+        longTermAbsenceDays: String(longTermAbsenceDays),
+        absenceCostGbp: absenceCostGbp !== undefined && absenceCostGbp !== null ? String(absenceCostGbp) : null,
+        retentionRatePct: retentionRatePct !== undefined && retentionRatePct !== null ? String(retentionRatePct) : null,
+        submittedBy: submittedBy ?? null,
+      })
+      .onConflictDoUpdate({
+        target: [wellbeingActionPlansTable.companyId, wellbeingActionPlansTable.quarter],
+        set: {
+          shortTermAbsenceDays: String(shortTermAbsenceDays),
+          longTermAbsenceDays: String(longTermAbsenceDays),
+          absenceCostGbp: absenceCostGbp !== undefined && absenceCostGbp !== null ? String(absenceCostGbp) : null,
+          retentionRatePct: retentionRatePct !== undefined && retentionRatePct !== null ? String(retentionRatePct) : null,
+          submittedBy: submittedBy ?? null,
+        },
+      })
       .returning();
+
     res.status(201).json(plan);
   } catch (err) {
     logger.error({ err }, "Failed to save wellbeing action plan");
