@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "@workspace/db";
-import { employeesTable, companiesTable, bookingsTable } from "@workspace/db/schema";
+import { employeesTable, companiesTable, bookingsTable, wellbeingActionPlansTable } from "@workspace/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { isAdmin, employeeId } from "../lib/roles";
@@ -233,6 +233,20 @@ companyEmployeesRouter.get("/companies/join/:code", async (req, res) => {
       .where(eq(companiesTable.inviteCode, code))
       .limit(1);
     if (!company) return res.status(404).json({ error: "Invalid invite code" });
+
+    // Employees can't join until HR has completed their company's Wellbeing
+    // Action Plan setup — this is a genuine onboarding gate, not just a nudge.
+    const [plan] = await db
+      .select({ id: wellbeingActionPlansTable.id })
+      .from(wellbeingActionPlansTable)
+      .where(eq(wellbeingActionPlansTable.companyId, company.id))
+      .limit(1);
+    if (!plan) {
+      return res.status(403).json({
+        error: "Your company hasn't finished setting up yet. Please check with your HR team.",
+      });
+    }
+
     return res.json(company);
   } catch {
     return res.status(500).json({ error: "Failed to resolve invite code" });
