@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import { useUpload } from "@workspace/object-storage-web";
+import { useEffect, useState, useCallback } from "react";
 import { useListCompanies } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Upload, FileText, CheckCircle2, Clock, AlertCircle, HelpCircle, Download, BarChart3 } from "lucide-react";
+import { Loader2, CheckCircle2, Clock, AlertCircle, HelpCircle, BarChart3, Save } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -30,10 +31,14 @@ interface EmployeeCompliance {
 
 interface ActionPlan {
   id: number;
-  fileUrl: string;
-  fileName: string;
-  uploadedBy: string | null;
-  uploadedAt: string;
+  companyId: number;
+  quarter: string;
+  shortTermAbsenceDays: string;
+  longTermAbsenceDays: string;
+  absenceCostGbp: string | null;
+  retentionRatePct: string | null;
+  submittedBy: string | null;
+  submittedAt: string;
 }
 
 const STATUS_CONFIG: Record<RequirementStatus, { label: string; className: string; icon: typeof CheckCircle2 }> = {
@@ -42,6 +47,14 @@ const STATUS_CONFIG: Record<RequirementStatus, { label: string; className: strin
   overdue: { label: "Overdue", className: "bg-red-50 text-red-700 border-red-200", icon: AlertCircle },
   no_data: { label: "Not started", className: "bg-muted text-muted-foreground border-border", icon: HelpCircle },
 };
+
+// Works out the current calendar quarter as a label like "2026-Q3", used as
+// the default quarter HR is submitting figures for.
+function currentQuarter(): string {
+  const now = new Date();
+  const q = Math.floor(now.getMonth() / 3) + 1;
+  return `${now.getFullYear()}-Q${q}`;
+}
 
 export default function DashboardWellbeingPlan() {
   const { hrSession, isAdminUser, user } = useAuth();
@@ -57,38 +70,33 @@ export default function DashboardWellbeingPlan() {
   const [rows, setRows] = useState<EmployeeCompliance[] | null>(null);
   const [loadingRows, setLoadingRows] = useState(false);
   const [markingKey, setMarkingKey] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
-  const uploaderName = hrSession?.user
+  const [quarter] = useState(currentQuarter());
+  const [shortTermDays, setShortTermDays] = useState("");
+  const [longTermDays, setLongTermDays] = useState("");
+  const [absenceCost, setAbsenceCost] = useState("");
+  const [retentionRate, setRetentionRate] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const submitterName = hrSession?.user
     ? [hrSession.user.firstName, hrSession.user.lastName].filter(Boolean).join(" ") || hrSession.user.email
     : user?.email ?? "HR Team";
-
-  const { uploadFile, isUploading } = useUpload({
-    onSuccess: async (res) => {
-      if (!companyId) return;
-      const fileUrl = `/api/storage${res.objectPath}`;
-      const response = await fetch("/api/wellbeing/action-plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyId, fileUrl, fileName: res.metadata.name, uploadedBy: uploaderName }),
-      });
-      if (response.ok) {
-        const saved = await response.json();
-        setPlan(saved);
-        toast({ title: "Action plan uploaded", description: "The agreed wellbeing action plan is now available to HR." });
-      } else {
-        toast({ title: "Couldn't save the plan", description: "Please try again.", variant: "destructive" });
-      }
-    },
-    onError: (err) => toast({ title: "Upload failed", description: err.message, variant: "destructive" }),
-  });
 
   const loadPlan = useCallback(() => {
     if (!companyId) return;
     setLoadingPlan(true);
     fetch(`/api/wellbeing/action-plan/${companyId}`)
       .then((r) => r.json())
-      .then(setPlan)
+      .then((data: ActionPlan | null) => {
+        setPlan(data);
+        // Pre-fill the form if this quarter's figures were already submitted.
+        if (data && data.quarter === currentQuarter()) {
+          setShortTermDays(data.shortTermAbsenceDays);
+          setLongTermDays(data.longTermAbsenceDays);
+          setAbsenceCost(data.absenceCostGbp ?? "");
+          setRetentionRate(data.retentionRatePct ?? "");
+        }
+      })
       .catch(() => {})
       .finally(() => setLoadingPlan(false));
   }, [companyId]);
@@ -108,20 +116,39 @@ export default function DashboardWellbeingPlan() {
     loadCompliance();
   }, [loadPlan, loadCompliance]);
 
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    const allowed = ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
-    if (!allowed.includes(file.type)) {
-      toast({ title: "Invalid file", description: "Please upload a PDF or Word document.", variant: "destructive" });
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!companyId) return;
+    if (!shortTermDays.trim() || !longTermDays.trim()) {
+      toast({ title: "Missing figures", description: "Short-term and long-term absence days are required.", variant: "destructive" });
       return;
     }
-    if (file.size > 10 * 1024 * 1024) {
-      toast({ title: "File too large", description: "Please choose a file under 10MB.", variant: "destructive" });
-      return;
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/wellbeing/action-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId,
+          quarter,
+          shortTermAbsenceDays: Number(shortTermDays),
+          longTermAbsenceDays: Number(longTermDays),
+          absenceCostGbp: absenceCost.trim() ? Number(absenceCost) : null,
+          retentionRatePct: retentionRate.trim() ? Number(retentionRate) : null,
+          submittedBy: submitterName,
+        }),
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        setPlan(saved);
+        toast({ title: "Saved", description: `Figures for ${quarter} have been recorded.` });
+      } else {
+        toast({ title: "Couldn't save", description: "Please try again.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Couldn't save", description: "Please try again.", variant: "destructive" });
     }
-    await uploadFile(file);
+    setSubmitting(false);
   };
 
   const markComplete = async (employeeId: number, key: string) => {
@@ -130,7 +157,7 @@ export default function DashboardWellbeingPlan() {
       const res = await fetch(`/api/employees/${employeeId}/wellbeing-requirements/${key}/complete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ recordedBy: uploaderName }),
+        body: JSON.stringify({ recordedBy: submitterName }),
       });
       if (res.ok) {
         loadCompliance();
@@ -146,7 +173,7 @@ export default function DashboardWellbeingPlan() {
         <div>
           <h1 className="text-2xl font-serif font-bold text-foreground">Wellbeing Action Plan</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Upload the agreed action plan and track completion of the base engagement requirements
+            Quarterly figures showing the impact of your wellbeing programme, plus base engagement tracking
           </p>
         </div>
         {isAdminUser && (
@@ -175,44 +202,82 @@ export default function DashboardWellbeingPlan() {
         <>
           <Card>
             <CardHeader>
-              <CardTitle className="text-base font-serif">Agreed Action Plan</CardTitle>
+              <CardTitle className="text-base font-serif">This quarter: {quarter}</CardTitle>
               <CardDescription className="text-xs">
-                Upload the wellbeing action plan agreed with this company (PDF or Word document)
+                Enter your latest absence, cost, and retention figures. Submitted every 3 months, reviewed annually
+                to show the impact Soulful is having.
               </CardDescription>
             </CardHeader>
             <CardContent>
               {loadingPlan ? (
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               ) : (
-                <div className="flex items-center justify-between flex-wrap gap-4">
-                  {plan ? (
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                        <FileText className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <a href={plan.fileUrl} target="_blank" rel="noreferrer" className="text-sm font-medium hover:underline flex items-center gap-1">
-                          {plan.fileName} <Download className="h-3 w-3" />
-                        </a>
-                        <p className="text-xs text-muted-foreground">
-                          Uploaded {format(parseISO(plan.uploadedAt), "d MMM yyyy")}{plan.uploadedBy ? ` by ${plan.uploadedBy}` : ""}
-                        </p>
-                      </div>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="shortTermDays">Short-term absence (days lost)</Label>
+                      <Input
+                        id="shortTermDays"
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={shortTermDays}
+                        onChange={(e) => setShortTermDays(e.target.value)}
+                        placeholder="e.g. 12"
+                        required
+                      />
                     </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No action plan uploaded yet.</p>
-                  )}
-                  <div>
-                    <input ref={inputRef} type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={handleFile} />
-                    <Button type="button" variant="outline" size="sm" disabled={isUploading} onClick={() => inputRef.current?.click()}>
-                      {isUploading ? (
-                        <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Uploading…</>
-                      ) : (
-                        <><Upload className="h-4 w-4 mr-1.5" /> {plan ? "Replace plan" : "Upload plan"}</>
-                      )}
-                    </Button>
+                    <div className="space-y-2">
+                      <Label htmlFor="longTermDays">Long-term absence (days lost)</Label>
+                      <Input
+                        id="longTermDays"
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={longTermDays}
+                        onChange={(e) => setLongTermDays(e.target.value)}
+                        placeholder="e.g. 20"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="absenceCost">Cost associated with absence (£, optional)</Label>
+                      <Input
+                        id="absenceCost"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={absenceCost}
+                        onChange={(e) => setAbsenceCost(e.target.value)}
+                        placeholder="e.g. 4500"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="retentionRate">Staff retention rate (%, optional)</Label>
+                      <Input
+                        id="retentionRate"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={retentionRate}
+                        onChange={(e) => setRetentionRate(e.target.value)}
+                        placeholder="e.g. 92"
+                      />
+                    </div>
                   </div>
-                </div>
+                  <Button type="submit" disabled={submitting} className="gap-1.5">
+                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Save {quarter} figures
+                  </Button>
+                  {plan && (
+                    <p className="text-xs text-muted-foreground pt-2 border-t">
+                      Last submitted: {plan.quarter}
+                      {plan.submittedBy ? ` by ${plan.submittedBy}` : ""}
+                      {" on "}{format(parseISO(plan.submittedAt), "d MMM yyyy")}
+                    </p>
+                  )}
+                </form>
               )}
             </CardContent>
           </Card>
