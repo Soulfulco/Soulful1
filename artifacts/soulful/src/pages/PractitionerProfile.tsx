@@ -14,15 +14,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
-import { MapPin, Star, Clock, GraduationCap, ArrowLeft, CheckCircle2, CreditCard, Loader2, EyeOff } from "lucide-react";
+import { MapPin, Star, Clock, GraduationCap, ArrowLeft, CheckCircle2, CreditCard, Loader2, EyeOff, Users } from "lucide-react";
 import { Link, useSearch } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function PractitionerProfile({ id }: { id: string }) {
   const practitionerId = parseInt(id, 10);
   const { toast } = useToast();
+  const { isHrUser } = useAuth();
   const search = useSearch();
   const params = new URLSearchParams(search);
   const isSelfFunded = params.get("paymentType") === "self";
@@ -32,17 +34,17 @@ export default function PractitionerProfile({ id }: { id: string }) {
   const { data: practitioner, isLoading: isLoadingProfile } = useGetPractitioner(practitionerId, { 
     query: { enabled: !!practitionerId, queryKey: getGetPractitionerQueryKey(practitionerId) } 
   });
-  
+
   const { data: slots, isLoading: isLoadingSlots } = useListPractitionerSlots(practitionerId, { 
     query: { enabled: !!practitionerId, queryKey: getListPractitionerSlotsQueryKey(practitionerId) } 
   });
-  
+
   const { data: reviews, isLoading: isLoadingReviews } = useGetPractitionerReviews(practitionerId, { 
     query: { enabled: !!practitionerId, queryKey: getGetPractitionerReviewsQueryKey(practitionerId) } 
   });
 
   const createBooking = useCreateBooking();
-  
+
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
@@ -93,7 +95,7 @@ export default function PractitionerProfile({ id }: { id: string }) {
 
   const handleBooking = () => {
     if (!selectedSlot) return;
-    
+
     createBooking.mutate({
       data: {
         practitionerId,
@@ -154,10 +156,19 @@ export default function PractitionerProfile({ id }: { id: string }) {
       </div>
 
       <div className="container mx-auto px-4 md:px-8 max-w-6xl relative -mt-32">
-        <Link href="/practitioners" className="inline-flex items-center gap-2 text-primary bg-background/80 backdrop-blur px-4 py-2 rounded-full mb-6 hover:bg-background transition-colors shadow-sm">
-          <ArrowLeft className="h-4 w-4" /> Back to Directory
-        </Link>
-        
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
+          <Link href="/practitioners" className="inline-flex items-center gap-2 text-primary bg-background/80 backdrop-blur px-4 py-2 rounded-full hover:bg-background transition-colors shadow-sm">
+            <ArrowLeft className="h-4 w-4" /> Back to Directory
+          </Link>
+          {isHrUser && (
+            <Button asChild variant="outline" className="rounded-full gap-2 bg-background/80 backdrop-blur">
+              <Link href={`/dashboard/group-sessions?practitionerId=${practitionerId}`}>
+                <Users className="h-4 w-4" /> Schedule Group Session with {practitioner.name}
+              </Link>
+            </Button>
+          )}
+        </div>
+
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-8">
@@ -264,7 +275,7 @@ export default function PractitionerProfile({ id }: { id: string }) {
                 </div>
                 <div className="text-primary-foreground/80 text-sm mt-2">per 60 minute session</div>
               </div>
-              
+
               <CardContent className="p-6">
                 <h3 className="font-serif text-xl mb-4">Book a session</h3>
                 <Calendar
@@ -418,7 +429,7 @@ export default function PractitionerProfile({ id }: { id: string }) {
                     </Button>
                   </DialogContent>
                 </Dialog>
-                
+
                 <div className="mt-4 flex items-start gap-2 text-xs text-muted-foreground">
                   {isSelfFunded ? (
                     <>

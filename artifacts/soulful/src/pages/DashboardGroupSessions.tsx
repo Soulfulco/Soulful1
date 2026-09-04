@@ -6,12 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Users, MapPin, Clock, ChevronDown, ChevronUp, Building2 } from "lucide-react";
+import { Users, MapPin, Clock, ChevronDown, ChevronUp, Building2 } from "lucide-react";
 import { format } from "date-fns";
+import { Link, useSearch } from "wouter";
 
 const SESSION_TYPES = [
   "Yoga", "Meditation", "Breathwork", "Sound Healing",
@@ -73,6 +74,7 @@ const EMPTY_FORM = {
 
 export default function DashboardGroupSessions() {
   const { toast } = useToast();
+  const search = useSearch();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [sessions, setSessions] = useState<GroupSession[]>([]);
@@ -83,6 +85,18 @@ export default function DashboardGroupSessions() {
 
   const { data: practitioners } = useListPractitioners({});
   const { data: companies } = useListCompanies();
+
+  // Coming back from a practitioner's profile with ?practitionerId=X pre-fills
+  // that practitioner and opens the scheduling dialog automatically, rather
+  // than starting blind with an empty dropdown.
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    const practitionerId = params.get("practitionerId");
+    if (practitionerId) {
+      setForm(f => ({ ...f, practitionerId }));
+      setOpen(true);
+    }
+  }, [search]);
 
   const fetchSessions = async () => {
     setLoading(true);
@@ -174,105 +188,108 @@ export default function DashboardGroupSessions() {
           <p className="text-muted-foreground text-sm">Schedule workplace wellbeing sessions that employees can sign up to.</p>
         </div>
 
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2"><Plus className="h-4 w-4" />Schedule Session</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="font-serif text-xl">Schedule a Group Session</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4 pt-2">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label>Company <span className="text-destructive">*</span></Label>
-                  <Select value={form.companyId} onValueChange={v => handleChange("companyId", v)}>
-                    <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
-                    <SelectContent>
-                      {companies?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Practitioner <span className="text-destructive">*</span></Label>
-                  <Select value={form.practitionerId} onValueChange={v => handleChange("practitionerId", v)}>
-                    <SelectTrigger><SelectValue placeholder="Select practitioner" /></SelectTrigger>
-                    <SelectContent>
-                      {practitioners?.filter(p => p.isActive).map(p => (
-                        <SelectItem key={p.id} value={String(p.id)}>{p.name} — {p.specialism}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+        <Button asChild className="gap-2">
+          <Link href="/practitioners">
+            <Users className="h-4 w-4" /> Schedule Session
+          </Link>
+        </Button>
+      </div>
 
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-xl">Schedule a Group Session</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>Session Type <span className="text-destructive">*</span></Label>
-                <Select value={form.sessionType} onValueChange={v => handleChange("sessionType", v)}>
-                  <SelectTrigger><SelectValue placeholder="e.g. Yoga, Meditation..." /></SelectTrigger>
+                <Label>Company <span className="text-destructive">*</span></Label>
+                <Select value={form.companyId} onValueChange={v => handleChange("companyId", v)}>
+                  <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
                   <SelectContent>
-                    {SESSION_TYPES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    {companies?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="date">Date <span className="text-destructive">*</span></Label>
-                  <Input id="date" type="date" value={form.date} onChange={e => handleChange("date", e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="startTime">Start Time <span className="text-destructive">*</span></Label>
-                  <Input id="startTime" type="time" value={form.startTime} onChange={e => handleChange("startTime", e.target.value)} />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label>Duration</Label>
-                  <Select value={form.durationMinutes} onValueChange={v => handleChange("durationMinutes", v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {DURATIONS.map(d => <SelectItem key={d.minutes} value={String(d.minutes)}>{d.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="maxAttendees">Max Attendees</Label>
-                  <Input id="maxAttendees" type="number" min="1" max="200" value={form.maxAttendees} onChange={e => handleChange("maxAttendees", e.target.value)} />
-                </div>
-              </div>
-
               <div className="space-y-1.5">
-                <Label>Location</Label>
-                <Select value={form.locationType} onValueChange={v => handleChange("locationType", v)}>
+                <Label>Practitioner <span className="text-destructive">*</span></Label>
+                <Select value={form.practitionerId} onValueChange={v => handleChange("practitionerId", v)}>
+                  <SelectTrigger><SelectValue placeholder="Select practitioner" /></SelectTrigger>
+                  <SelectContent>
+                    {practitioners?.filter(p => p.isActive).map(p => (
+                      <SelectItem key={p.id} value={String(p.id)}>{p.name} — {p.specialism}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Session Type <span className="text-destructive">*</span></Label>
+              <Select value={form.sessionType} onValueChange={v => handleChange("sessionType", v)}>
+                <SelectTrigger><SelectValue placeholder="e.g. Yoga, Meditation..." /></SelectTrigger>
+                <SelectContent>
+                  {SESSION_TYPES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="date">Date <span className="text-destructive">*</span></Label>
+                <Input id="date" type="date" value={form.date} onChange={e => handleChange("date", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="startTime">Start Time <span className="text-destructive">*</span></Label>
+                <Input id="startTime" type="time" value={form.startTime} onChange={e => handleChange("startTime", e.target.value)} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Duration</Label>
+                <Select value={form.durationMinutes} onValueChange={v => handleChange("durationMinutes", v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {LOCATION_TYPES.map(l => <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>)}
+                    {DURATIONS.map(d => <SelectItem key={d.minutes} value={String(d.minutes)}>{d.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="space-y-1.5">
-                <Label htmlFor="locationDescription">Location Details</Label>
-                <Input id="locationDescription" placeholder="e.g. Floor 3 boardroom, or Zoom link" value={form.locationDescription} onChange={e => handleChange("locationDescription", e.target.value)} />
+                <Label htmlFor="maxAttendees">Max Attendees</Label>
+                <Input id="maxAttendees" type="number" min="1" max="200" value={form.maxAttendees} onChange={e => handleChange("maxAttendees", e.target.value)} />
               </div>
+            </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="notes">Notes for employees</Label>
-                <Textarea id="notes" placeholder="What to bring, what to wear, etc." rows={2} value={form.notes} onChange={e => handleChange("notes", e.target.value)} />
-              </div>
+            <div className="space-y-1.5">
+              <Label>Location</Label>
+              <Select value={form.locationType} onValueChange={v => handleChange("locationType", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {LOCATION_TYPES.map(l => <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
 
-              <div className="flex justify-end gap-3 pt-2">
-                <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                <Button type="submit" disabled={submitting}>
-                  {submitting ? "Scheduling..." : "Schedule Session"}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="locationDescription">Location Details</Label>
+              <Input id="locationDescription" placeholder="e.g. Floor 3 boardroom, or Zoom link" value={form.locationDescription} onChange={e => handleChange("locationDescription", e.target.value)} />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="notes">Notes for employees</Label>
+              <Textarea id="notes" placeholder="What to bring, what to wear, etc." rows={2} value={form.notes} onChange={e => handleChange("notes", e.target.value)} />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? "Scheduling..." : "Schedule Session"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Card className="border-none shadow-sm overflow-hidden bg-card">
         <div className="overflow-x-auto">
