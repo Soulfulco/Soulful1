@@ -5,6 +5,7 @@ import { eq, and, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { isAdmin, employeeId } from "../lib/roles";
 import { createSession, clearSession, getSessionId, SESSION_COOKIE, SESSION_TTL } from "../lib/auth";
+import { logger } from "../lib/logger";
 
 function hashPassword(password: string): string {
   return bcrypt.hashSync(password, 10);
@@ -110,6 +111,14 @@ employeesRouter.post("/employees/claim", async (req, res) => {
 
     const passwordHash = hashPassword(password);
     await db.update(employeesTable).set({ passwordHash }).where(eq(employeesTable.id, employee.id));
+
+    // Best-effort mailing list capture, matching the same pattern already
+    // used for HR signups — never blocks or fails the actual account setup.
+    db.execute(sql`
+      INSERT INTO mailing_list_subscribers (email, name, source, notes)
+      VALUES (${employee.email}, ${employee.name}, ${"employee-signup"}, ${null})
+      ON CONFLICT (lower(email)) DO NOTHING
+    `).catch((err: unknown) => logger.warn({ err, email: employee.email }, "Failed to add employee signup to mailing list"));
 
     const sessionData = {
       user: {
