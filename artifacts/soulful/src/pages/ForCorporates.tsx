@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useCreateCompany, useListSubscriptions, getListSubscriptionsQueryKey, useCreateStripeCheckout, useListPractitionerShowcase, type PractitionerShowcase } from "@workspace/api-client-react";
 import { LogoMarquee } from "@/components/LogoMarquee";
 import { useSiteContent } from "@/hooks/useSiteContent";
@@ -9,7 +9,109 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CheckCircle2, XCircle, Building2, Info, TrendingUp } from "lucide-react";
+import { CheckCircle2, XCircle, Building2, Info, TrendingUp, Calculator, Brain } from "lucide-react";
+
+// Cost of absence calculator, shared by the For Corporates page and the
+// Wellbeing Action Plan dashboard. Formula, in order:
+//   average salary ÷ 225           = cost per working day
+//   cost per working day × absence days = cost of absence per employee
+//   cost per employee × headcount  = total cost of absence per year
+//   total cost × 54%               = portion attributed to mental health
+// 225 approximates working days/year (365 minus weekends and standard
+// UK holiday/annual leave). 54% is the mental-health attribution figure
+// this calculator is specifically built to surface.
+const WORKING_DAYS_PER_YEAR = 225;
+const MENTAL_HEALTH_ATTRIBUTION = 0.54;
+
+function formatGbp(value: number): string {
+  return value.toLocaleString("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 });
+}
+
+function AbsenceCostCalculator() {
+  const [headcount, setHeadcount] = useState("50");
+  const [averageSalary, setAverageSalary] = useState("32000");
+  const [averageAbsenceDays, setAverageAbsenceDays] = useState("6");
+
+  const results = useMemo(() => {
+    const hc = Number(headcount) || 0;
+    const salary = Number(averageSalary) || 0;
+    const days = Number(averageAbsenceDays) || 0;
+
+    const costPerWorkingDay = salary / WORKING_DAYS_PER_YEAR;
+    const costOfAbsencePerEmployee = costPerWorkingDay * days;
+    const totalCostOfAbsencePerYear = costOfAbsencePerEmployee * hc;
+    const mentalHealthPortion = totalCostOfAbsencePerYear * MENTAL_HEALTH_ATTRIBUTION;
+
+    return { totalCostOfAbsencePerYear, mentalHealthPortion };
+  }, [headcount, averageSalary, averageAbsenceDays]);
+
+  return (
+    <Card className="border-2 border-primary/20 rounded-3xl overflow-hidden">
+      <CardHeader className="bg-primary/5 pb-4">
+        <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium mb-2 w-fit">
+          <Calculator className="h-3.5 w-3.5" /> Cost of absence calculator
+        </div>
+        <CardTitle className="font-serif text-2xl">What is absence really costing you?</CardTitle>
+        <CardDescription>Enter your own figures — every business is different.</CardDescription>
+      </CardHeader>
+      <CardContent className="pt-6">
+        <div className="grid sm:grid-cols-3 gap-4 mb-6">
+          <div className="grid gap-1.5">
+            <Label htmlFor="calcHeadcount" className="text-xs">Headcount</Label>
+            <Input
+              id="calcHeadcount"
+              type="number"
+              min="0"
+              className="bg-background h-11"
+              value={headcount}
+              onChange={(e) => setHeadcount(e.target.value)}
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="calcSalary" className="text-xs">Average salary (£)</Label>
+            <Input
+              id="calcSalary"
+              type="number"
+              min="0"
+              className="bg-background h-11"
+              value={averageSalary}
+              onChange={(e) => setAverageSalary(e.target.value)}
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="calcAbsenceDays" className="text-xs">Average absence days/year</Label>
+            <Input
+              id="calcAbsenceDays"
+              type="number"
+              min="0"
+              step="0.5"
+              className="bg-background h-11"
+              value={averageAbsenceDays}
+              onChange={(e) => setAverageAbsenceDays(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div className="bg-muted/50 rounded-2xl p-5">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Total cost of absence per year</p>
+            <p className="text-3xl font-serif font-bold text-foreground">{formatGbp(results.totalCostOfAbsencePerYear)}</p>
+          </div>
+          <div className="bg-primary text-primary-foreground rounded-2xl p-5">
+            <div className="flex items-center gap-1.5 text-xs uppercase tracking-wide mb-1 opacity-90">
+              <Brain className="h-3.5 w-3.5" /> Attributed to mental health (54%)
+            </div>
+            <p className="text-3xl font-serif font-bold">{formatGbp(results.mentalHealthPortion)}</p>
+          </div>
+        </div>
+
+        <p className="text-xs text-muted-foreground mt-4">
+          Based on {WORKING_DAYS_PER_YEAR} working days/year. This is an estimate for illustrative purposes, using your own figures.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function ForCorporates() {
   const c = useSiteContent();
@@ -255,6 +357,9 @@ export default function ForCorporates() {
             </div>
           </div>
         </div>
+
+        {/* Cost of absence calculator */}
+        <AbsenceCostCalculator />
 
         {/* Plans + Registration form */}
         <div className="grid lg:grid-cols-2 gap-16">
