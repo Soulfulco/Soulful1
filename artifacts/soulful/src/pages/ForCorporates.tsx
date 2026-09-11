@@ -52,7 +52,7 @@ function AbsenceCostCalculator({ corporatePlans }: { corporatePlans: { id: numbe
     const hc = Number(headcount) || 0;
     if (!hc) return null;
     for (const plan of corporatePlans) {
-      const match = plan.name.match(/(\d+)\s*-\s*(\d+)\s*employees/i);
+      const match = plan.name.match(/(\d+)\s*[-–—]\s*(\d+)\s*employees/i);
       if (!match) continue;
       const min = Number(match[1]);
       const max = Number(match[2]);
