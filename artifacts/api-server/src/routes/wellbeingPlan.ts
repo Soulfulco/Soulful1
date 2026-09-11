@@ -63,10 +63,10 @@ router.get("/wellbeing/action-plan/:companyId/history", async (req, res) => {
 });
 
 // POST /wellbeing/action-plan — HR submits (or updates) their quarterly
-// entry: short/long-term absence, cost, and retention. One entry per
-// company per quarter — resubmitting the same quarter updates it rather
-// than creating a duplicate (enforced by the unique companyId+quarter
-// constraint, upserted here).
+// entry: short/long-term absence, cost, salary, and retention. One entry
+// per company per quarter — resubmitting the same quarter updates it
+// rather than creating a duplicate (enforced by the unique
+// companyId+quarter constraint, upserted here).
 router.post("/wellbeing/action-plan", async (req, res) => {
   try {
     const {
@@ -75,6 +75,7 @@ router.post("/wellbeing/action-plan", async (req, res) => {
       shortTermAbsenceDays,
       longTermAbsenceDays,
       absenceCostGbp,
+      averageSalaryGbp,
       retentionRatePct,
       submittedBy,
     } = req.body ?? {};
@@ -96,6 +97,7 @@ router.post("/wellbeing/action-plan", async (req, res) => {
         shortTermAbsenceDays: String(shortTermAbsenceDays),
         longTermAbsenceDays: String(longTermAbsenceDays),
         absenceCostGbp: absenceCostGbp !== undefined && absenceCostGbp !== null ? String(absenceCostGbp) : null,
+        averageSalaryGbp: averageSalaryGbp !== undefined && averageSalaryGbp !== null ? String(averageSalaryGbp) : null,
         retentionRatePct: retentionRatePct !== undefined && retentionRatePct !== null ? String(retentionRatePct) : null,
         submittedBy: submittedBy ?? null,
       })
@@ -105,6 +107,7 @@ router.post("/wellbeing/action-plan", async (req, res) => {
           shortTermAbsenceDays: String(shortTermAbsenceDays),
           longTermAbsenceDays: String(longTermAbsenceDays),
           absenceCostGbp: absenceCostGbp !== undefined && absenceCostGbp !== null ? String(absenceCostGbp) : null,
+          averageSalaryGbp: averageSalaryGbp !== undefined && averageSalaryGbp !== null ? String(averageSalaryGbp) : null,
           retentionRatePct: retentionRatePct !== undefined && retentionRatePct !== null ? String(retentionRatePct) : null,
           submittedBy: submittedBy ?? null,
         },

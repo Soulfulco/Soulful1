@@ -33,6 +33,10 @@ export const wellbeingActionPlansTable = pgTable(
     shortTermAbsenceDays: numeric("short_term_absence_days", { precision: 10, scale: 1 }).notNull(),
     longTermAbsenceDays: numeric("long_term_absence_days", { precision: 10, scale: 1 }).notNull(),
     absenceCostGbp: numeric("absence_cost_gbp", { precision: 10, scale: 2 }),
+    // Used to calculate the ROI/savings comparison shown on the dashboard
+    // (cost of absence = salary ÷ 225 working days × absence days × headcount),
+    // alongside the quarter-on-quarter change in absence days.
+    averageSalaryGbp: numeric("average_salary_gbp", { precision: 10, scale: 2 }),
     retentionRatePct: numeric("retention_rate_pct", { precision: 5, scale: 2 }),
     submittedBy: text("submitted_by"),
     submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
