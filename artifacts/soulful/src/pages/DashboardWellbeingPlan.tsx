@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useListCompanies } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, CheckCircle2, Clock, AlertCircle, HelpCircle, BarChart3, Save } from "lucide-react";
+import { Loader2, CheckCircle2, Clock, AlertCircle, HelpCircle, BarChart3, Save, TrendingDown, TrendingUp, PoundSterling } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -36,6 +36,7 @@ interface ActionPlan {
   shortTermAbsenceDays: string;
   longTermAbsenceDays: string;
   absenceCostGbp: string | null;
+  averageSalaryGbp: string | null;
   retentionRatePct: string | null;
   submittedBy: string | null;
   submittedAt: string;
@@ -48,12 +49,94 @@ const STATUS_CONFIG: Record<RequirementStatus, { label: string; className: strin
   no_data: { label: "Not started", className: "bg-muted text-muted-foreground border-border", icon: HelpCircle },
 };
 
+const WORKING_DAYS_PER_YEAR = 225;
+
+function formatGbp(value: number): string {
+  return value.toLocaleString("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 });
+}
+
 // Works out the current calendar quarter as a label like "2026-Q3", used as
 // the default quarter HR is submitting figures for.
 function currentQuarter(): string {
   const now = new Date();
   const q = Math.floor(now.getMonth() / 3) + 1;
   return `${now.getFullYear()}-Q${q}`;
+}
+
+// Real ROI comparison built from HR's own reported quarterly figures —
+// what Soulful costs vs the actual cost of absence, and the £ value of any
+// reduction in absence days compared to the previous quarter. Distinct from
+// the illustrative "what if" calculator on the public For Corporates page.
+function RoiComparison({ history, headcount, subscriptionAnnualCost }: {
+  history: ActionPlan[];
+  headcount: number;
+  subscriptionAnnualCost: number;
+}) {
+  const comparison = useMemo(() => {
+    if (history.length === 0) return null;
+    const current = history[history.length - 1];
+    const previous = history.length > 1 ? history[history.length - 2] : null;
+
+    const salary = Number(current.averageSalaryGbp) || 0;
+    const currentDays = Number(current.shortTermAbsenceDays) + Number(current.longTermAbsenceDays);
+    if (!salary || !headcount) return null;
+
+    const costPerWorkingDay = salary / WORKING_DAYS_PER_YEAR;
+    const currentAbsenceCost = costPerWorkingDay * currentDays * headcount;
+
+    let dayChange: number | null = null;
+    let totalSaving: number | null = null;
+    if (previous) {
+      const previousDays = Number(previous.shortTermAbsenceDays) + Number(previous.longTermAbsenceDays);
+      dayChange = previousDays - currentDays; // positive = improvement (fewer days)
+      totalSaving = costPerWorkingDay * dayChange * headcount;
+    }
+
+    return { currentAbsenceCost, dayChange, totalSaving, quarter: current.quarter };
+  }, [history, headcount]);
+
+  if (!comparison) return null;
+
+  return (
+    <Card className="border-2 border-primary/20">
+      <CardHeader>
+        <CardTitle className="text-base font-serif flex items-center gap-2">
+          <PoundSterling className="h-4 w-4 text-primary" /> Real ROI — {comparison.quarter}
+        </CardTitle>
+        <CardDescription className="text-xs">
+          Calculated from your own reported figures, compared to what you pay Soulful.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid sm:grid-cols-3 gap-4">
+          <div className="bg-muted/50 rounded-xl p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">What you pay Soulful (annual)</p>
+            <p className="text-2xl font-serif font-bold text-foreground">{formatGbp(subscriptionAnnualCost)}</p>
+          </div>
+          <div className="bg-muted/50 rounded-xl p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Actual cost of absence this quarter</p>
+            <p className="text-2xl font-serif font-bold text-foreground">{formatGbp(comparison.currentAbsenceCost)}</p>
+          </div>
+          {comparison.totalSaving !== null && comparison.dayChange !== null ? (
+            <div className={`rounded-xl p-4 ${comparison.totalSaving >= 0 ? "bg-primary text-primary-foreground" : "bg-destructive/10 text-destructive"}`}>
+              <div className="flex items-center gap-1.5 text-xs uppercase tracking-wide mb-1 opacity-90">
+                {comparison.totalSaving >= 0 ? <TrendingDown className="h-3.5 w-3.5" /> : <TrendingUp className="h-3.5 w-3.5" />}
+                {comparison.dayChange >= 0 ? "Absence days reduced" : "Absence days increased"} ({Math.abs(comparison.dayChange)} days)
+              </div>
+              <p className="text-2xl font-serif font-bold">
+                {comparison.totalSaving >= 0 ? "" : "-"}{formatGbp(Math.abs(comparison.totalSaving))}
+              </p>
+              <p className="text-xs opacity-90 mt-0.5">{comparison.totalSaving >= 0 ? "Total saving" : "Total increase"} vs last quarter</p>
+            </div>
+          ) : (
+            <div className="bg-muted/30 rounded-xl p-4 flex items-center">
+              <p className="text-xs text-muted-foreground">Submit next quarter's figures to see your saving trend.</p>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function DashboardWellbeingPlan() {
@@ -66,6 +149,9 @@ export default function DashboardWellbeingPlan() {
   const companyId = hrSession?.companyId ?? selectedCompanyId;
 
   const [plan, setPlan] = useState<ActionPlan | null>(null);
+  const [history, setHistory] = useState<ActionPlan[]>([]);
+  const [headcount, setHeadcount] = useState(0);
+  const [subscriptionAnnualCost, setSubscriptionAnnualCost] = useState(0);
   const [loadingPlan, setLoadingPlan] = useState(false);
   const [rows, setRows] = useState<EmployeeCompliance[] | null>(null);
   const [loadingRows, setLoadingRows] = useState(false);
@@ -75,6 +161,7 @@ export default function DashboardWellbeingPlan() {
   const [shortTermDays, setShortTermDays] = useState("");
   const [longTermDays, setLongTermDays] = useState("");
   const [absenceCost, setAbsenceCost] = useState("");
+  const [averageSalary, setAverageSalary] = useState("");
   const [retentionRate, setRetentionRate] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -85,15 +172,21 @@ export default function DashboardWellbeingPlan() {
   const loadPlan = useCallback(() => {
     if (!companyId) return;
     setLoadingPlan(true);
-    fetch(`/api/wellbeing/action-plan/${companyId}`)
-      .then((r) => r.json())
-      .then((data: ActionPlan | null) => {
+    Promise.all([
+      fetch(`/api/wellbeing/action-plan/${companyId}`).then((r) => r.json()),
+      fetch(`/api/wellbeing/action-plan/${companyId}/history`).then((r) => r.json()),
+      fetch(`/api/companies/${companyId}/utilisation`, { credentials: "include" }).then((r) => r.ok ? r.json() : null),
+    ])
+      .then(([data, historyData, utilisation]: [ActionPlan | null, ActionPlan[], { totalEmployees: number } | null]) => {
         setPlan(data);
+        setHistory(Array.isArray(historyData) ? historyData : []);
+        if (utilisation) setHeadcount(utilisation.totalEmployees ?? 0);
         // Pre-fill the form if this quarter's figures were already submitted.
         if (data && data.quarter === currentQuarter()) {
           setShortTermDays(data.shortTermAbsenceDays);
           setLongTermDays(data.longTermAbsenceDays);
           setAbsenceCost(data.absenceCostGbp ?? "");
+          setAverageSalary(data.averageSalaryGbp ?? "");
           setRetentionRate(data.retentionRatePct ?? "");
         }
       })
@@ -116,6 +209,16 @@ export default function DashboardWellbeingPlan() {
     loadCompliance();
   }, [loadPlan, loadCompliance]);
 
+  useEffect(() => {
+    if (!companyId) return;
+    fetch(`/api/dashboard/summary`, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((summary: { subscriptionPriceGbp?: number } | null) => {
+        if (summary?.subscriptionPriceGbp) setSubscriptionAnnualCost(summary.subscriptionPriceGbp * 12);
+      })
+      .catch(() => {});
+  }, [companyId]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!companyId) return;
@@ -134,6 +237,7 @@ export default function DashboardWellbeingPlan() {
           shortTermAbsenceDays: Number(shortTermDays),
           longTermAbsenceDays: Number(longTermDays),
           absenceCostGbp: absenceCost.trim() ? Number(absenceCost) : null,
+          averageSalaryGbp: averageSalary.trim() ? Number(averageSalary) : null,
           retentionRatePct: retentionRate.trim() ? Number(retentionRate) : null,
           submittedBy: submitterName,
         }),
@@ -141,6 +245,7 @@ export default function DashboardWellbeingPlan() {
       if (res.ok) {
         const saved = await res.json();
         setPlan(saved);
+        loadPlan();
         toast({ title: "Saved", description: `Figures for ${quarter} have been recorded.` });
       } else {
         toast({ title: "Couldn't save", description: "Please try again.", variant: "destructive" });
@@ -241,6 +346,18 @@ export default function DashboardWellbeingPlan() {
                       />
                     </div>
                     <div className="space-y-2">
+                      <Label htmlFor="averageSalary">Average salary (£, needed for ROI calculation)</Label>
+                      <Input
+                        id="averageSalary"
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={averageSalary}
+                        onChange={(e) => setAverageSalary(e.target.value)}
+                        placeholder="e.g. 32000"
+                      />
+                    </div>
+                    <div className="space-y-2">
                       <Label htmlFor="absenceCost">Cost associated with absence (£, optional)</Label>
                       <Input
                         id="absenceCost"
@@ -277,26 +394,28 @@ export default function DashboardWellbeingPlan() {
                       {" on "}{format(parseISO(plan.submittedAt), "d MMM yyyy")}
                     </p>
                   )}
-                </form>
-              )}
-            </CardContent>
-          </Card>
+                  </form>
+                  )}
+                  </CardContent>
+                  </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base font-serif">Base Requirement Compliance</CardTitle>
-              <CardDescription className="text-xs">
-                Sessions and RSVPs booked through Soulful are logged automatically. Use "Mark complete" for
-                anything confirmed outside the platform (e.g. a volunteering day or an offered new modality).
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loadingRows ? (
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              ) : !rows || rows.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-6 text-center">No active employees for this company yet.</p>
-              ) : (
-                <div className="space-y-6">
+                  <RoiComparison history={history} headcount={headcount} subscriptionAnnualCost={subscriptionAnnualCost} />
+
+                  <Card>
+                  <CardHeader>
+                  <CardTitle className="text-base font-serif">Base Requirement Compliance</CardTitle>
+                  <CardDescription className="text-xs">
+                  Sessions and RSVPs booked through Soulful are logged automatically. Use "Mark complete" for
+                  anything confirmed outside the platform (e.g. a volunteering day or an offered new modality).
+                  </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                  {loadingRows ? (
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  ) : !rows || rows.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-6 text-center">No active employees for this company yet.</p>
+                  ) : (
+                  <div className="space-y-6">
                   {rows.map((row) => (
                     <div key={row.employeeId} className="border rounded-lg p-4">
                       <p className="text-sm font-semibold mb-3">{row.employeeName}</p>
@@ -349,12 +468,12 @@ export default function DashboardWellbeingPlan() {
                       </div>
                     </div>
                   ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </>
-      )}
-    </div>
-  );
-}
+                  </div>
+                  )}
+                  </CardContent>
+                  </Card>
+                  </>
+                  )}
+                  </div>
+                  );
+                  }
