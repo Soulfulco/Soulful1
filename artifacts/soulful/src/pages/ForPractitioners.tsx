@@ -8,10 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { CheckCircle2, User } from "lucide-react";
+import { CheckCircle2, User, AlertTriangle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PhotoUpload } from "@/components/PhotoUpload";
 import { DocumentUpload } from "@/components/DocumentUpload";
+
+const DEFAULT_COMMISSION_PCT = "10";
 
 export default function ForPractitioners() {
   const c = useSiteContent();
@@ -49,7 +51,10 @@ export default function ForPractitioners() {
     insuranceFileUrl: "",
     avatarUrl: "",
     password: "",
+    commissionRatePct: DEFAULT_COMMISSION_PCT,
   });
+
+  const commissionChanged = formData.commissionRatePct.trim() !== DEFAULT_COMMISSION_PCT;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,6 +76,11 @@ export default function ForPractitioners() {
       toast({ title: "Add a rate", description: "Enter an in-person rate, an online rate, or both.", variant: "destructive" });
       return;
     }
+    const commissionRatePct = formData.commissionRatePct.trim() ? Number(formData.commissionRatePct) : 10;
+    if (!Number.isFinite(commissionRatePct) || commissionRatePct < 0 || commissionRatePct > 100) {
+      toast({ title: "Invalid commission", description: "Commission rate must be between 0 and 100.", variant: "destructive" });
+      return;
+    }
 
     createPractitioner.mutate({
       data: {
@@ -82,6 +92,7 @@ export default function ForPractitioners() {
         sessionRateGbp: (inPersonRate ?? onlineRate)!,
         inPersonRateGbp: inPersonRate,
         onlineRateGbp: onlineRate,
+        commissionRatePct,
         location: formData.location,
         qualifications: formData.qualifications,
         qualificationsFileUrl: formData.qualificationsFileUrl || undefined,
@@ -222,213 +233,235 @@ export default function ForPractitioners() {
                 </p>
                 <Button asChild variant="outline" className="rounded-full mt-2">
                   <a href="/">Back to home</a>
-                </Button>
-              </CardContent>
-              ) : (
-              <>
-              <CardHeader className="pb-6">
-                <CardTitle className="text-2xl font-serif">Apply to join</CardTitle>
-                <CardDescription>Tell us about your practice.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-5">
-                  <div className="grid md:grid-cols-2 gap-5">
-                    <div className="grid gap-2">
-                      <Label htmlFor="name">Full Name</Label>
-                      <Input 
-                        id="name" 
-                        required
-                        className="bg-background h-11"
-                        value={formData.name}
-                        onChange={(e) => setFormData({...formData, name: e.target.value})}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="email">Email Address</Label>
-                      <Input 
-                        id="email" 
-                        type="email" 
-                        required
-                        className="bg-background h-11"
-                        value={formData.email}
-                        onChange={(e) => setFormData({...formData, email: e.target.value})}
-                      />
-                    </div>
-                  </div>
+                                  </Button>
+                                </CardContent>
+                                ) : (
+                                <>
+                                <CardHeader className="pb-6">
+                                  <CardTitle className="text-2xl font-serif">Apply to join</CardTitle>
+                                  <CardDescription>Tell us about your practice.</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                  <form onSubmit={handleSubmit} className="space-y-5">
+                                    <div className="grid md:grid-cols-2 gap-5">
+                                      <div className="grid gap-2">
+                                        <Label htmlFor="name">Full Name</Label>
+                                        <Input 
+                                          id="name" 
+                                          required
+                                          className="bg-background h-11"
+                                          value={formData.name}
+                                          onChange={(e) => setFormData({...formData, name: e.target.value})}
+                                        />
+                                      </div>
+                                      <div className="grid gap-2">
+                                        <Label htmlFor="email">Email Address</Label>
+                                        <Input 
+                                          id="email" 
+                                          type="email" 
+                                          required
+                                          className="bg-background h-11"
+                                          value={formData.email}
+                                          onChange={(e) => setFormData({...formData, email: e.target.value})}
+                                        />
+                                      </div>
+                                    </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="phoneNumber">Phone Number</Label>
-                    <Input
-                      id="phoneNumber"
-                      type="tel"
-                      required
-                      className="bg-background h-11"
-                      value={formData.phoneNumber}
-                      onChange={(e) => setFormData({...formData, phoneNumber: e.target.value})}
-                      placeholder="07123 456789"
-                    />
-                  </div>
+                                    <div className="grid gap-2">
+                                      <Label htmlFor="phoneNumber">Phone Number</Label>
+                                      <Input
+                                        id="phoneNumber"
+                                        type="tel"
+                                        required
+                                        className="bg-background h-11"
+                                        value={formData.phoneNumber}
+                                        onChange={(e) => setFormData({...formData, phoneNumber: e.target.value})}
+                                        placeholder="07123 456789"
+                                      />
+                                    </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="password">Portal Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      required
-                      minLength={8}
-                      autoComplete="new-password"
-                      className="bg-background h-11"
-                      value={formData.password}
-                      onChange={(e) => setFormData({...formData, password: e.target.value})}
-                      placeholder="At least 8 characters"
-                    />
-                    <p className="text-xs text-muted-foreground">You'll use this to log in to your practitioner portal and manage availability.</p>
-                  </div>
+                                    <div className="grid gap-2">
+                                      <Label htmlFor="password">Portal Password</Label>
+                                      <Input
+                                        id="password"
+                                        type="password"
+                                        required
+                                        minLength={8}
+                                        autoComplete="new-password"
+                                        className="bg-background h-11"
+                                        value={formData.password}
+                                        onChange={(e) => setFormData({...formData, password: e.target.value})}
+                                        placeholder="At least 8 characters"
+                                      />
+                                      <p className="text-xs text-muted-foreground">You'll use this to log in to your practitioner portal and manage availability.</p>
+                                    </div>
 
-                  <div className="grid md:grid-cols-2 gap-5">
-                    <div className="grid gap-2">
-                      <Label htmlFor="specialism">Primary Specialism</Label>
-                      <Select value={formData.specialism} onValueChange={(val) => setFormData({...formData, specialism: val})}>
-                        <SelectTrigger className="bg-background h-11" id="specialism">
-                          <SelectValue placeholder="Select specialism" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {SPECIALISMS.map(spec => (
-                            <SelectItem key={spec} value={spec} className="capitalize">{spec}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="inPersonRateGbp">In-person Rate (£)</Label>
-                      <Input 
-                        id="inPersonRateGbp" 
-                        type="number" 
-                        min="1"
-                        className="bg-background h-11"
-                        value={formData.inPersonRateGbp}
-                        onChange={(e) => setFormData({...formData, inPersonRateGbp: e.target.value})}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="onlineRateGbp">Online Rate (£)</Label>
-                      <Input 
-                        id="onlineRateGbp" 
-                        type="number" 
-                        min="1"
-                        className="bg-background h-11"
-                        value={formData.onlineRateGbp}
-                        onChange={(e) => setFormData({...formData, onlineRateGbp: e.target.value})}
-                      />
-                    </div>
-                  </div>
+                                    <div className="grid md:grid-cols-2 gap-5">
+                                      <div className="grid gap-2">
+                                        <Label htmlFor="specialism">Primary Specialism</Label>
+                                        <Select value={formData.specialism} onValueChange={(val) => setFormData({...formData, specialism: val})}>
+                                          <SelectTrigger className="bg-background h-11" id="specialism">
+                                            <SelectValue placeholder="Select specialism" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {SPECIALISMS.map(spec => (
+                                              <SelectItem key={spec} value={spec} className="capitalize">{spec}</SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div className="grid gap-2">
+                                        <Label htmlFor="inPersonRateGbp">In-person Rate (£)</Label>
+                                        <Input 
+                                          id="inPersonRateGbp" 
+                                          type="number" 
+                                          min="1"
+                                          className="bg-background h-11"
+                                          value={formData.inPersonRateGbp}
+                                          onChange={(e) => setFormData({...formData, inPersonRateGbp: e.target.value})}
+                                        />
+                                      </div>
+                                      <div className="grid gap-2">
+                                        <Label htmlFor="onlineRateGbp">Online Rate (£)</Label>
+                                        <Input 
+                                          id="onlineRateGbp" 
+                                          type="number" 
+                                          min="1"
+                                          className="bg-background h-11"
+                                          value={formData.onlineRateGbp}
+                                          onChange={(e) => setFormData({...formData, onlineRateGbp: e.target.value})}
+                                        />
+                                      </div>
+                                      <div className="grid gap-2">
+                                        <Label htmlFor="commissionRatePct">Commission Rate (%)</Label>
+                                        <Input
+                                          id="commissionRatePct"
+                                          type="number"
+                                          min="0"
+                                          max="100"
+                                          step="0.5"
+                                          className="bg-background h-11"
+                                          value={formData.commissionRatePct}
+                                          onChange={(e) => setFormData({...formData, commissionRatePct: e.target.value})}
+                                        />
+                                      </div>
+                                    </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="location">Location (City, UK)</Label>
-                    <Input 
-                      id="location" 
-                      className="bg-background h-11"
-                      value={formData.location}
-                      onChange={(e) => setFormData({...formData, location: e.target.value})}
-                      placeholder="e.g. London, or Remote"
-                    />
-                  </div>
+                                    {commissionChanged && (
+                                      <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+                                        <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                                        <span>Changing the commission rate from our standard 10% means your application will need extra review — this may lengthen the time it takes to approve and list your profile.</span>
+                                      </div>
+                                    )}
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="qualifications">Qualifications & Certifications</Label>
-                    <Input 
-                      id="qualifications" 
-                      className="bg-background h-11"
-                      value={formData.qualifications}
-                      onChange={(e) => setFormData({...formData, qualifications: e.target.value})}
-                      placeholder="e.g. 500h YTT, BSc Nutrition"
-                    />
-                  </div>
+                                    <div className="grid gap-2">
+                                      <Label htmlFor="location">Location (City, UK)</Label>
+                                      <Input 
+                                        id="location" 
+                                        className="bg-background h-11"
+                                        value={formData.location}
+                                        onChange={(e) => setFormData({...formData, location: e.target.value})}
+                                        placeholder="e.g. London, or Remote"
+                                      />
+                                    </div>
 
-                  <div className="grid gap-2">
-                    <Label>Qualification documents</Label>
-                    <DocumentUpload
-                      label="qualification"
-                      value={formData.qualificationsFileUrl}
-                      onChange={(url) => setFormData({...formData, qualificationsFileUrl: url})}
-                    />
-                    <p className="text-xs text-muted-foreground">Certificates or proof of your qualifications (PDF, Word, or image).</p>
-                  </div>
+                                    <div className="grid gap-2">
+                                      <Label htmlFor="qualifications">Qualifications & Certifications</Label>
+                                      <Input 
+                                        id="qualifications" 
+                                        className="bg-background h-11"
+                                        value={formData.qualifications}
+                                        onChange={(e) => setFormData({...formData, qualifications: e.target.value})}
+                                        placeholder="e.g. 500h YTT, BSc Nutrition"
+                                      />
+                                    </div>
 
-                  <div className="grid gap-2">
-                    <Label>Insurance document</Label>
-                    <DocumentUpload
-                      label="insurance certificate"
-                      value={formData.insuranceFileUrl}
-                      onChange={(url) => setFormData({...formData, insuranceFileUrl: url})}
-                    />
-                    <p className="text-xs text-muted-foreground">Your current professional indemnity / public liability insurance certificate.</p>
-                  </div>
+                                    <div className="grid gap-2">
+                                      <Label>Qualification documents</Label>
+                                      <DocumentUpload
+                                        label="qualification"
+                                        value={formData.qualificationsFileUrl}
+                                        onChange={(url) => setFormData({...formData, qualificationsFileUrl: url})}
+                                      />
+                                      <p className="text-xs text-muted-foreground">Certificates or proof of your qualifications (PDF, Word, or image).</p>
+                                    </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="bio">Professional Bio</Label>
-                    <Textarea 
-                      id="bio" 
-                      required
-                      className="bg-background min-h-[120px]"
-                      value={formData.bio}
-                      onChange={(e) => setFormData({...formData, bio: e.target.value})}
-                      placeholder="Tell potential clients about your approach, experience, and what to expect in a session..."
-                    />
-                  </div>
+                                    <div className="grid gap-2">
+                                      <Label>Insurance document</Label>
+                                      <DocumentUpload
+                                        label="insurance certificate"
+                                        value={formData.insuranceFileUrl}
+                                        onChange={(url) => setFormData({...formData, insuranceFileUrl: url})}
+                                      />
+                                      <p className="text-xs text-muted-foreground">Your current professional indemnity / public liability insurance certificate.</p>
+                                    </div>
 
-                  <div className="grid gap-2">
-                    <Label>Profile Photo</Label>
-                    <PhotoUpload value={formData.avatarUrl} onChange={(url) => setFormData({...formData, avatarUrl: url})} />
-                    <p className="text-xs text-muted-foreground">A friendly headshot helps clients connect with you (JPG or PNG, up to 5MB).</p>
-                  </div>
+                                    <div className="grid gap-2">
+                                      <Label htmlFor="bio">Professional Bio</Label>
+                                      <Textarea 
+                                        id="bio" 
+                                        required
+                                        className="bg-background min-h-[120px]"
+                                        value={formData.bio}
+                                        onChange={(e) => setFormData({...formData, bio: e.target.value})}
+                                        placeholder="Tell potential clients about your approach, experience, and what to expect in a session..."
+                                      />
+                                    </div>
 
-                  <Button 
-                    type="submit" 
-                    className="w-full h-12 rounded-full text-base mt-4 bg-secondary hover:bg-secondary/90 text-secondary-foreground" 
-                    disabled={createPractitioner.isPending || !selectedPlanId}
-                  >
-                    {createPractitioner.isPending ? "Submitting..." : selectedPlanId ? "Submit Application" : "Select a plan first"}
-                  </Button>
-                </form>
-              </CardContent>
-              </>
-              )}
-            </Card>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+                                    <div className="grid gap-2">
+                                      <Label>Profile Photo</Label>
+                                      <PhotoUpload value={formData.avatarUrl} onChange={(url) => setFormData({...formData, avatarUrl: url})} />
+                                      <p className="text-xs text-muted-foreground">A friendly headshot helps clients connect with you (JPG or PNG, up to 5MB).</p>
+                                    </div>
 
-function initialsOf(name: string) {
-  return name
-    .trim()
-    .split(/\s+/)
-    .map(w => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
+                                    <Button 
+                                      type="submit" 
+                                      className="w-full h-12 rounded-full text-base mt-4 bg-secondary hover:bg-secondary/90 text-secondary-foreground" 
+                                      disabled={createPractitioner.isPending || !selectedPlanId}
+                                    >
+                                      {createPractitioner.isPending ? "Submitting..." : selectedPlanId ? "Submit Application" : "Select a plan first"}
+                                    </Button>
+                                  </form>
+                                </CardContent>
+                                </>
+                                )}
+                              </Card>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
 
-function CompanyChip({ company }: { company: CompanyShowcase }) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-card px-5 py-3 shadow-sm">
-      {company.logoUrl ? (
-        <img
-          src={company.logoUrl}
-          alt={company.name}
-          className="h-9 w-9 rounded-lg object-contain"
-        />
-      ) : (
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary/10 text-secondary font-serif text-sm font-bold">
-          {initialsOf(company.name)}
-        </div>
-      )}
-      <span className="font-serif text-lg text-foreground whitespace-nowrap">
-        {company.name}
-      </span>
-    </div>
-  );
-}
+                  function initialsOf(name: string) {
+                    return name
+                      .trim()
+                      .split(/\s+/)
+                      .map(w => w[0])
+                      .slice(0, 2)
+                      .join("")
+                      .toUpperCase();
+                  }
+
+                  function CompanyChip({ company }: { company: CompanyShowcase }) {
+                    return (
+                      <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-card px-5 py-3 shadow-sm">
+                        {company.logoUrl ? (
+                          <img
+                            src={company.logoUrl}
+                            alt={company.name}
+                            className="h-9 w-9 rounded-lg object-contain"
+                          />
+                        ) : (
+                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary/10 text-secondary font-serif text-sm font-bold">
+                            {initialsOf(company.name)}
+                          </div>
+                        )}
+                        <span className="font-serif text-lg text-foreground whitespace-nowrap">
+                          {company.name}
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  
