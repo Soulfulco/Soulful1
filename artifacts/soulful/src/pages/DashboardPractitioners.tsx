@@ -34,6 +34,7 @@ const EMPTY_FORM = {
   bio: "",
   inPersonRateGbp: "",
   onlineRateGbp: "",
+  commissionRatePct: "",
   location: "",
   qualifications: "",
   qualificationsFileUrl: "",
@@ -171,6 +172,7 @@ export default function DashboardPractitioners() {
       bio: p.bio ?? "",
       inPersonRateGbp: p.inPersonRateGbp != null ? String(p.inPersonRateGbp) : "",
       onlineRateGbp: p.onlineRateGbp != null ? String(p.onlineRateGbp) : "",
+      commissionRatePct: p.commissionRatePct != null ? String(p.commissionRatePct) : "",
       location: p.location ?? "",
       qualifications: p.qualifications ?? "",
       qualificationsFileUrl: p.qualificationsFileUrl ?? "",
@@ -236,6 +238,14 @@ export default function DashboardPractitioners() {
       toast({ title: "Add a rate", description: "Enter an in-person rate, an online rate, or both.", variant: "destructive" });
       return;
     }
+    let commissionRatePct: number | undefined;
+    if (form.commissionRatePct.trim()) {
+      commissionRatePct = Number(form.commissionRatePct);
+      if (!Number.isFinite(commissionRatePct) || commissionRatePct < 0 || commissionRatePct > 100) {
+        toast({ title: "Invalid commission", description: "Commission rate must be between 0 and 100.", variant: "destructive" });
+        return;
+      }
+    }
     const baseRate = (inPersonRate ?? onlineRate)!;
     if (isEditing && editingId !== null) {
       updatePractitioner.mutate(
@@ -252,6 +262,7 @@ export default function DashboardPractitioners() {
             // the base sessionRateGbp is derived server-side from these two.
             inPersonRateGbp: inPersonRate ?? null,
             onlineRateGbp: onlineRate ?? null,
+            commissionRatePct,
             location: form.location,
             qualifications: form.qualifications,
             avatarUrl: form.avatarUrl,
@@ -269,8 +280,8 @@ export default function DashboardPractitioners() {
         }
       );
       return;
-    }
-    createPractitioner.mutate(
+      }
+      createPractitioner.mutate(
       {
         data: {
           name: form.name,
@@ -281,6 +292,7 @@ export default function DashboardPractitioners() {
           sessionRateGbp: baseRate,
           inPersonRateGbp: inPersonRate,
           onlineRateGbp: onlineRate,
+          commissionRatePct,
           location: form.location || undefined,
           qualifications: form.qualifications || undefined,
           qualificationsFileUrl: form.qualificationsFileUrl || undefined,
@@ -300,27 +312,27 @@ export default function DashboardPractitioners() {
           toast({ title: "Error", description: "Could not add practitioner. Check the email isn't already in use.", variant: "destructive" });
         },
       }
-    );
-  };
-  const handleBulkOpenChange = (next: boolean) => {
-    setBulkOpen(next);
-    if (!next) {
+      );
+      };
+      const handleBulkOpenChange = (next: boolean) => {
+      setBulkOpen(next);
+      if (!next) {
       setBulkText("");
       setBulkResult(null);
-    }
-  };
-  const handleBulkFile = (file: File | undefined) => {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setBulkText(String(reader.result ?? ""));
-    reader.readAsText(file);
-  };
-  const handleBulkSubmit = () => {
-    if (parsedBulk.length === 0) {
+      }
+      };
+      const handleBulkFile = (file: File | undefined) => {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => setBulkText(String(reader.result ?? ""));
+      reader.readAsText(file);
+      };
+      const handleBulkSubmit = () => {
+      if (parsedBulk.length === 0) {
       toast({ title: "Nothing to import", description: "Paste rows or upload a CSV first.", variant: "destructive" });
       return;
-    }
-    bulkCreate.mutate(
+      }
+      bulkCreate.mutate(
       { data: { practitioners: parsedBulk } },
       {
         onSuccess: (result) => {
@@ -335,10 +347,10 @@ export default function DashboardPractitioners() {
           toast({ title: "Import failed", description: "Could not import practitioners. Please try again.", variant: "destructive" });
         },
       }
-    );
-  };
-  return (
-    <div className="space-y-6">
+      );
+      };
+      return (
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-serif text-foreground">Practitioners Directory</h1>
@@ -486,238 +498,249 @@ export default function DashboardPractitioners() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="inPersonRate">In-person Rate (£)</Label>
-                  <Input id="inPersonRate" type="number" min="0" step="5" placeholder="75" value={form.inPersonRateGbp} onChange={(e) => handleChange("inPersonRateGbp", e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="onlineRate">Online Rate (£)</Label>
-                  <Input id="onlineRate" type="number" min="0" step="5" placeholder="60" value={form.onlineRateGbp} onChange={(e) => handleChange("onlineRateGbp", e.target.value)} />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="bio">Bio <span className="text-destructive">*</span></Label>
-                <Textarea id="bio" placeholder="A short description of the practitioner's background and approach..." rows={3} value={form.bio} onChange={(e) => handleChange("bio", e.target.value)} />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="location">Location</Label>
-                  <Input id="location" placeholder="e.g. London, SE1" value={form.location} onChange={(e) => handleChange("location", e.target.value)} />
-                </div>
-                {!isEditing && (
-                  <div className="space-y-1.5">
-                    <Label>Subscription Status</Label>
-                    <Select value={form.subscriptionStatus} onValueChange={(v) => handleChange("subscriptionStatus", v)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="trial">Trial</SelectItem>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="inactive">Inactive</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="qualifications">Qualifications</Label>
-                <Input id="qualifications" placeholder="e.g. REPs Level 3, YMCA Diploma" value={form.qualifications} onChange={(e) => handleChange("qualifications", e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Qualification documents</Label>
-                <DocumentUpload label="qualification" value={form.qualificationsFileUrl} onChange={(url) => handleChange("qualificationsFileUrl", url)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Insurance document</Label>
-                <DocumentUpload label="insurance certificate" value={form.insuranceFileUrl} onChange={(url) => handleChange("insuranceFileUrl", url)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Profile photo</Label>
-                <PhotoUpload value={form.avatarUrl} onChange={(url) => handleChange("avatarUrl", url)} />
-                <p className="text-xs text-muted-foreground">Upload a headshot (JPG or PNG, up to 5MB).</p>
-              </div>
-              <div className="flex justify-end gap-3 pt-2">
-                <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>Cancel</Button>
-                <Button type="submit" disabled={isEditing ? updatePractitioner.isPending : createPractitioner.isPending}>
-                  {isEditing
-                    ? (updatePractitioner.isPending ? "Saving..." : "Save Changes")
-                    : (createPractitioner.isPending ? "Adding..." : "Add Practitioner")}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-        </div>
-      </div>
-      {pending.length > 0 && (
-        <Card className="border border-secondary/30 bg-secondary/5 shadow-sm p-6 space-y-4">
-          <div>
-            <h2 className="text-lg font-serif text-foreground">Pending applications</h2>
-            <p className="text-sm text-muted-foreground">
-              New practitioners waiting for review. Reach out to arrange a call, then approve to make their profile live.
-            </p>
-          </div>
-          <div className="space-y-3">
-            {pending.map((p) => (
-              <div
-                key={p.id}
-                className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-serif text-xs overflow-hidden shrink-0">
-                    {p.avatarUrl ? <img src={p.avatarUrl} alt="" className="h-full w-full object-cover" /> : p.name.charAt(0)}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="font-medium text-sm truncate">{p.name}</div>
-                    <div className="text-xs text-muted-foreground truncate">
-                      <span className="capitalize">{p.specialism}</span> · {rateSummary(p)}
-                    </div>
-                    <div className="flex items-center gap-3 mt-1 flex-wrap">
-                      <a href={`mailto:${p.email}`} className="text-xs text-secondary hover:underline">{p.email}</a>
-                      {p.phoneNumber && (
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Phone className="h-3 w-3" /> {p.phoneNumber}
-                        </span>
-                      )}
-                      {p.qualificationsFileUrl && (
-                        <a href={p.qualificationsFileUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-secondary hover:underline flex items-center gap-1">
-                          <FileText className="h-3 w-3" /> Qualifications
-                        </a>
-                      )}
-                      {p.insuranceFileUrl && (
-                        <a href={p.insuranceFileUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-secondary hover:underline flex items-center gap-1">
-                          <FileText className="h-3 w-3" /> Insurance
-                        </a>
-                      )}
-                      {!p.qualificationsFileUrl && !p.insuranceFileUrl && (
-                        <span className="text-xs text-amber-600">No documents uploaded yet</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Button size="sm" variant="outline" onClick={() => openEdit(p)} className="gap-1.5">
-                    <Pencil className="h-3.5 w-3.5" /> Review
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-destructive hover:text-destructive"
-                    disabled={updatePractitioner.isPending}
-                    onClick={() => handleApproval(p.id, p.name, "rejected")}
-                  >
-                    Reject
-                  </Button>
-                  <Button
-                    size="sm"
-                    disabled={updatePractitioner.isPending}
-                    onClick={() => handleApproval(p.id, p.name, "approved")}
-                  >
-                    Approve
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-      <Card className="border-none shadow-sm overflow-hidden bg-card">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-muted/50">
-              <TableRow>
-                <TableHead>Practitioner</TableHead>
-                <TableHead>Specialism</TableHead>
-                <TableHead>Rate</TableHead>
-                <TableHead>Subscription</TableHead>
-                <TableHead>Directory Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                Array(5).fill(0).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell><div className="h-10 bg-muted animate-pulse rounded" /></TableCell>
-                    <TableCell><div className="h-6 bg-muted animate-pulse rounded w-24" /></TableCell>
-                    <TableCell><div className="h-6 bg-muted animate-pulse rounded w-16" /></TableCell>
-                    <TableCell><div className="h-6 bg-muted animate-pulse rounded w-20" /></TableCell>
-                    <TableCell><div className="h-6 bg-muted animate-pulse rounded w-12" /></TableCell>
-                    <TableCell><div className="h-6 bg-muted animate-pulse rounded w-16 ml-auto" /></TableCell>
-                  </TableRow>
-                ))
-              ) : practitioners?.length ? (
-                practitioners.map((practitioner) => (
-                  <TableRow key={practitioner.id} className="hover:bg-muted/30">
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-serif text-xs overflow-hidden shrink-0">
-                          {practitioner.avatarUrl ? (
-                            <img src={practitioner.avatarUrl} alt="" className="h-full w-full object-cover" />
-                          ) : (
-                            practitioner.name.charAt(0)
-                          )}
+                                    <Input id="inPersonRate" type="number" min="0" step="5" placeholder="75" value={form.inPersonRateGbp} onChange={(e) => handleChange("inPersonRateGbp", e.target.value)} />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <Label htmlFor="onlineRate">Online Rate (£)</Label>
+                                    <Input id="onlineRate" type="number" min="0" step="5" placeholder="60" value={form.onlineRateGbp} onChange={(e) => handleChange("onlineRateGbp", e.target.value)} />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <Label htmlFor="commissionRatePct">Commission Rate (%)</Label>
+                                    <Input id="commissionRatePct" type="number" min="0" max="100" step="0.5" placeholder="10" value={form.commissionRatePct} onChange={(e) => handleChange("commissionRatePct", e.target.value)} />
+                                    <p className="text-[11px] text-muted-foreground">Leave blank to keep the platform standard (10%).</p>
+                                  </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                  <Label htmlFor="bio">Bio <span className="text-destructive">*</span></Label>
+                                  <Textarea id="bio" placeholder="A short description of the practitioner's background and approach..." rows={3} value={form.bio} onChange={(e) => handleChange("bio", e.target.value)} />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div className="space-y-1.5">
+                                    <Label htmlFor="location">Location</Label>
+                                    <Input id="location" placeholder="e.g. London, SE1" value={form.location} onChange={(e) => handleChange("location", e.target.value)} />
+                                  </div>
+                                  {!isEditing && (
+                                    <div className="space-y-1.5">
+                                      <Label>Subscription Status</Label>
+                                      <Select value={form.subscriptionStatus} onValueChange={(v) => handleChange("subscriptionStatus", v)}>
+                                        <SelectTrigger>
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="trial">Trial</SelectItem>
+                                          <SelectItem value="active">Active</SelectItem>
+                                          <SelectItem value="inactive">Inactive</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="space-y-1.5">
+                                  <Label htmlFor="qualifications">Qualifications</Label>
+                                  <Input id="qualifications" placeholder="e.g. REPs Level 3, YMCA Diploma" value={form.qualifications} onChange={(e) => handleChange("qualifications", e.target.value)} />
+                                </div>
+                                <div className="space-y-1.5">
+                                  <Label>Qualification documents</Label>
+                                  <DocumentUpload label="qualification" value={form.qualificationsFileUrl} onChange={(url) => handleChange("qualificationsFileUrl", url)} />
+                                </div>
+                                <div className="space-y-1.5">
+                                  <Label>Insurance document</Label>
+                                  <DocumentUpload label="insurance certificate" value={form.insuranceFileUrl} onChange={(url) => handleChange("insuranceFileUrl", url)} />
+                                </div>
+                                <div className="space-y-1.5">
+                                  <Label>Profile photo</Label>
+                                  <PhotoUpload value={form.avatarUrl} onChange={(url) => handleChange("avatarUrl", url)} />
+                                  <p className="text-xs text-muted-foreground">Upload a headshot (JPG or PNG, up to 5MB).</p>
+                                </div>
+                                <div className="flex justify-end gap-3 pt-2">
+                                  <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>Cancel</Button>
+                                  <Button type="submit" disabled={isEditing ? updatePractitioner.isPending : createPractitioner.isPending}>
+                                    {isEditing
+                                      ? (updatePractitioner.isPending ? "Saving..." : "Save Changes")
+                                      : (createPractitioner.isPending ? "Adding..." : "Add Practitioner")}
+                                  </Button>
+                                </div>
+                              </form>
+                            </DialogContent>
+                          </Dialog>
+                          </div>
                         </div>
-                        <div>
-                          <div className="font-medium text-sm">{practitioner.name}</div>
-                          <div className="text-xs text-muted-foreground">{practitioner.email}</div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="capitalize text-sm">{practitioner.specialism}</span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm font-medium">{rateSummary(practitioner)}</span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={
-                        practitioner.subscriptionStatus === "active" ? "bg-primary/10 text-primary border-primary/20" :
-                        practitioner.subscriptionStatus === "trial" ? "bg-secondary/10 text-secondary border-secondary/20" :
-                        "bg-muted text-muted-foreground"
-                      }>
-                        {practitioner.subscriptionStatus}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={practitioner.isActive}
-                          onCheckedChange={() => handleToggleActive(practitioner.id, practitioner.isActive)}
-                          disabled={updatePractitioner.isPending}
-                        />
-                        <span className="text-xs text-muted-foreground w-12">
-                          {practitioner.isActive ? "Active" : "Hidden"}
-                        </span>
-                        {practitioner.approvalStatus !== "approved" && (
-                          <Badge variant="outline" className={
-                            practitioner.approvalStatus === "pending"
-                              ? "bg-secondary/10 text-secondary border-secondary/20"
-                              : "bg-destructive/10 text-destructive border-destructive/20"
-                          }>
-                            {practitioner.approvalStatus === "pending" ? "Pending" : "Rejected"}
-                          </Badge>
+                        {pending.length > 0 && (
+                          <Card className="border border-secondary/30 bg-secondary/5 shadow-sm p-6 space-y-4">
+                            <div>
+                              <h2 className="text-lg font-serif text-foreground">Pending applications</h2>
+                              <p className="text-sm text-muted-foreground">
+                                New practitioners waiting for review. Reach out to arrange a call, then approve to make their profile live.
+                              </p>
+                            </div>
+                            <div className="space-y-3">
+                              {pending.map((p) => (
+                                <div
+                                  key={p.id}
+                                  className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
+                                >
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-serif text-xs overflow-hidden shrink-0">
+                                      {p.avatarUrl ? <img src={p.avatarUrl} alt="" className="h-full w-full object-cover" /> : p.name.charAt(0)}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="font-medium text-sm truncate">{p.name}</div>
+                                      <div className="text-xs text-muted-foreground truncate">
+                                        <span className="capitalize">{p.specialism}</span> · {rateSummary(p)}
+                                        {p.commissionRatePct != null && Number(p.commissionRatePct) !== 10 && (
+                                          <span className="ml-1.5 text-amber-600 font-medium">· {p.commissionRatePct}% commission requested</span>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-3 mt-1 flex-wrap">
+                                        <a href={`mailto:${p.email}`} className="text-xs text-secondary hover:underline">{p.email}</a>
+                                        {p.phoneNumber && (
+                                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                            <Phone className="h-3 w-3" /> {p.phoneNumber}
+                                          </span>
+                                        )}
+                                        {p.qualificationsFileUrl && (
+                                          <a href={p.qualificationsFileUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-secondary hover:underline flex items-center gap-1">
+                                            <FileText className="h-3 w-3" /> Qualifications
+                                          </a>
+                                        )}
+                                        {p.insuranceFileUrl && (
+                                          <a href={p.insuranceFileUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-secondary hover:underline flex items-center gap-1">
+                                            <FileText className="h-3 w-3" /> Insurance
+                                          </a>
+                                        )}
+                                        {!p.qualificationsFileUrl && !p.insuranceFileUrl && (
+                                          <span className="text-xs text-amber-600">No documents uploaded yet</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <Button size="sm" variant="outline" onClick={() => openEdit(p)} className="gap-1.5">
+                                      <Pencil className="h-3.5 w-3.5" /> Review
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-destructive hover:text-destructive"
+                                      disabled={updatePractitioner.isPending}
+                                      onClick={() => handleApproval(p.id, p.name, "rejected")}
+                                    >
+                                      Reject
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      disabled={updatePractitioner.isPending}
+                                      onClick={() => handleApproval(p.id, p.name, "approved")}
+                                    >
+                                      Approve
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </Card>
                         )}
+                        <Card className="border-none shadow-sm overflow-hidden bg-card">
+                          <div className="overflow-x-auto">
+                            <Table>
+                              <TableHeader className="bg-muted/50">
+                                <TableRow>
+                                  <TableHead>Practitioner</TableHead>
+                                  <TableHead>Specialism</TableHead>
+                                  <TableHead>Rate</TableHead>
+                                  <TableHead>Subscription</TableHead>
+                                  <TableHead>Directory Status</TableHead>
+                                  <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {isLoading ? (
+                                  Array(5).fill(0).map((_, i) => (
+                                    <TableRow key={i}>
+                                      <TableCell><div className="h-10 bg-muted animate-pulse rounded" /></TableCell>
+                                      <TableCell><div className="h-6 bg-muted animate-pulse rounded w-24" /></TableCell>
+                                      <TableCell><div className="h-6 bg-muted animate-pulse rounded w-16" /></TableCell>
+                                      <TableCell><div className="h-6 bg-muted animate-pulse rounded w-20" /></TableCell>
+                                      <TableCell><div className="h-6 bg-muted animate-pulse rounded w-12" /></TableCell>
+                                      <TableCell><div className="h-6 bg-muted animate-pulse rounded w-16 ml-auto" /></TableCell>
+                                    </TableRow>
+                                  ))
+                                ) : practitioners?.length ? (
+                                  practitioners.map((practitioner) => (
+                                    <TableRow key={practitioner.id} className="hover:bg-muted/30">
+                                      <TableCell>
+                                        <div className="flex items-center gap-3">
+                                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-serif text-xs overflow-hidden shrink-0">
+                                            {practitioner.avatarUrl ? (
+                                              <img src={practitioner.avatarUrl} alt="" className="h-full w-full object-cover" />
+                                            ) : (
+                                              practitioner.name.charAt(0)
+                                            )}
+                                          </div>
+                                          <div>
+                                            <div className="font-medium text-sm">{practitioner.name}</div>
+                                            <div className="text-xs text-muted-foreground">{practitioner.email}</div>
+                                          </div>
+                                        </div>
+                                      </TableCell>
+                                      <TableCell>
+                                        <span className="capitalize text-sm">{practitioner.specialism}</span>
+                                      </TableCell>
+                                      <TableCell>
+                                        <span className="text-sm font-medium">{rateSummary(practitioner)}</span>
+                                        {practitioner.commissionRatePct != null && (
+                                          <div className="text-xs text-muted-foreground">{practitioner.commissionRatePct}% commission</div>
+                                        )}
+                                      </TableCell>
+                                      <TableCell>
+                                        <Badge variant="outline" className={
+                                          practitioner.subscriptionStatus === "active" ? "bg-primary/10 text-primary border-primary/20" :
+                                          practitioner.subscriptionStatus === "trial" ? "bg-secondary/10 text-secondary border-secondary/20" :
+                                          "bg-muted text-muted-foreground"
+                                        }>
+                                          {practitioner.subscriptionStatus}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell>
+                                        <div className="flex items-center gap-2">
+                                          <Switch
+                                            checked={practitioner.isActive}
+                                            onCheckedChange={() => handleToggleActive(practitioner.id, practitioner.isActive)}
+                                            disabled={updatePractitioner.isPending}
+                                          />
+                                          <span className="text-xs text-muted-foreground w-12">
+                                            {practitioner.isActive ? "Active" : "Hidden"}
+                                          </span>
+                                          {practitioner.approvalStatus !== "approved" && (
+                                            <Badge variant="outline" className={
+                                              practitioner.approvalStatus === "pending"
+                                                ? "bg-secondary/10 text-secondary border-secondary/20"
+                                                : "bg-destructive/10 text-destructive border-destructive/20"
+                                            }>
+                                              {practitioner.approvalStatus === "pending" ? "Pending" : "Rejected"}
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                        <Button variant="outline" size="sm" className="gap-1.5" onClick={() => openEdit(practitioner)}>
+                                          <Pencil className="h-3.5 w-3.5" />
+                                          Edit
+                                        </Button>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))
+                                ) : (
+                                  <TableRow>
+                                    <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                                      No practitioners found. Add one above.
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </Card>
                       </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="outline" size="sm" className="gap-1.5" onClick={() => openEdit(practitioner)}>
-                        <Pencil className="h-3.5 w-3.5" />
-                        Edit
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                    No practitioners found. Add one above.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
-    </div>
-  );
-}
+                    );
+                  }
