@@ -11,20 +11,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CheckCircle2, XCircle, Building2, Info, TrendingUp, Calculator, Brain } from "lucide-react";
 
-// Cost of absence calculator, shared by the For Corporates page and the
-// Wellbeing Action Plan dashboard. Formula, in order:
-//   average salary ÷ 225           = cost per working day
-//   cost per working day × absence days = cost of absence per employee
-//   cost per employee × headcount  = total cost of absence per year
-//   total cost × 54%               = portion attributed to mental health
-// 225 approximates working days/year (365 minus weekends and standard
-// UK holiday/annual leave). 54% is the mental-health attribution figure
-// this calculator is specifically built to surface.
 const WORKING_DAYS_PER_YEAR = 225;
 const MENTAL_HEALTH_ATTRIBUTION = 0.54;
 
 function formatGbp(value: number): string {
   return value.toLocaleString("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 });
+}
+
+function bespokeQuoteMailto(headcount: number): string {
+  const subject = encodeURIComponent("Bespoke quote request");
+  const body = encodeURIComponent(`Hi, we're looking for a quote for ${headcount} employees.`);
+  return `mailto:enquiries@soulfulco.uk?subject=${subject}&body=${body}`;
 }
 
 function AbsenceCostCalculator({ corporatePlans }: { corporatePlans: { id: number; name: string; priceGbp: number | string }[] }) {
@@ -45,20 +42,22 @@ function AbsenceCostCalculator({ corporatePlans }: { corporatePlans: { id: numbe
     return { totalCostOfAbsencePerYear, mentalHealthPortion };
   }, [headcount, averageSalary, averageAbsenceDays]);
 
-  // Plan names encode their headcount range, e.g. "Self-Serve — 51-250
-  // employees" — parsed here rather than stored as a separate field, since
-  // that's how the range data already exists in the plan names themselves.
   const recommendedPlan = useMemo(() => {
     const hc = Number(headcount) || 0;
     if (!hc) return null;
+    let highestMax = 0;
     for (const plan of corporatePlans) {
       const match = plan.name.match(/(\d+)\s*[-–—]\s*(\d+)\s*employees/i);
       if (!match) continue;
       const min = Number(match[1]);
       const max = Number(match[2]);
+      if (max > highestMax) highestMax = max;
       if (hc >= min && hc <= max) {
         return { plan, annualCost: Number(plan.priceGbp) * 12 };
       }
+    }
+    if (highestMax > 0 && hc > highestMax) {
+      return { bespoke: true as const, headcount: hc };
     }
     return null;
   }, [headcount, corporatePlans]);
@@ -121,7 +120,17 @@ function AbsenceCostCalculator({ corporatePlans }: { corporatePlans: { id: numbe
             </div>
             <p className="text-3xl font-serif font-bold">{formatGbp(results.mentalHealthPortion)}</p>
           </div>
-          {recommendedPlan && (
+          {recommendedPlan && "bespoke" in recommendedPlan && (
+            <div className="bg-secondary/10 border border-secondary/30 rounded-2xl p-5">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Recommended for your headcount</p>
+              <p className="font-serif text-lg text-foreground leading-tight">Bespoke quote needed</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Our self-serve plans cover up to 500 employees. For {recommendedPlan.headcount} employees, email us for a bespoke quote:{" "}
+                <a href={bespokeQuoteMailto(recommendedPlan.headcount)} className="text-secondary underline">enquiries@soulfulco.uk</a>
+              </p>
+            </div>
+          )}
+          {recommendedPlan && !("bespoke" in recommendedPlan) && (
             <div className="bg-secondary/10 border border-secondary/30 rounded-2xl p-5">
               <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Recommended for your headcount</p>
               <p className="font-serif text-lg text-foreground leading-tight">{recommendedPlan.plan.name}</p>
@@ -209,245 +218,246 @@ export default function ForCorporates() {
           toast({ title: "Welcome to Soulful!", description: "Your free account is ready." });
           setLocation("/dashboard");
         } catch (err) {
-          toast({ title: "Registration failed", description: err instanceof Error ? err.message : "Please try again.", variant: "destructive" });
-        } finally {
-          setRegistering(false);
-        }
-        })();
-        return;
-        }
+                  toast({ title: "Registration failed", description: err instanceof Error ? err.message : "Please try again.", variant: "destructive" });
+                } finally {
+                  setRegistering(false);
+                }
+              })();
+              return;
+            }
 
-        createCompany.mutate({
-        data: {
-          name: formData.name,
-          email: formData.email,
-          industry: formData.industry,
-          employeeCount: parseInt(formData.employeeCount, 10),
-          contactName: formData.contactName,
-          referralCode: formData.referralCode.trim() || undefined,
-        } as any
-        }, {
-        onSuccess: (company) => {
-          startCheckout.mutate({
-            data: {
-              planId: selectedPlanId,
-              companyId: company.id,
-              successPath: "/dashboard",
-              cancelPath: "/for-corporates",
-            },
-          }, {
-            onSuccess: (session) => {
-              if (session.url) {
-                window.location.href = session.url;
-              } else {
-                toast({ title: "Company registered", description: "Welcome to Soulful! Set up billing from your dashboard." });
-                setLocation("/dashboard");
+            createCompany.mutate({
+              data: {
+                name: formData.name,
+                email: formData.email,
+                industry: formData.industry,
+                employeeCount: parseInt(formData.employeeCount, 10),
+                contactName: formData.contactName,
+                referralCode: formData.referralCode.trim() || undefined,
+              } as any
+            }, {
+              onSuccess: (company) => {
+                startCheckout.mutate({
+                  data: {
+                    planId: selectedPlanId,
+                    companyId: company.id,
+                    successPath: "/dashboard",
+                    cancelPath: "/for-corporates",
+                  },
+                }, {
+                  onSuccess: (session) => {
+                    if (session.url) {
+                      window.location.href = session.url;
+                    } else {
+                      toast({ title: "Company registered", description: "Welcome to Soulful! Set up billing from your dashboard." });
+                      setLocation("/dashboard");
+                    }
+                  },
+                  onError: () => {
+                    toast({ title: "Company registered", description: "Your account was created, but we couldn't open checkout. You can set up billing from your dashboard.", variant: "destructive" });
+                    setLocation("/dashboard");
+                  },
+                });
+              },
+              onError: () => {
+                toast({ title: "Registration failed", description: "Please check your details and try again.", variant: "destructive" });
               }
-            },
-            onError: () => {
-              toast({ title: "Company registered", description: "Your account was created, but we couldn't open checkout. You can set up billing from your dashboard.", variant: "destructive" });
-              setLocation("/dashboard");
-            },
-          });
-        },
-        onError: () => {
-          toast({ title: "Registration failed", description: "Please check your details and try again.", variant: "destructive" });
-        }
-        });
-        };
+            });
+          };
 
-        return (
-        <div className="bg-background min-h-screen pb-24">
-        {/* Header */}
-        <div className="bg-primary/5 py-20 text-center border-b">
-          <div className="container mx-auto px-4 max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium mb-6">
-              <Building2 className="h-4 w-4" /> For Corporates
-            </div>
-            <h1 className="text-4xl md:text-5xl font-serif text-foreground mb-6">
-              {c("corp_hero_headline", "Invest in the soul of your company.")}
-            </h1>
-            <p className="text-xl text-muted-foreground">
-              {c("corp_hero_body", "Give your team access to the UK's top wellbeing practitioners — personal trainers, yoga instructors, therapists, coaches, and more — all in one place.")}
-            </p>
-          </div>
-        </div>
-
-        {networkPractitioners.length > 0 && (
-          <div className="bg-background py-10 border-b">
-            <p className="text-center text-sm font-medium text-muted-foreground uppercase tracking-widest mb-6">
-              Practitioners your team gets access to
-            </p>
-            <LogoMarquee
-              items={networkPractitioners.map(p => (
-                <PractitionerChip key={p.id} practitioner={p} />
-              ))}
-            />
-          </div>
-        )}
-
-        <div className="container mx-auto px-4 max-w-6xl mt-16 space-y-20">
-
-          {/* How the billing works */}
-          <div className="max-w-3xl mx-auto">
-            <div className="flex items-start gap-3 bg-primary/5 border border-primary/20 rounded-2xl p-6">
-              <Info className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-              <div className="space-y-1">
-                <p className="font-medium text-foreground">How Soulful billing works</p>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Your subscription covers <strong className="text-foreground">platform access and a monthly session allowance</strong> — the timetable, booking system, employee portal, and HR dashboard.
-                  Each plan includes a set number of sessions per month.
-                  Sessions beyond your included allowance are billed at the same per-session rate.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* EAP Comparison */}
-          <div>
-            <div className="text-center mb-10">
-              <p className="text-sm font-medium text-primary uppercase tracking-widest mb-3">Not your typical EAP</p>
-              <h2 className="text-3xl font-serif mb-3">Your EAP has 4% utilisation.<br />Soulful is built to hit 40%.</h2>
-              <p className="text-muted-foreground max-w-xl mx-auto">
-                Traditional Employee Assistance Programmes sit unused until someone hits a crisis. Soulful is the proactive layer that keeps employees well before they ever need one.
-              </p>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-6 mb-10">
-              {/* EAP column */}
-              <Card className="border-2 border-border/50 rounded-2xl overflow-hidden">
-                <CardHeader className="bg-muted/40 pb-4">
-                  <CardTitle className="text-lg font-serif text-muted-foreground">Typical EAP</CardTitle>
-                  <CardDescription>The counselling helpline bundled with your health insurance</CardDescription>
-                </CardHeader>
-                <CardContent className="pt-5">
-                  <ul className="space-y-3">
-                    {[
-                      "Crisis-reactive — employees call when things go wrong",
-                      "Counselling only — no PT, yoga, massage, or coaching",
-                      "Assigned to a practitioner — no choice",
-                      "Phone or video only — no in-person sessions",
-                      "Call a helpline — no self-service booking",
-                      "HR sees nothing — zero utilisation visibility",
-                      "Under 5% of employees ever use it",
-                    ].map((item, i) => (
-                      <li key={i} className="flex items-start gap-3 text-sm">
-                        <XCircle className="h-4 w-4 text-muted-foreground/50 shrink-0 mt-0.5" />
-                        <span className="text-muted-foreground">{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-
-              {/* Soulful column */}
-              <Card className="border-2 border-primary rounded-2xl overflow-hidden shadow-md">
-                <CardHeader className="bg-primary/5 pb-4">
-                  <CardTitle className="text-lg font-serif text-primary">Soulful</CardTitle>
-                  <CardDescription>A proactive wellbeing marketplace your team actually uses</CardDescription>
-                </CardHeader>
-                <CardContent className="pt-5">
-                  <ul className="space-y-3">
-                    {[
-                      "Proactive — ongoing, preventative wellbeing as a daily habit",
-                      "8 disciplines — PT, yoga, massage, nutrition, coaching, breathwork & more",
-                      "Employees choose who they want, when they want",
-                      "In-person, studio, office visit, or virtual — employee's choice",
-                      "Self-service booking in seconds via the employee portal",
-                      "Live HR dashboard — see utilisation, sessions booked, who hasn't engaged",
-                      "Designed to drive utilisation above 40%",
-                    ].map((item, i) => (
-                      <li key={i} className="flex items-start gap-3 text-sm">
-                        <CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                        <span className="text-muted-foreground">{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Stat callout */}
-            <div className="bg-foreground text-background rounded-2xl px-8 py-8 flex flex-col md:flex-row items-center gap-6 text-center md:text-left">
-              <div className="flex-shrink-0">
-                <TrendingUp className="h-12 w-12 text-primary mx-auto md:mx-0" />
-              </div>
-              <div className="flex-1">
-                <p className="text-2xl font-serif font-bold mb-1">
-                  Soulful doesn't replace your EAP — it means employees never need to call it.
-                </p>
-                <p className="text-background/70 text-sm leading-relaxed">
-                  Regular PT sessions, yoga, and coaching keep stress, burnout, and absenteeism low. The EAP is still there for crises. Soulful is the reason crises happen less often.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Cost of absence calculator */}
-          <AbsenceCostCalculator corporatePlans={corporatePlans} />
-
-          {/* Plans + Registration form */}
-          <div className="grid lg:grid-cols-2 gap-16">
-            {/* Plans */}
-            <div>
-              <h2 className="text-2xl font-serif mb-2">Choose your plan</h2>
-              <p className="text-muted-foreground text-sm mb-8">Platform access fee + included sessions. Scale your session budget as your team grows.</p>
-
-              <div className="space-y-5">
-                {plansLoading ? (
-                  <div className="animate-pulse space-y-5">
-                    <div className="h-64 bg-muted rounded-2xl" />
-                    <div className="h-64 bg-muted rounded-2xl" />
-                    <div className="h-64 bg-muted rounded-2xl" />
+          return (
+            <div className="bg-background min-h-screen pb-24">
+              {/* Header */}
+              <div className="bg-primary/5 py-20 text-center border-b">
+                <div className="container mx-auto px-4 max-w-3xl">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium mb-6">
+                    <Building2 className="h-4 w-4" /> For Corporates
                   </div>
-                ) : (
-                  corporatePlans.map(plan => {
-                    const isSelected = selectedPlanId === plan.id;
-                    // Extract per-session rate from features
-                    const sessionFeature = plan.features?.find((f: string) => f.includes("sessions/month included"));
-                    const rateFeature = plan.features?.find((f: string) => f.includes("Additional sessions"));
-                    return (
-                      <Card
-                        key={plan.id}
-                        className={`cursor-pointer transition-all border-2 rounded-2xl overflow-hidden ${isSelected ? "border-primary shadow-md" : "border-border/50 hover:border-primary/50 hover:shadow-sm"}`}
-                        onClick={() => setSelectedPlanId(plan.id)}
-                      >
-                        <CardHeader className={`${isSelected ? "bg-primary/5" : "bg-muted/30"} pb-4`}>
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <CardTitle className="font-serif text-xl">{plan.name}</CardTitle>
-                              <CardDescription className="mt-1 text-xs leading-relaxed">{plan.description}</CardDescription>
-                            </div>
-                            <div className="text-right flex-shrink-0 ml-4">
-                              {Number(plan.priceGbp) === 0 ? (
-                                <span className="text-2xl font-serif font-bold text-foreground">Free</span>
-                              ) : (
-                                <>
-                                  <span className="text-2xl font-serif font-bold text-foreground">£{plan.priceGbp}</span>
-                                  <span className="text-muted-foreground text-sm">/mo</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          {sessionFeature && rateFeature && (
-                            <div className="mt-3 flex gap-3">
-                              <div className="flex-1 bg-primary/10 rounded-lg px-3 py-2 text-center">
-                                <p className="text-xs text-primary font-semibold">{sessionFeature.replace(" included", "")}</p>
+                  <h1 className="text-4xl md:text-5xl font-serif text-foreground mb-6">
+                    {c("corp_hero_headline", "Invest in the soul of your company.")}
+                  </h1>
+                  <p className="text-xl text-muted-foreground">
+                    {c("corp_hero_body", "Give your team access to the UK's top wellbeing practitioners — personal trainers, yoga instructors, therapists, coaches, and more — all in one place.")}
+                  </p>
+                </div>
+              </div>
+
+              {networkPractitioners.length > 0 && (
+                <div className="bg-background py-10 border-b">
+                  <p className="text-center text-sm font-medium text-muted-foreground uppercase tracking-widest mb-6">
+                    Practitioners your team gets access to
+                  </p>
+                  <LogoMarquee
+                    items={networkPractitioners.map(p => (
+                      <PractitionerChip key={p.id} practitioner={p} />
+                    ))}
+                  />
+                </div>
+              )}
+
+              <div className="container mx-auto px-4 max-w-6xl mt-16 space-y-20">
+
+                {/* How the billing works */}
+                <div className="max-w-3xl mx-auto">
+                  <div className="flex items-start gap-3 bg-primary/5 border border-primary/20 rounded-2xl p-6">
+                    <Info className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                    <div className="space-y-1">
+                      <p className="font-medium text-foreground">How Soulful billing works</p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Your subscription covers <strong className="text-foreground">platform access and a monthly session allowance</strong> — the timetable, booking system, employee portal, and HR dashboard.
+                        Each plan includes a set number of sessions per month.
+                        Sessions beyond your included allowance are billed at the same per-session rate.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* EAP Comparison */}
+                <div>
+                  <div className="text-center mb-10">
+                    <p className="text-sm font-medium text-primary uppercase tracking-widest mb-3">Not your typical EAP</p>
+                    <h2 className="text-3xl font-serif mb-3">Your EAP has 4% utilisation.<br />Soulful is built to hit 40%.</h2>
+                    <p className="text-muted-foreground max-w-xl mx-auto">
+                      Traditional Employee Assistance Programmes sit unused until someone hits a crisis. Soulful is the proactive layer that keeps employees well before they ever need one.
+                    </p>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-6 mb-10">
+                    {/* EAP column */}
+                    <Card className="border-2 border-border/50 rounded-2xl overflow-hidden">
+                      <CardHeader className="bg-muted/40 pb-4">
+                        <CardTitle className="text-lg font-serif text-muted-foreground">Typical EAP</CardTitle>
+                        <CardDescription>The counselling helpline bundled with your health insurance</CardDescription>
+                      </CardHeader>
+                      <CardContent className="pt-5">
+                        <ul className="space-y-3">
+                          {[
+                            "Crisis-reactive — employees call when things go wrong",
+                            "Counselling only — no PT, yoga, massage, or coaching",
+                            "Assigned to a practitioner — no choice",
+                            "Phone or video only — no in-person sessions",
+                            "Call a helpline — no self-service booking",
+                            "HR sees nothing — zero utilisation visibility",
+                            "Under 5% of employees ever use it",
+                          ].map((item, i) => (
+                            <li key={i} className="flex items-start gap-3 text-sm">
+                              <XCircle className="h-4 w-4 text-muted-foreground/50 shrink-0 mt-0.5" />
+                              <span className="text-muted-foreground">{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </CardContent>
+                    </Card>
+
+                    {/* Soulful column */}
+                    <Card className="border-2 border-primary rounded-2xl overflow-hidden shadow-md">
+                      <CardHeader className="bg-primary/5 pb-4">
+                        <CardTitle className="text-lg font-serif text-primary">Soulful</CardTitle>
+                        <CardDescription>A proactive wellbeing marketplace your team actually uses</CardDescription>
+                      </CardHeader>
+                      <CardContent className="pt-5">
+                        <ul className="space-y-3">
+                          {[
+                            "Proactive — ongoing, preventative wellbeing as a daily habit",
+                            "8 disciplines — PT, yoga, massage, nutrition, coaching, breathwork & more",
+                            "Employees choose who they want, when they want",
+                            "In-person, studio, office visit, or virtual — employee's choice",
+                            "Self-service booking in seconds via the employee portal",
+                            "Live HR dashboard — see utilisation, sessions booked, who hasn't engaged",
+                            "Designed to drive utilisation above 40%",
+                          ].map((item, i) => (
+                            <li key={i} className="flex items-start gap-3 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                              <span className="text-muted-foreground">{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Stat callout */}
+                  <div className="bg-foreground text-background rounded-2xl px-8 py-8 flex flex-col md:flex-row items-center gap-6 text-center md:text-left">
+                    <div className="flex-shrink-0">
+                      <TrendingUp className="h-12 w-12 text-primary mx-auto md:mx-0" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-2xl font-serif font-bold mb-1">
+                        Soulful doesn't replace your EAP — it means employees never need to call it.
+                      </p>
+                      <p className="text-background/70 text-sm leading-relaxed">
+                        Regular PT sessions, yoga, and coaching keep stress, burnout, and absenteeism low. The EAP is still there for crises. Soulful is the reason crises happen less often.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Cost of absence calculator */}
+                <AbsenceCostCalculator corporatePlans={corporatePlans} />
+
+                {/* Plans + Registration form */}
+                <div className="grid lg:grid-cols-2 gap-16">
+                  {/* Plans */}
+                  <div>
+                    <h2 className="text-2xl font-serif mb-2">Choose your plan</h2>
+                    <p className="text-muted-foreground text-sm mb-8">Platform access fee + included sessions. Scale your session budget as your team grows.</p>
+
+                    <div className="space-y-5">
+                      {plansLoading ? (
+                        <div className="animate-pulse space-y-5">
+                          <div className="h-64 bg-muted rounded-2xl" />
+                          <div className="h-64 bg-muted rounded-2xl" />
+                          <div className="h-64 bg-muted rounded-2xl" />
+                        </div>
+                      ) : (
+                        corporatePlans.map(plan => {
+                          const isSelected = selectedPlanId === plan.id;
+                          // Extract per-session rate from features
+                          const sessionFeature = plan.features?.find((f: string) => f.includes("sessions/month included"));
+                          const rateFeature = plan.features?.find((f: string) => f.includes("Additional sessions"));
+                          return (
+                            <Card
+                              key={plan.id}
+                              className={`cursor-pointer transition-all border-2 rounded-2xl overflow-hidden ${isSelected ? "border-primary shadow-md" : "border-border/50 hover:border-primary/50 hover:shadow-sm"}`}
+                              onClick={() => setSelectedPlanId(plan.id)}
+                            >
+                              <CardHeader className={`${isSelected ? "bg-primary/5" : "bg-muted/30"} pb-4`}>
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <CardTitle className="font-serif text-xl">{plan.name}</CardTitle>
+                                    <CardDescription className="mt-1 text-xs leading-relaxed">{plan.description}</CardDescription>
+                                  </div>
+                                  <div className="text-right flex-shrink-0 ml-4">
+                                    {Number(plan.priceGbp) === 0 ? (
+                                      <span className="text-2xl font-serif font-bold text-foreground">Free</span>
+                                    ) : (
+                                      <>
+                                        <span className="text-2xl font-serif font-bold text-foreground">£{plan.priceGbp}</span>
+                                        <span className="text-muted-foreground text-sm">/mo</span>
+                                      </>
+                                    )}
+                                  </div>
                                 </div>
-                                <div className="flex-1 bg-background rounded-lg px-3 py-2 text-center border">
-                                  <p className="text-xs text-muted-foreground">{rateFeature}</p>
-                                </div>
-                                </div>
+
+                                {sessionFeature && rateFeature && (
+                                  <div className="mt-3 flex gap-3">
+                                    <div className="flex-1 bg-primary/10 rounded-lg px-3 py-2 text-center">
+                                      <p className="text-xs text-primary font-semibold">{sessionFeature.replace(" included", "")}</p>
+                                    </div>
+                                    <div className="flex-1 bg-background rounded-lg px-3 py-2 text-center border">
+                                      <p className="text-xs text-muted-foreground">{rateFeature}</p>
+                                    </div>
+                                  </div>
                                 )}
                                 </CardHeader>
                                 <CardContent className="pt-5">
                                 <ul className="space-y-2.5">
-                                {plan.features?.filter((f: string) => !f.includes("sessions/month included") && !f.includes("Additional sessions")).map((feature: string, i: number) => (
-                                <li key={i} className="flex items-start gap-3 text-sm">
-                                  <CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                                  <span className="text-muted-foreground">{feature}</span>
-                                </li>
-                                ))}
+                                  {plan.features?.filter((f: string) => !f.includes("sessions/month included") && !f.includes("Additional sessions")).map((feature: string, i: number) => (
+                                    <li key={i} className="flex items-start gap-3 text-sm">
+                                      <CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                                      <span className="text-muted-foreground">{feature}</span>
+                                    </li>
+                                  ))}
                                 </ul>
                                 </CardContent>
                                 </Card>
