@@ -10,6 +10,12 @@ export const companiesTable = pgTable("companies", {
   email: text("email").notNull().unique(),
   industry: text("industry").notNull(),
   employeeCount: integer("employee_count").notNull(),
+  // Head office / primary location, captured at signup — used for
+  // geographic matching to nearby practitioners. Companies with multiple
+  // offices will additionally need per-employee locations (tracked
+  // separately) so an employee isn't matched against practitioners near
+  // a different office to the one they actually work from.
+  location: text("location"),
   subscriptionStatus: companySubscriptionStatusEnum("subscription_status").notNull().default("trial"),
   trialEndsAt: timestamp("trial_ends_at"),
   logoUrl: text("logo_url"),

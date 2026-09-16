@@ -22,7 +22,7 @@ export default function Home() {
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
             <div className="flex flex-col gap-8 max-w-2xl">
               <h1 className="text-5xl lg:text-7xl font-serif leading-[1.1] text-foreground tracking-tight">
-                {c("home_hero_headline", "Corporate wellbeing,")} <span className="text-primary italic">{c("home_hero_headline_2", "rooted in nature.")}</span>
+                {c("home_hero_headline", "The wellbeing marketplace,")} <span className="text-primary italic">{c("home_hero_headline_2", "rooted in nature.")}</span>
               </h1>
               <p className="text-lg lg:text-xl text-muted-foreground leading-relaxed max-w-lg">
                 {c("home_hero_body", "Soulful connects forward-thinking UK corporations with vetted wellbeing practitioners. Build a culture of care through yoga, meditation, coaching, and more.")}
