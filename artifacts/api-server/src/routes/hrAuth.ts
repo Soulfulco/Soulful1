@@ -87,7 +87,7 @@ router.post("/hr/login", async (req, res) => {
 // login regardless of which plan they picked.
 router.post("/hr/register", async (req, res) => {
   try {
-    const { name, email, industry, employeeCount, contactName, password, planId, referralCode, employerName } =
+    const { name, email, industry, employeeCount, contactName, password, planId, referralCode, employerName, location } =
       req.body ?? {};
     if (!name || !email || !industry || !contactName || !password) {
       return res
@@ -153,8 +153,8 @@ router.post("/hr/register", async (req, res) => {
     try {
       const out = await db.transaction(async (tx) => {
         const companyResult = await tx.execute(sql`
-          INSERT INTO companies (name, email, industry, employee_count, contact_name, referral_code, referred_by_company_id, invite_code, trial_ends_at)
-          VALUES (${name}, ${normEmail}, ${industry}, ${count}, ${contactName}, ${ownReferralCode}, ${referrer?.id ?? null}, ${employeeInviteCode}, ${isEducation ? null : sql`now() + interval '7 days'`})
+          INSERT INTO companies (name, email, industry, employee_count, contact_name, location, referral_code, referred_by_company_id, invite_code, trial_ends_at)
+          VALUES (${name}, ${normEmail}, ${industry}, ${count}, ${contactName}, ${location ?? null}, ${ownReferralCode}, ${referrer?.id ?? null}, ${employeeInviteCode}, ${isEducation ? null : sql`now() + interval '7 days'`})
           RETURNING id, name
         `);
         const co = companyResult.rows[0] as { id: number; name: string };
@@ -279,165 +279,165 @@ router.post("/hr/register", async (req, res) => {
       role: hrUser.role,
       checkoutUrl: session.url,
     });
-  } catch (err) {
+    } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Registration failed" });
-  }
-});
-
-// HR Logout
-router.post("/hr/logout", async (req, res) => {
-  const sid = getSessionId(req);
-  await clearSession(res, sid);
-  res.json({ ok: true });
-});
-
-// Get current HR session info (augments /api/auth/user)
-router.get("/hr/me", async (req, res) => {
-  if (!req.isAuthenticated()) return res.status(401).json({ error: "Not authenticated" });
-  const userId = req.user.id;
-  if (!userId.startsWith("hr:")) return res.status(403).json({ error: "Not an HR account" });
-
-  const hrId = parseInt(userId.slice(3));
-  const result = await db.execute(sql`
-    SELECT hr.*, c.name AS company_name
-    FROM hr_users hr
-    JOIN companies c ON c.id = hr.company_id
-    WHERE hr.id = ${hrId}
-  `);
-  const hrUser = result.rows[0] as any;
-  if (!hrUser) return res.status(404).json({ error: "HR user not found" });
-
-  res.json({
-    id: hrUser.id,
-    email: hrUser.email,
-    name: hrUser.name,
-    role: hrUser.role,
-    companyId: hrUser.company_id,
-    companyName: hrUser.company_name,
-  });
-});
-
-// Admin: create an HR user for a company (Soulful admin only)
-router.post("/hr/users", async (req, res) => {
-  if (!req.isAuthenticated()) return res.status(401).json({ error: "Not authenticated" });
-  // Only Soulful admins can create HR accounts (excludes hr: and pract: sessions)
-  if (!isAdmin(req)) return res.status(403).json({ error: "Forbidden" });
-
-  try {
-    const { companyId, email, password, name } = req.body;
-    if (!companyId || !email || !password || !name) {
-      return res.status(400).json({ error: "companyId, email, password, name are required" });
     }
-    const hash = hashPassword(password);
-    const result = await db.execute(sql`
-      INSERT INTO hr_users (company_id, email, password_hash, name)
-      VALUES (${companyId}, ${email.toLowerCase().trim()}, ${hash}, ${name})
-      ON CONFLICT (email) DO UPDATE SET
-        password_hash = EXCLUDED.password_hash,
-        name = EXCLUDED.name,
-        company_id = EXCLUDED.company_id
-      RETURNING id, email, name, role, company_id, created_at
-    `);
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to create HR user" });
-  }
-});
-
-// Admin: list HR users
-router.get("/hr/users", async (req, res) => {
-  if (!req.isAuthenticated()) return res.status(401).json({ error: "Not authenticated" });
-  if (!isAdmin(req)) return res.status(403).json({ error: "Forbidden" });
-  try {
-    const result = await db.execute(sql`
-      SELECT hr.id, hr.email, hr.name, hr.role, hr.is_active, hr.created_at,
-        c.name AS company_name, c.id AS company_id
-      FROM hr_users hr
-      JOIN companies c ON c.id = hr.company_id
-      ORDER BY c.name, hr.name
-    `);
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to list HR users" });
-  }
-});
-
-// ── Payment method (self-service, for logged-in HR users) ──────────────
-
-// GET /company/payment-method — does the logged-in HR user's company have a card on file?
-router.get("/company/payment-method", async (req, res) => {
-  if (!isHr(req)) return res.status(403).json({ error: "Not an HR account" });
-  try {
-    const companyId = await resolveHrCompanyId(req);
-    if (!companyId) return res.status(403).json({ error: "No company associated with this account" });
-
-    const [company] = await db
-      .select({ stripeCustomerId: companiesTable.stripeCustomerId })
-      .from(companiesTable)
-      .where(eq(companiesTable.id, companyId));
-
-    if (!company?.stripeCustomerId) {
-      return res.json({ hasPaymentMethod: false, last4: null, brand: null });
-    }
-
-    const stripe = await getUncachableStripeClient();
-    const methods = await stripe.paymentMethods.list({ customer: company.stripeCustomerId, type: "card" });
-    const card = methods.data[0]?.card;
-    res.json({
-      hasPaymentMethod: Boolean(card),
-      last4: card?.last4 ?? null,
-      brand: card?.brand ?? null,
     });
-  } catch (err) {
-    logger.error({ err }, "Failed to fetch company payment method");
-    res.status(500).json({ error: "Failed to fetch payment method" });
-  }
-});
 
-// POST /company/payment-method/setup — creates a Stripe customer if the
-// company doesn't have one yet, then returns a Stripe-hosted Checkout URL
-// (mode: "setup") to add or replace a card, with no charge involved.
-router.post("/company/payment-method/setup", async (req, res) => {
-  if (!isHr(req)) return res.status(403).json({ error: "Not an HR account" });
-  try {
-    const companyId = await resolveHrCompanyId(req);
-    if (!companyId) return res.status(403).json({ error: "No company associated with this account" });
+    // HR Logout
+    router.post("/hr/logout", async (req, res) => {
+    const sid = getSessionId(req);
+    await clearSession(res, sid);
+    res.json({ ok: true });
+    });
 
-    const [company] = await db
-      .select({ stripeCustomerId: companiesTable.stripeCustomerId, name: companiesTable.name, email: companiesTable.email })
-      .from(companiesTable)
-      .where(eq(companiesTable.id, companyId));
-    if (!company) return res.status(404).json({ error: "Company not found" });
+    // Get current HR session info (augments /api/auth/user)
+    router.get("/hr/me", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Not authenticated" });
+    const userId = req.user.id;
+    if (!userId.startsWith("hr:")) return res.status(403).json({ error: "Not an HR account" });
+        const hrId = parseInt(userId.slice(3));
+        const result = await db.execute(sql`
+          SELECT hr.*, c.name AS company_name
+          FROM hr_users hr
+          JOIN companies c ON c.id = hr.company_id
+          WHERE hr.id = ${hrId}
+        `);
+        const hrUser = result.rows[0] as any;
+        if (!hrUser) return res.status(404).json({ error: "HR user not found" });
 
-    const stripe = await getUncachableStripeClient();
-    let customerId = company.stripeCustomerId;
-
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: company.email,
-        name: company.name,
-        metadata: { appCompanyId: String(companyId) },
+        res.json({
+          id: hrUser.id,
+          email: hrUser.email,
+          name: hrUser.name,
+          role: hrUser.role,
+          companyId: hrUser.company_id,
+          companyName: hrUser.company_name,
+        });
       });
-      customerId = customer.id;
-      await db.update(companiesTable).set({ stripeCustomerId: customerId }).where(eq(companiesTable.id, companyId));
-    }
 
-    const origin = baseUrl();
-    const session = await stripe.checkout.sessions.create({
-      mode: "setup",
-      customer: customerId,
-      currency: "gbp",
-      success_url: `${origin}/dashboard?payment_method=success`,
-      cancel_url: `${origin}/dashboard?payment_method=cancelled`,
-    });
+      // Admin: create an HR user for a company (Soulful admin only)
+      router.post("/hr/users", async (req, res) => {
+        if (!req.isAuthenticated()) return res.status(401).json({ error: "Not authenticated" });
+        // Only Soulful admins can create HR accounts (excludes hr: and pract: sessions)
+        if (!isAdmin(req)) return res.status(403).json({ error: "Forbidden" });
 
-    res.json({ url: session.url });
-  } catch (err) {
-    logger.error({ err }, "Failed to start payment method setup");
-    res.status(500).json({ error: "Failed to start payment method setup" });
-  }
-});
+        try {
+          const { companyId, email, password, name } = req.body;
+          if (!companyId || !email || !password || !name) {
+            return res.status(400).json({ error: "companyId, email, password, name are required" });
+          }
+          const hash = hashPassword(password);
+          const result = await db.execute(sql`
+            INSERT INTO hr_users (company_id, email, password_hash, name)
+            VALUES (${companyId}, ${email.toLowerCase().trim()}, ${hash}, ${name})
+            ON CONFLICT (email) DO UPDATE SET
+              password_hash = EXCLUDED.password_hash,
+              name = EXCLUDED.name,
+              company_id = EXCLUDED.company_id
+            RETURNING id, email, name, role, company_id, created_at
+          `);
+          res.status(201).json(result.rows[0]);
+        } catch (err) {
+          console.error(err);
+          res.status(500).json({ error: "Failed to create HR user" });
+        }
+      });
 
-export default router;
+      // Admin: list HR users
+      router.get("/hr/users", async (req, res) => {
+        if (!req.isAuthenticated()) return res.status(401).json({ error: "Not authenticated" });
+        if (!isAdmin(req)) return res.status(403).json({ error: "Forbidden" });
+        try {
+          const result = await db.execute(sql`
+            SELECT hr.id, hr.email, hr.name, hr.role, hr.is_active, hr.created_at,
+              c.name AS company_name, c.id AS company_id
+            FROM hr_users hr
+            JOIN companies c ON c.id = hr.company_id
+            ORDER BY c.name, hr.name
+          `);
+          res.json(result.rows);
+        } catch (err) {
+          res.status(500).json({ error: "Failed to list HR users" });
+        }
+      });
+
+      // ── Payment method (self-service, for logged-in HR users) ──────────────
+
+      // GET /company/payment-method — does the logged-in HR user's company have a card on file?
+      router.get("/company/payment-method", async (req, res) => {
+        if (!isHr(req)) return res.status(403).json({ error: "Not an HR account" });
+        try {
+          const companyId = await resolveHrCompanyId(req);
+          if (!companyId) return res.status(403).json({ error: "No company associated with this account" });
+
+          const [company] = await db
+            .select({ stripeCustomerId: companiesTable.stripeCustomerId })
+            .from(companiesTable)
+            .where(eq(companiesTable.id, companyId));
+
+          if (!company?.stripeCustomerId) {
+            return res.json({ hasPaymentMethod: false, last4: null, brand: null });
+          }
+
+          const stripe = await getUncachableStripeClient();
+          const methods = await stripe.paymentMethods.list({ customer: company.stripeCustomerId, type: "card" });
+          const card = methods.data[0]?.card;
+          res.json({
+            hasPaymentMethod: Boolean(card),
+            last4: card?.last4 ?? null,
+            brand: card?.brand ?? null,
+          });
+        } catch (err) {
+          logger.error({ err }, "Failed to fetch company payment method");
+          res.status(500).json({ error: "Failed to fetch payment method" });
+        }
+      });
+
+      // POST /company/payment-method/setup — creates a Stripe customer if the
+      // company doesn't have one yet, then returns a Stripe-hosted Checkout URL
+      // (mode: "setup") to add or replace a card, with no charge involved.
+      router.post("/company/payment-method/setup", async (req, res) => {
+        if (!isHr(req)) return res.status(403).json({ error: "Not an HR account" });
+        try {
+          const companyId = await resolveHrCompanyId(req);
+          if (!companyId) return res.status(403).json({ error: "No company associated with this account" });
+
+          const [company] = await db
+            .select({ stripeCustomerId: companiesTable.stripeCustomerId, name: companiesTable.name, email: companiesTable.email })
+            .from(companiesTable)
+            .where(eq(companiesTable.id, companyId));
+          if (!company) return res.status(404).json({ error: "Company not found" });
+
+          const stripe = await getUncachableStripeClient();
+          let customerId = company.stripeCustomerId;
+
+          if (!customerId) {
+            const customer = await stripe.customers.create({
+              email: company.email,
+              name: company.name,
+              metadata: { appCompanyId: String(companyId) },
+            });
+            customerId = customer.id;
+            await db.update(companiesTable).set({ stripeCustomerId: customerId }).where(eq(companiesTable.id, companyId));
+          }
+
+          const origin = baseUrl();
+          const session = await stripe.checkout.sessions.create({
+            mode: "setup",
+            customer: customerId,
+            currency: "gbp",
+            success_url: `${origin}/dashboard?payment_method=success`,
+            cancel_url: `${origin}/dashboard?payment_method=cancelled`,
+          });
+
+          res.json({ url: session.url });
+        } catch (err) {
+          logger.error({ err }, "Failed to start payment method setup");
+          res.status(500).json({ error: "Failed to start payment method setup" });
+        }
+      });
+
+      export default router;
+
