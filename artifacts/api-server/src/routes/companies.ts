@@ -40,7 +40,7 @@ router.get("/companies", async (req, res) => {
 router.post("/companies", async (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: "Forbidden" });
   try {
-    const { name, email, industry, employeeCount, contactName, logoUrl, referralCode } = req.body;
+    const { name, email, industry, employeeCount, contactName, logoUrl, referralCode, location } = req.body;
     if (!name || !email || !industry) {
       return res.status(400).json({ error: "name, email and industry are required" });
     }
@@ -59,6 +59,7 @@ router.post("/companies", async (req, res) => {
         employeeCount: count,
         contactName,
         logoUrl,
+        location,
         referralCode: ownReferralCode,
         referredByCompanyId: referrer?.id ?? null,
       })
@@ -68,6 +69,7 @@ router.post("/companies", async (req, res) => {
     }
     res.status(201).json({ ...c, createdAt: c.createdAt.toISOString() });
   } catch {
+
     res.status(500).json({ error: "Failed to create company" });
   }
 });
@@ -109,13 +111,14 @@ router.patch("/companies/:id", async (req, res) => {
       const hrCompanyId = await getHrCompanyId(req);
       if (hrCompanyId !== id) return res.status(403).json({ error: "Forbidden" });
     }
-    const { name, industry, employeeCount, contactName, logoUrl } = req.body;
+    const { name, industry, employeeCount, contactName, logoUrl, location } = req.body;
     const updates: Record<string, unknown> = {};
     if (name !== undefined) updates.name = name;
     if (industry !== undefined) updates.industry = industry;
     if (employeeCount !== undefined) updates.employeeCount = employeeCount;
     if (contactName !== undefined) updates.contactName = contactName;
     if (logoUrl !== undefined) updates.logoUrl = logoUrl;
+    if (location !== undefined) updates.location = location;
     const [c] = await db.update(companiesTable).set(updates).where(eq(companiesTable.id, id)).returning();
     if (!c) return res.status(404).json({ error: "Not found" });
     res.json({ ...c, createdAt: c.createdAt.toISOString() });
