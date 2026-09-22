@@ -26,6 +26,9 @@ export const practitionersTable = pgTable("practitioners", {
   avatarUrl: text("avatar_url"),
   location: text("location"),
   qualifications: text("qualifications"),
+  // Years practicing in their field, self-declared at signup, shown on
+  // their public profile as a trust signal for prospective clients.
+  yearsOfExperience: integer("years_of_experience"),
   averageRating: numeric("average_rating", { precision: 3, scale: 2 }),
   totalReviews: integer("total_reviews").notNull().default(0),
   stripeCustomerId: text("stripe_customer_id"),

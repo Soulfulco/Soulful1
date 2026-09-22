@@ -23,6 +23,7 @@ export function serializePractitioner(p: PractitionerRow) {
     inPersonRateGbp: p.inPersonRateGbp != null ? Number(p.inPersonRateGbp) : null,
     onlineRateGbp: p.onlineRateGbp != null ? Number(p.onlineRateGbp) : null,
     commissionRatePct: Number(p.commissionRatePct),
+    yearsOfExperience: p.yearsOfExperience ?? null,
     isActive: p.isActive,
     approvalStatus: p.approvalStatus,
     subscriptionStatus: p.subscriptionStatus,
@@ -66,7 +67,7 @@ router.get("/practitioners", async (req, res) => {
 
 router.post("/practitioners", async (req, res) => {
   try {
-    const { name, email, specialism, bio, sessionRateGbp, inPersonRateGbp, onlineRateGbp, location, qualifications, avatarUrl, password, commissionRatePct } = req.body;
+    const { name, email, specialism, bio, sessionRateGbp, inPersonRateGbp, onlineRateGbp, location, qualifications, avatarUrl, password, commissionRatePct, yearsOfExperience } = req.body;
     let passwordHash: string | undefined;
     if (password !== undefined && password !== null && password !== "") {
       if (typeof password !== "string" || password.length < 8) {
@@ -91,6 +92,8 @@ router.post("/practitioners", async (req, res) => {
     const commission = Number.isFinite(proposedCommission) && proposedCommission >= 0 && proposedCommission <= 100
       ? proposedCommission
       : 10;
+    const yearsExp = Number(yearsOfExperience);
+    const validYearsExp = Number.isFinite(yearsExp) && yearsExp >= 0 && yearsExp <= 80 ? Math.round(yearsExp) : null;
     // Admin-created practitioners go live immediately; public self-registrations
     // are held as pending applications (hidden) until an admin approves them and
     // arranges an onboarding call.
@@ -106,6 +109,7 @@ router.post("/practitioners", async (req, res) => {
         inPersonRateGbp: inPerson != null ? String(inPerson) : null,
         onlineRateGbp: online != null ? String(online) : null,
         commissionRatePct: String(commission),
+        yearsOfExperience: validYearsExp,
         location,
         qualifications,
         avatarUrl,
@@ -128,43 +132,43 @@ router.get("/practitioners/showcase", async (_req, res) => {
         name: practitionersTable.name,
         specialism: practitionersTable.specialism,
         avatarUrl: practitionersTable.avatarUrl,
-      })
-      .from(practitionersTable)
-      .where(eq(practitionersTable.isActive, true));
-    res.json(rows);
-  } catch {
-    res.status(500).json({ error: "Failed to list practitioner showcase" });
-  }
-});
+        })
+        .from(practitionersTable)
+        .where(eq(practitionersTable.isActive, true));
+        res.json(rows);
+        } catch {
+        res.status(500).json({ error: "Failed to list practitioner showcase" });
+        }
+        });
 
-router.post("/practitioners/bulk", async (req, res) => {
-  try {
-    if (!isAdmin(req)) return res.status(401).json({ error: "Not authorised" });
+        router.post("/practitioners/bulk", async (req, res) => {
+        try {
+        if (!isAdmin(req)) return res.status(401).json({ error: "Not authorised" });
 
-    const rows = Array.isArray(req.body?.practitioners) ? req.body.practitioners : null;
-    if (!rows || rows.length === 0) {
-      return res.status(400).json({ error: "practitioners must be a non-empty array" });
-    }
+        const rows = Array.isArray(req.body?.practitioners) ? req.body.practitioners : null;
+        if (!rows || rows.length === 0) {
+        return res.status(400).json({ error: "practitioners must be a non-empty array" });
+        }
 
-    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const existing = await db.select({ email: practitionersTable.email }).from(practitionersTable);
-    const seen = new Set(existing.map((e) => e.email.toLowerCase()));
+        const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const existing = await db.select({ email: practitionersTable.email }).from(practitionersTable);
+        const seen = new Set(existing.map((e) => e.email.toLowerCase()));
 
-    const toInsert: {
-      name: string;
-      email: string;
-      specialism: string;
-      bio: string;
-      sessionRateGbp: string;
-      inPersonRateGbp: string | null;
-      onlineRateGbp: string | null;
-      location: string | null;
-      qualifications: string | null;
-    }[] = [];
-    const invalid: { row: number; reason: string }[] = [];
+        const toInsert: {
+        name: string;
+        email: string;
+        specialism: string;
+        bio: string;
+        sessionRateGbp: string;
+        inPersonRateGbp: string | null;
+        onlineRateGbp: string | null;
+        location: string | null;
+        qualifications: string | null;
+        }[] = [];
+        const invalid: { row: number; reason: string }[] = [];
 
-    rows.forEach((raw: unknown, i: number) => {
-      const r = raw as {
+        rows.forEach((raw: unknown, i: number) => {
+        const r = raw as {
         name?: unknown;
         email?: unknown;
         specialism?: unknown;
@@ -254,90 +258,100 @@ router.post("/practitioners/bulk", async (req, res) => {
         if (!p || (!p.isActive && !isAdmin(req))) return res.status(404).json({ error: "Not found" });
         res.json(serializePractitioner(p));
         } catch (err) {
-        res.status(500).json({ error: "Failed to get practitioner" });
-        }
-        });
+              res.status(500).json({ error: "Failed to get practitioner" });
+            }
+          });
 
-        router.patch("/practitioners/:id", async (req, res) => {
-        try {
-        if (!isAdmin(req)) return res.status(401).json({ error: "Not authorised" });
-        const id = Number(req.params.id);
-        const { name, bio, specialism, inPersonRateGbp, onlineRateGbp, location, qualifications, avatarUrl, isActive, approvalStatus, commissionRatePct } = req.body;
-        const updates: Record<string, unknown> = {};
-        if (name !== undefined) updates.name = name;
-        if (bio !== undefined) updates.bio = bio;
-        if (specialism !== undefined) updates.specialism = specialism;
-        if (location !== undefined) updates.location = location;
-        if (qualifications !== undefined) updates.qualifications = qualifications;
-        if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
-        if (commissionRatePct !== undefined) {
-        const pct = Number(commissionRatePct);
-        if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
-        return res.status(400).json({ error: "commissionRatePct must be between 0 and 100" });
-        }
-        updates.commissionRatePct = String(pct);
-        }
-        // Invariant: a practitioner is only ever live (isActive) when approved. The
-        // public directory, profile lookup and login gate on isActive, so we must
-        // never leave a live-but-unapproved profile. Activating implies approval;
-        // pending/rejected always force inactive.
-        if (approvalStatus !== undefined) {
-        if (!["pending", "approved", "rejected"].includes(approvalStatus)) {
-        return res.status(400).json({ error: "Invalid approvalStatus" });
-        }
-        if (approvalStatus !== "approved" && isActive === true) {
-        return res
-          .status(400)
-          .json({ error: "Cannot activate a practitioner that hasn't been approved" });
-        }
-        updates.approvalStatus = approvalStatus;
-        updates.isActive = approvalStatus === "approved" ? (isActive === undefined ? true : isActive) : false;
-        } else if (isActive !== undefined) {
-        if (isActive === true) updates.approvalStatus = "approved";
-        updates.isActive = isActive;
-        }
+          router.patch("/practitioners/:id", async (req, res) => {
+            try {
+              if (!isAdmin(req)) return res.status(401).json({ error: "Not authorised" });
+              const id = Number(req.params.id);
+              const { name, bio, specialism, inPersonRateGbp, onlineRateGbp, location, qualifications, avatarUrl, isActive, approvalStatus, commissionRatePct, yearsOfExperience } = req.body;
+              const updates: Record<string, unknown> = {};
+              if (name !== undefined) updates.name = name;
+              if (bio !== undefined) updates.bio = bio;
+              if (specialism !== undefined) updates.specialism = specialism;
+              if (location !== undefined) updates.location = location;
+              if (qualifications !== undefined) updates.qualifications = qualifications;
+              if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
+              if (commissionRatePct !== undefined) {
+                const pct = Number(commissionRatePct);
+                if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
+                  return res.status(400).json({ error: "commissionRatePct must be between 0 and 100" });
+                }
+                updates.commissionRatePct = String(pct);
+              }
+              if (yearsOfExperience !== undefined) {
+                if (yearsOfExperience === null) {
+                  updates.yearsOfExperience = null;
+                } else {
+                  const yearsExp = Number(yearsOfExperience);
+                  if (!Number.isFinite(yearsExp) || yearsExp < 0 || yearsExp > 80) {
+                    return res.status(400).json({ error: "yearsOfExperience must be between 0 and 80" });
+                  }
+                  updates.yearsOfExperience = Math.round(yearsExp);
+                }
+              }
+              // Invariant: a practitioner is only ever live (isActive) when approved. The
+              // public directory, profile lookup and login gate on isActive, so we must
+              // never leave a live-but-unapproved profile. Activating implies approval;
+              // pending/rejected always force inactive.
+              if (approvalStatus !== undefined) {
+                if (!["pending", "approved", "rejected"].includes(approvalStatus)) {
+                  return res.status(400).json({ error: "Invalid approvalStatus" });
+                }
+                if (approvalStatus !== "approved" && isActive === true) {
+                  return res
+                    .status(400)
+                    .json({ error: "Cannot activate a practitioner that hasn't been approved" });
+                }
+                updates.approvalStatus = approvalStatus;
+                updates.isActive = approvalStatus === "approved" ? (isActive === undefined ? true : isActive) : false;
+              } else if (isActive !== undefined) {
+                if (isActive === true) updates.approvalStatus = "approved";
+                updates.isActive = isActive;
+              }
 
-        // If either mode rate is being changed, recompute the derived base rate from
-        // the merged (new ?? existing) values so the three rates never drift, and
-        // reject clearing both.
-        if (inPersonRateGbp !== undefined || onlineRateGbp !== undefined) {
-        const [current] = await db.select().from(practitionersTable).where(eq(practitionersTable.id, id));
-        if (!current) return res.status(404).json({ error: "Not found" });
-        const toRate = (v: unknown, fallback: number | null): number | null => {
-        if (v === undefined) return fallback;
-        if (v === null) return null;
-        const n = Number(v);
-        return Number.isFinite(n) && n > 0 ? n : null;
-        };
-        const inPerson = toRate(inPersonRateGbp, current.inPersonRateGbp != null ? Number(current.inPersonRateGbp) : null);
-        const online = toRate(onlineRateGbp, current.onlineRateGbp != null ? Number(current.onlineRateGbp) : null);
-        const baseRate = inPerson ?? online;
-        if (baseRate == null) {
-        return res.status(400).json({ error: "At least one of in-person or online rate is required" });
-        }
-        updates.inPersonRateGbp = inPerson != null ? String(inPerson) : null;
-        updates.onlineRateGbp = online != null ? String(online) : null;
-        updates.sessionRateGbp = String(baseRate);
-        }
+              // If either mode rate is being changed, recompute the derived base rate from
+              // the merged (new ?? existing) values so the three rates never drift, and
+              // reject clearing both.
+              if (inPersonRateGbp !== undefined || onlineRateGbp !== undefined) {
+                const [current] = await db.select().from(practitionersTable).where(eq(practitionersTable.id, id));
+                if (!current) return res.status(404).json({ error: "Not found" });
+                const toRate = (v: unknown, fallback: number | null): number | null => {
+                  if (v === undefined) return fallback;
+                  if (v === null) return null;
+                  const n = Number(v);
+                  return Number.isFinite(n) && n > 0 ? n : null;
+                };
+                const inPerson = toRate(inPersonRateGbp, current.inPersonRateGbp != null ? Number(current.inPersonRateGbp) : null);
+                const online = toRate(onlineRateGbp, current.onlineRateGbp != null ? Number(current.onlineRateGbp) : null);
+                const baseRate = inPerson ?? online;
+                if (baseRate == null) {
+                  return res.status(400).json({ error: "At least one of in-person or online rate is required" });
+                }
+                updates.inPersonRateGbp = inPerson != null ? String(inPerson) : null;
+                updates.onlineRateGbp = online != null ? String(online) : null;
+                updates.sessionRateGbp = String(baseRate);
+              }
 
-        const [p] = await db.update(practitionersTable).set(updates).where(eq(practitionersTable.id, id)).returning();
-        if (!p) return res.status(404).json({ error: "Not found" });
-        res.json(serializePractitioner(p));
-        } catch (err) {
-        res.status(500).json({ error: "Failed to update practitioner" });
-        }
-        });
+              const [p] = await db.update(practitionersTable).set(updates).where(eq(practitionersTable.id, id)).returning();
+              if (!p) return res.status(404).json({ error: "Not found" });
+              res.json(serializePractitioner(p));
+            } catch (err) {
+              res.status(500).json({ error: "Failed to update practitioner" });
+            }
+          });
 
-        router.get("/practitioners/:id/reviews", async (req, res) => {
-        try {
-        const { reviewsTable } = await import("@workspace/db");
-        const id = Number(req.params.id);
-        const reviews = await db.select().from(reviewsTable).where(eq(reviewsTable.practitionerId, id));
-        res.json(reviews.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })));
-        } catch (err) {
-        res.status(500).json({ error: "Failed to get reviews" });
-        }
-        });
+          router.get("/practitioners/:id/reviews", async (req, res) => {
+            try {
+              const { reviewsTable } = await import("@workspace/db");
+              const id = Number(req.params.id);
+              const reviews = await db.select().from(reviewsTable).where(eq(reviewsTable.practitionerId, id));
+              res.json(reviews.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })));
+            } catch (err) {
+              res.status(500).json({ error: "Failed to get reviews" });
+            }
+          });
 
-        export default router;
-
+          export default router;
