@@ -56,7 +56,10 @@ router.post("/practitioner/login", async (req, res) => {
       .where(eq(practitionersTable.email, String(email).toLowerCase().trim()));
 
     if (!p || !p.passwordHash) return res.status(401).json({ error: "Invalid credentials" });
-    if (!p.isActive) return res.status(403).json({ error: "This account is not active. Please contact Soulful." });
+    // Pending applicants can sign in so they can complete their price list ahead of
+    // their onboarding call. They stay hidden from the public directory until approved.
+    // Rejected accounts, and approved accounts an admin has deactivated, stay blocked.
+    if (!p.isActive && p.approvalStatus !== "pending") return res.status(403).json({ error: "This account is not active. Please contact Soulful." });
     if (!verifyPassword(String(password), p.passwordHash)) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
@@ -102,6 +105,10 @@ router.get("/practitioner/me", async (req, res) => {
     avatarUrl: p.avatarUrl,
     isActive: p.isActive,
     approvalStatus: p.approvalStatus,
+    inPersonRateGbp: p.inPersonRateGbp != null ? Number(p.inPersonRateGbp) : null,
+    onlineRateGbp: p.onlineRateGbp != null ? Number(p.onlineRateGbp) : null,
+    groupInPersonRateGbp: p.groupInPersonRateGbp != null ? Number(p.groupInPersonRateGbp) : null,
+    groupOnlineRateGbp: p.groupOnlineRateGbp != null ? Number(p.groupOnlineRateGbp) : null,
     googleConnected: Boolean(p.googleRefreshToken),
     googleEmail: p.googleEmail ?? null,
     phoneNumber: p.phoneNumber,
@@ -179,17 +186,59 @@ router.patch("/practitioner/profile", async (req, res) => {
   if (!id) return res.status(401).json({ error: "Not authenticated" });
   if (!isSameOrigin(req)) return res.status(403).json({ error: "Invalid request origin" });
   try {
-    const { phoneNumber, qualificationsFileUrl, insuranceFileUrl } = req.body ?? {};
+    const {
+      phoneNumber, qualificationsFileUrl, insuranceFileUrl,
+      inPersonRateGbp, onlineRateGbp, groupInPersonRateGbp, groupOnlineRateGbp,
+    } = req.body ?? {};
     const updates: Record<string, unknown> = {};
     if (phoneNumber !== undefined) updates.phoneNumber = phoneNumber;
     if (qualificationsFileUrl !== undefined) updates.qualificationsFileUrl = qualificationsFileUrl;
     if (insuranceFileUrl !== undefined) updates.insuranceFileUrl = insuranceFileUrl;
+
+    // Price list ("My Offerings"): 1:1 and group rates, in-person and online.
+    // Omitted = unchanged; null/empty/0 = clear that offering. sessionRateGbp
+    // (the base rate the booking system reads) is re-derived so it always
+    // matches a live offering, and at least one offering must remain.
+    if (
+      inPersonRateGbp !== undefined || onlineRateGbp !== undefined ||
+      groupInPersonRateGbp !== undefined || groupOnlineRateGbp !== undefined
+    ) {
+      const [current] = await db.select().from(practitionersTable).where(eq(practitionersTable.id, id));
+      if (!current) return res.status(404).json({ error: "Practitioner not found" });
+      const toRate = (v: unknown, existing: string | null): number | null | undefined => {
+        if (v === undefined) return existing != null ? Number(existing) : null;
+        if (v === null || v === "") return null;
+        const n = Number(v);
+        if (!Number.isFinite(n) || n < 0 || n > 10000) return undefined;
+        return n > 0 ? n : null;
+      };
+      const inPerson = toRate(inPersonRateGbp, current.inPersonRateGbp);
+      const online = toRate(onlineRateGbp, current.onlineRateGbp);
+      const groupInPerson = toRate(groupInPersonRateGbp, current.groupInPersonRateGbp);
+      const groupOnline = toRate(groupOnlineRateGbp, current.groupOnlineRateGbp);
+      if ([inPerson, online, groupInPerson, groupOnline].includes(undefined)) {
+        return res.status(400).json({ error: "Rates must be numbers between 0 and 10,000" });
+      }
+      const baseRate = inPerson ?? online ?? groupInPerson ?? groupOnline;
+      if (baseRate == null) {
+        return res.status(400).json({ error: "At least one rate is required" });
+      }
+      updates.inPersonRateGbp = inPerson != null ? String(inPerson) : null;
+      updates.onlineRateGbp = online != null ? String(online) : null;
+      updates.groupInPersonRateGbp = groupInPerson != null ? String(groupInPerson) : null;
+      updates.groupOnlineRateGbp = groupOnline != null ? String(groupOnline) : null;
+      updates.sessionRateGbp = String(baseRate);
+    }
     const [updated] = await db.update(practitionersTable).set(updates).where(eq(practitionersTable.id, id)).returning();
     if (!updated) return res.status(404).json({ error: "Practitioner not found" });
     res.json({
       phoneNumber: updated.phoneNumber,
       qualificationsFileUrl: updated.qualificationsFileUrl,
       insuranceFileUrl: updated.insuranceFileUrl,
+      inPersonRateGbp: updated.inPersonRateGbp != null ? Number(updated.inPersonRateGbp) : null,
+      onlineRateGbp: updated.onlineRateGbp != null ? Number(updated.onlineRateGbp) : null,
+      groupInPersonRateGbp: updated.groupInPersonRateGbp != null ? Number(updated.groupInPersonRateGbp) : null,
+      groupOnlineRateGbp: updated.groupOnlineRateGbp != null ? Number(updated.groupOnlineRateGbp) : null,
     });
   } catch (err) {
     logger.error({ err }, "Failed to update practitioner profile");
@@ -282,6 +331,19 @@ router.get("/practitioner/availability", async (req, res) => {
 
 // Add a slot to my availability
 router.post("/practitioner/availability", async (req, res) => {
+  {
+    // Pending applicants can sign in, but can't open availability until approved.
+    const pendingCheckId = practitionerId(req);
+    if (pendingCheckId) {
+      const [pr] = await db
+        .select({ isActive: practitionersTable.isActive })
+        .from(practitionersTable)
+        .where(eq(practitionersTable.id, pendingCheckId));
+      if (pr && !pr.isActive) {
+        return res.status(403).json({ error: "Availability opens once your profile is approved." });
+      }
+    }
+  }
   const id = practitionerId(req);
   if (!id) return res.status(401).json({ error: "Not authenticated" });
   if (!isSameOrigin(req)) return res.status(403).json({ error: "Invalid request origin" });

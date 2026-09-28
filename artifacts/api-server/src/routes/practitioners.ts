@@ -4,6 +4,8 @@
   import { and, eq, ilike, or, sql } from "drizzle-orm";
   import { isAdmin } from "../lib/roles";
   import { hashPassword } from "./practitionerAuth";
+import { sendEmail } from "../lib/email";
+import { logger } from "../lib/logger";
 
   type PractitionerRow = typeof practitionersTable.$inferSelect;
 
@@ -131,7 +133,25 @@
           isActive: adminCreating,
         })
         .returning();
-      res.status(201).json(serializePractitioner(p));
+      // Public applicants get an email straight away with the link to book their
+    // onboarding call. A failure to send never blocks the application.
+    if (!adminCreating && typeof normalizedEmail === "string") {
+      const firstName = String(name ?? "").trim().split(" ")[0] || "there";
+      const esc = (s: string) =>
+        s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+      sendEmail(
+        normalizedEmail,
+        "Book your Soulful onboarding call",
+        `<p>Hi ${esc(firstName)},</p>
+<p>Thanks for applying to join Soulful. The next step is a 15 minute onboarding call to finalise the process and get started.</p>
+<p><a href="https://calendar.app.google/aVkEXCAm2zEqhfoZ6">Book your onboarding call</a></p>
+<p>Ahead of the call, please sign in to your practitioner dashboard and complete your price list (1:1 and group rates) under My Offerings. On the call we'll go through your documents, connect your Stripe account and answer any questions.</p>
+<p>Speak soon,<br />The Soulful team</p>`,
+      ).catch((err: unknown) =>
+        logger.warn({ err, email: normalizedEmail }, "Failed to send practitioner onboarding email"),
+      );
+    }
+    res.status(201).json(serializePractitioner(p));
     } catch (err) {
       res.status(500).json({ error: "Failed to create practitioner" });
     }

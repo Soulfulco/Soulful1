@@ -8,12 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { CheckCircle2, User, AlertTriangle } from "lucide-react";
+import { CheckCircle2, User, AlertTriangle, CalendarDays } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PhotoUpload } from "@/components/PhotoUpload";
 import { DocumentUpload } from "@/components/DocumentUpload";
 
 const DEFAULT_COMMISSION_PCT = "10";
+const CONSULTATION_BOOKING_URL = "https://calendar.app.google/aVkEXCAm2zEqhfoZ6";
 
 export default function ForPractitioners() {
   const c = useSiteContent();
@@ -47,6 +48,7 @@ export default function ForPractitioners() {
     onlineRateGbp: "",
     location: "",
     qualifications: "",
+    yearsOfExperience: "",
     qualificationsFileUrl: "",
     insuranceFileUrl: "",
     avatarUrl: "",
@@ -82,6 +84,15 @@ export default function ForPractitioners() {
       return;
     }
 
+    let yearsOfExperience: number | undefined;
+    if (formData.yearsOfExperience.trim()) {
+      yearsOfExperience = Number(formData.yearsOfExperience);
+      if (!Number.isFinite(yearsOfExperience) || yearsOfExperience < 0 || yearsOfExperience > 80) {
+        toast({ title: "Invalid years of experience", description: "Please enter a number between 0 and 80.", variant: "destructive" });
+        return;
+      }
+    }
+
     createPractitioner.mutate({
       data: {
         name: formData.name,
@@ -93,6 +104,7 @@ export default function ForPractitioners() {
         inPersonRateGbp: inPersonRate,
         onlineRateGbp: onlineRate,
         commissionRatePct,
+        yearsOfExperience,
         location: formData.location,
         qualifications: formData.qualifications,
         qualificationsFileUrl: formData.qualificationsFileUrl || undefined,
@@ -104,7 +116,7 @@ export default function ForPractitioners() {
       onSuccess: () => {
         setSubmitted(true);
         window.scrollTo({ top: 0, behavior: "smooth" });
-        toast({ title: "Application received", description: "Thanks! Our team will review your application and arrange a call before your profile goes live." });
+        toast({ title: "Application received", description: "Thanks! Book your onboarding call to finish setting up your profile." });
       },
       onError: () => {
         toast({ title: "Submission failed", description: "Please check your details and try again.", variant: "destructive" });
@@ -229,8 +241,15 @@ export default function ForPractitioners() {
                 </div>
                 <h2 className="text-2xl font-serif text-foreground">Application received</h2>
                 <p className="text-muted-foreground max-w-sm mx-auto leading-relaxed">
-                  Thank you for applying to Soulful. Our team will review your details and reach out to arrange a short call before your profile goes live. Once you're approved, you can sign in to your practitioner portal with the password you just set.
+                  Thank you for applying to Soulful. Book a 15 minute onboarding call to finalise the process and get started. Please also complete your price list (including group session rates) in your dashboard ahead of the call.
                 </p>
+                <div>
+                  <Button asChild className="rounded-full gap-2">
+                    <a href={CONSULTATION_BOOKING_URL} target="_blank" rel="noopener noreferrer">
+                      <CalendarDays className="h-4 w-4" /> Book your 15 minute onboarding call
+                    </a>
+                  </Button>
+                </div>
                 <Button asChild variant="outline" className="rounded-full mt-2">
                   <a href="/">Back to home</a>
                                   </Button>
@@ -311,7 +330,20 @@ export default function ForPractitioners() {
                                         </Select>
                                       </div>
                                       <div className="grid gap-2">
-                                        <Label htmlFor="inPersonRateGbp">In-person Rate (£)</Label>
+                      <Label htmlFor="yearsOfExperience">Years of Experience</Label>
+                      <Input
+                        id="yearsOfExperience"
+                        type="number"
+                        min="0"
+                        max="80"
+                        className="bg-background h-11"
+                        value={formData.yearsOfExperience}
+                        onChange={(e) => setFormData({...formData, yearsOfExperience: e.target.value})}
+                        placeholder="e.g. 5"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                                        <Label htmlFor="inPersonRateGbp">1:1 In-person Rate (£)</Label>
                                         <Input 
                                           id="inPersonRateGbp" 
                                           type="number" 
@@ -322,7 +354,7 @@ export default function ForPractitioners() {
                                         />
                                       </div>
                                       <div className="grid gap-2">
-                                        <Label htmlFor="onlineRateGbp">Online Rate (£)</Label>
+                                        <Label htmlFor="onlineRateGbp">1:1 Online Rate (£)</Label>
                                         <Input 
                                           id="onlineRateGbp" 
                                           type="number" 
@@ -347,7 +379,11 @@ export default function ForPractitioners() {
                                       </div>
                                     </div>
 
-                                    {commissionChanged && (
+                                    <p className="text-xs text-muted-foreground -mt-3">
+                      Group session rates and event pricing can be added later from your dashboard, ahead of your onboarding call.
+                    </p>
+
+                    {commissionChanged && (
                                       <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
                                         <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
                                         <span>Changing the commission rate from our standard 10% means your application will need extra review — this may lengthen the time it takes to approve and list your profile.</span>

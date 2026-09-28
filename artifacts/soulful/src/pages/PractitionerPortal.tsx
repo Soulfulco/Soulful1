@@ -12,6 +12,7 @@ import {
   CreditCard, User, TrendingUp, PoundSterling, Star, Users2,
 } from "lucide-react";
 import { DocumentUpload } from "@/components/DocumentUpload";
+import { MyOfferings } from "@/components/MyOfferings";
 
 type Slot = {
   id: number;
@@ -433,6 +434,8 @@ export default function PractitionerPortal() {
             )}
           </CardContent>
         </Card>
+
+        <MyOfferings />
 
         <Card>
           <CardHeader>
