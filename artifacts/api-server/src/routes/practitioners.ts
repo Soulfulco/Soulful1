@@ -71,7 +71,7 @@ import { logger } from "../lib/logger";
 
   router.post("/practitioners", async (req, res) => {
     try {
-      const { name, email, specialism, bio, sessionRateGbp, inPersonRateGbp, onlineRateGbp, groupInPersonRateGbp, groupOnlineRateGbp, location, qualifications, avatarUrl, password, commissionRatePct, yearsOfExperience } = req.body;
+      const { name, email, specialism, bio, sessionRateGbp, inPersonRateGbp, onlineRateGbp, groupInPersonRateGbp, groupOnlineRateGbp, location, qualifications, avatarUrl, password, commissionRatePct, yearsOfExperience, phoneNumber, qualificationsFileUrl, insuranceFileUrl } = req.body;
       let passwordHash: string | undefined;
       if (password !== undefined && password !== null && password !== "") {
         if (typeof password !== "string" || password.length < 8) {
@@ -111,6 +111,8 @@ import { logger } from "../lib/logger";
       // are held as pending applications (hidden) until an admin approves them and
       // arranges an onboarding call.
       const adminCreating = isAdmin(req);
+    const cleanText = (v: unknown, max: number): string | null =>
+      typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null;
       const [p] = await db
         .insert(practitionersTable)
         .values({
@@ -129,7 +131,10 @@ import { logger } from "../lib/logger";
           qualifications,
           avatarUrl,
           passwordHash,
-          approvalStatus: adminCreating ? "approved" : "pending",
+          phoneNumber: cleanText(phoneNumber, 40),
+        qualificationsFileUrl: cleanText(qualificationsFileUrl, 2000),
+        insuranceFileUrl: cleanText(insuranceFileUrl, 2000),
+        approvalStatus: adminCreating ? "approved" : "pending",
           isActive: adminCreating,
         })
         .returning();
