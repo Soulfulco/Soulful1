@@ -50,6 +50,7 @@ export default function PractitionerProfile({ id }: { id: string }) {
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [shareWithEmployer, setShareWithEmployer] = useState(true);
+  const [sessionMode, setSessionMode] = useState("");
   const [bookingForm, setBookingForm] = useState({
     employeeName: "",
     employeeEmail: "",
@@ -93,6 +94,22 @@ export default function PractitionerProfile({ id }: { id: string }) {
     new Date(s.startTime).toDateString() === date.toDateString()
   ) || [];
 
+  // What employers can choose from. 1:1 in-person and online are bookable here.
+  // Group sessions and events are arranged through Soulful, so they're shown as information.
+  const pr = practitioner as any;
+  const inPersonRate: number | null = pr?.inPersonRateGbp ?? null;
+  const onlineRate: number | null = pr?.onlineRateGbp ?? null;
+  const groupInPersonRate: number | null = pr?.groupInPersonRateGbp ?? null;
+  const groupOnlineRate: number | null = pr?.groupOnlineRateGbp ?? null;
+  const isGroupOnly =
+    inPersonRate == null && onlineRate == null && (groupInPersonRate != null || groupOnlineRate != null);
+  const offeringOptions: { key: string; label: string }[] = [];
+  if (inPersonRate != null) offeringOptions.push({ key: "in_person", label: `1:1 in-person, £${inPersonRate}` });
+  if (onlineRate != null) offeringOptions.push({ key: "online", label: `1:1 online, £${onlineRate}` });
+  const effectiveMode = offeringOptions.some((o) => o.key === sessionMode)
+    ? sessionMode
+    : (offeringOptions[0]?.key ?? "");
+
   const handleBooking = () => {
     if (!selectedSlot) return;
 
@@ -107,6 +124,7 @@ export default function PractitionerProfile({ id }: { id: string }) {
         notes: bookingForm.notes,
         paymentType: isSelfFunded ? "self" : "corporate",
         shareWithEmployer: isSelfFunded ? shareWithEmployer : true,
+        ...({ sessionMode: effectiveMode || undefined } as any),
       }
     }, {
       onSuccess: (data: unknown) => {
@@ -266,18 +284,57 @@ export default function PractitionerProfile({ id }: { id: string }) {
                   </div>
                 )}
                 <div className="flex items-center justify-center gap-4 flex-wrap">
-                  {practitionerRates(practitioner).map((r) => (
+                  {(isGroupOnly ? [] : practitionerRates(practitioner)).map((r) => (
                     <div key={r.label}>
                       <div className="text-3xl font-serif mb-1">£{r.value}</div>
                       <div className="text-primary-foreground/80 text-sm">{r.label}</div>
                     </div>
                   ))}
                 </div>
-                <div className="text-primary-foreground/80 text-sm mt-2">per 60 minute session</div>
+                {!isGroupOnly && (
+                  <div className="text-primary-foreground/80 text-sm mt-2">per 60 minute session</div>
+                )}
+                {(groupInPersonRate != null || groupOnlineRate != null) && (
+                  <div className={isGroupOnly ? "" : "mt-4 pt-4 border-t border-primary-foreground/20"}>
+                    <div className="text-primary-foreground/80 text-sm mb-2">Group sessions, up to 50 people</div>
+                    <div className="flex items-center justify-center gap-4 flex-wrap">
+                      {groupInPersonRate != null && (
+                        <div>
+                          <div className="text-2xl font-serif">£{groupInPersonRate}</div>
+                          <div className="text-primary-foreground/80 text-xs">In-person</div>
+                        </div>
+                      )}
+                      {groupOnlineRate != null && (
+                        <div>
+                          <div className="text-2xl font-serif">£{groupOnlineRate}</div>
+                          <div className="text-primary-foreground/80 text-xs">Online</div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-primary-foreground/70 text-xs mt-3">
+                      Events are priced by bespoke quotation. Group sessions and events are arranged through Soulful.
+                    </div>
+                  </div>
+                )}
               </div>
 
               <CardContent className="p-6">
                 <h3 className="font-serif text-xl mb-4">Book a session</h3>
+                {offeringOptions.length > 1 && (
+                  <div className="mb-6 space-y-2">
+                    <label htmlFor="sessionMode" className="text-sm font-medium">What would you like to book?</label>
+                    <select
+                      id="sessionMode"
+                      className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm"
+                      value={effectiveMode}
+                      onChange={(e) => setSessionMode(e.target.value)}
+                    >
+                      {offeringOptions.map((o) => (
+                        <option key={o.key} value={o.key}>{o.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <Calendar
                   mode="single"
                   selected={date}

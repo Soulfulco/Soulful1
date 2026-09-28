@@ -28,6 +28,7 @@ export const bookingsTable = pgTable("bookings", {
   stripeSessionId: text("stripe_session_id"),
   paymentType: text("payment_type").notNull().default("corporate"),
   shareWithEmployer: boolean("share_with_employer").notNull().default(true),
+  sessionMode: text("session_mode"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

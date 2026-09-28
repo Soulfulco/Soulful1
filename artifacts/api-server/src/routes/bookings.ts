@@ -138,7 +138,7 @@ router.get("/bookings/confirm", async (req, res) => {
 
 router.post("/bookings", async (req, res) => {
   try {
-    const { companyId, practitionerId, timeSlotId, sessionType, employeeName, employeeEmail, notes, paymentType, shareWithEmployer } = req.body;
+    const { companyId, practitionerId, timeSlotId, sessionType, employeeName, employeeEmail, notes, paymentType, shareWithEmployer, sessionMode } = req.body;
 
     const effectivePaymentType: string = paymentType === "self" ? "self" : "corporate";
     const effectiveShare: boolean = effectivePaymentType === "corporate" ? true : (shareWithEmployer !== false);
@@ -152,6 +152,9 @@ router.post("/bookings", async (req, res) => {
         inPersonRateGbp: practitionersTable.inPersonRateGbp,
         onlineRateGbp: practitionersTable.onlineRateGbp,
         sessionRateGbp: practitionersTable.sessionRateGbp,
+        isActive: practitionersTable.isActive,
+        groupInPersonRateGbp: practitionersTable.groupInPersonRateGbp,
+        groupOnlineRateGbp: practitionersTable.groupOnlineRateGbp,
         commissionRatePct: practitionersTable.commissionRatePct,
         stripeConnectAccountId: practitionersTable.stripeConnectAccountId,
         googleRefreshToken: practitionersTable.googleRefreshToken,
@@ -160,10 +163,34 @@ router.post("/bookings", async (req, res) => {
       .where(eq(practitionersTable.id, practitionerId));
 
     if (!practitionerForPricing) return res.status(404).json({ error: "Practitioner not found" });
+    // Hidden practitioners (pending, rejected or deactivated) can't be booked.
+    if (!practitionerForPricing.isActive) return res.status(404).json({ error: "Practitioner not found" });
 
+    const inPersonRate = practitionerForPricing.inPersonRateGbp != null ? Number(practitionerForPricing.inPersonRateGbp) : null;
+    const onlineRate = practitionerForPricing.onlineRateGbp != null ? Number(practitionerForPricing.onlineRateGbp) : null;
+    // Practitioners who only offer group sessions and events can't be booked 1:1.
+    const groupOnly =
+      inPersonRate == null && onlineRate == null &&
+      (practitionerForPricing.groupInPersonRateGbp != null || practitionerForPricing.groupOnlineRateGbp != null);
+    if (groupOnly) {
+      return res.status(400).json({ error: "This practitioner offers group sessions and events only. Please contact Soulful to arrange one." });
+    }
+    // Which 1:1 option the employee chose. Older clients send nothing and keep the
+    // previous behaviour: in-person rate first, then online, then the base rate.
+    const mode: "in_person" | "online" | null =
+      sessionMode === "online" ? "online" : sessionMode === "in_person" ? "in_person" : null;
+    if (mode === "online" && onlineRate == null) {
+      return res.status(400).json({ error: "This practitioner doesn't offer online sessions" });
+    }
+    if (mode === "in_person" && inPersonRate == null) {
+      return res.status(400).json({ error: "This practitioner doesn't offer in-person sessions" });
+    }
     const rate = Number(
-      practitionerForPricing.inPersonRateGbp ?? practitionerForPricing.onlineRateGbp ?? practitionerForPricing.sessionRateGbp ?? 0
+      (mode === "online" ? onlineRate : mode === "in_person" ? inPersonRate : (inPersonRate ?? onlineRate)) ??
+        practitionerForPricing.sessionRateGbp ?? 0
     );
+    const modeLabel = mode === "online" ? "online " : mode === "in_person" ? "in-person " : "";
+    const modeSuffix = mode === "online" ? " (online)" : mode === "in_person" ? " (in person)" : "";
     if (rate <= 0) return res.status(400).json({ error: "Practitioner has no rate set" });
 
     const commissionPct = Number(practitionerForPricing.commissionRatePct ?? 10);
@@ -227,6 +254,7 @@ router.post("/bookings", async (req, res) => {
         .insert(bookingsTable)
         .values({
           companyId, practitionerId, timeSlotId, sessionType, employeeName, employeeEmail, notes,
+        sessionMode: mode,
           paymentType: "corporate", status: "confirmed", shareWithEmployer: effectiveShare,
           priceGbp: String(rate),
           commissionRatePct: String(commissionPct),
@@ -246,7 +274,7 @@ router.post("/bookings", async (req, res) => {
         try {
           const eventId = await createEvent(practitionerForPricing.googleRefreshToken, {
             summary: `Soulful session — ${employeeName}`,
-            description: `${sessionType ?? "Wellbeing session"} with ${employeeName} (${employeeEmail})${c?.name ? `, ${c.name}` : ""}.${notes ? `\n\nNotes: ${notes}` : ""}`,
+            description: `${sessionType ?? "Wellbeing session"}${modeSuffix} with ${employeeName} (${employeeEmail})${c?.name ? `, ${c.name}` : ""}.${notes ? `\n\nNotes: ${notes}` : ""}`,
             start: slot.startTime,
             end: slot.endTime,
             attendeeEmail: employeeEmail,
@@ -274,6 +302,7 @@ router.post("/bookings", async (req, res) => {
       .insert(bookingsTable)
       .values({
         companyId, practitionerId, timeSlotId, sessionType, employeeName, employeeEmail, notes,
+        sessionMode: mode,
         paymentType: "self", status: "pending", shareWithEmployer: effectiveShare,
         priceGbp: String(rate),
         commissionRatePct: String(commissionPct),
@@ -294,7 +323,7 @@ router.post("/bookings", async (req, res) => {
             currency: "gbp",
             unit_amount: amountPence,
             product_data: {
-              name: `1:1 session with ${practitionerForPricing.name}`,
+              name: `1:1 ${modeLabel}session with ${practitionerForPricing.name}`,
               description: `${practitionerForPricing.specialism ?? sessionType} — 60 minute session`,
             },
           },
