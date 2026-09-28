@@ -153,7 +153,11 @@ import { logger } from "../lib/logger";
     }
     res.status(201).json(serializePractitioner(p));
     } catch (err) {
-      res.status(500).json({ error: "Failed to create practitioner" });
+      logger.error({ err }, "Failed to create practitioner");
+    if ((err as any)?.code === "23505" || (err as any)?.cause?.code === "23505") {
+      return res.status(409).json({ error: "An application with this email already exists." });
+    }
+    res.status(500).json({ error: "Failed to create practitioner" });
     }
   });
 
