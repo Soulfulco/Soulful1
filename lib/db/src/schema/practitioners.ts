@@ -20,6 +20,12 @@ export const practitionersTable = pgTable("practitioners", {
   sessionRateGbp: numeric("session_rate_gbp", { precision: 10, scale: 2 }).notNull(),
   inPersonRateGbp: numeric("in_person_rate_gbp", { precision: 10, scale: 2 }),
   onlineRateGbp: numeric("online_rate_gbp", { precision: 10, scale: 2 }),
+  // Group session rates — separate from the 1:1 rates above, since Soulful's
+  // group sessions (up to 50 attendees) are priced differently to individual
+  // bookings. Both optional, same as the 1:1 rates: a practitioner only
+  // needs at least one rate of any kind set to sign up.
+  groupInPersonRateGbp: numeric("group_in_person_rate_gbp", { precision: 10, scale: 2 }),
+  groupOnlineRateGbp: numeric("group_online_rate_gbp", { precision: 10, scale: 2 }),
   isActive: boolean("is_active").notNull().default(true),
   approvalStatus: approvalStatusEnum("approval_status").notNull().default("approved"),
   subscriptionStatus: subscriptionStatusEnum("subscription_status").notNull().default("trial"),
