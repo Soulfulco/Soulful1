@@ -168,29 +168,35 @@ router.post("/bookings", async (req, res) => {
 
     const inPersonRate = practitionerForPricing.inPersonRateGbp != null ? Number(practitionerForPricing.inPersonRateGbp) : null;
     const onlineRate = practitionerForPricing.onlineRateGbp != null ? Number(practitionerForPricing.onlineRateGbp) : null;
-    // Practitioners who only offer group sessions and events can't be booked 1:1.
-    const groupOnly =
-      inPersonRate == null && onlineRate == null &&
-      (practitionerForPricing.groupInPersonRateGbp != null || practitionerForPricing.groupOnlineRateGbp != null);
-    if (groupOnly) {
-      return res.status(400).json({ error: "This practitioner offers group sessions and events only. Please contact Soulful to arrange one." });
+    const groupInPersonRate = practitionerForPricing.groupInPersonRateGbp != null ? Number(practitionerForPricing.groupInPersonRateGbp) : null;
+    const groupOnlineRate = practitionerForPricing.groupOnlineRateGbp != null ? Number(practitionerForPricing.groupOnlineRateGbp) : null;
+    // Which option the employee chose: 1:1 or group, in person or online. Older clients
+    // send nothing and keep the previous behaviour: 1:1 in-person rate first, then
+    // online, then the base rate.
+    const modeRates: Record<string, number | null> = {
+      in_person: inPersonRate,
+      online: onlineRate,
+      group_in_person: groupInPersonRate,
+      group_online: groupOnlineRate,
+    };
+    const mode: string | null =
+      typeof sessionMode === "string" && Object.prototype.hasOwnProperty.call(modeRates, sessionMode) ? sessionMode : null;
+    if (mode && modeRates[mode] == null) {
+      return res.status(400).json({ error: "This practitioner doesn't offer that session type" });
     }
-    // Which 1:1 option the employee chose. Older clients send nothing and keep the
-    // previous behaviour: in-person rate first, then online, then the base rate.
-    const mode: "in_person" | "online" | null =
-      sessionMode === "online" ? "online" : sessionMode === "in_person" ? "in_person" : null;
-    if (mode === "online" && onlineRate == null) {
-      return res.status(400).json({ error: "This practitioner doesn't offer online sessions" });
-    }
-    if (mode === "in_person" && inPersonRate == null) {
-      return res.status(400).json({ error: "This practitioner doesn't offer in-person sessions" });
+    // Practitioners who only offer group sessions have to be booked through a group option.
+    if (!mode && inPersonRate == null && onlineRate == null && (groupInPersonRate != null || groupOnlineRate != null)) {
+      return res.status(400).json({ error: "Please choose a session type" });
     }
     const rate = Number(
-      (mode === "online" ? onlineRate : mode === "in_person" ? inPersonRate : (inPersonRate ?? onlineRate)) ??
-        practitionerForPricing.sessionRateGbp ?? 0
+      (mode ? modeRates[mode] : (inPersonRate ?? onlineRate)) ?? practitionerForPricing.sessionRateGbp ?? 0
     );
-    const modeLabel = mode === "online" ? "online " : mode === "in_person" ? "in-person " : "";
-    const modeSuffix = mode === "online" ? " (online)" : mode === "in_person" ? " (in person)" : "";
+    const isGroup = mode === "group_in_person" || mode === "group_online";
+    const isOnline = mode === "online" || mode === "group_online";
+    const productLabel = isGroup
+      ? `Group ${isOnline ? "online" : "in-person"} session (up to 50 people)`
+      : mode ? `1:1 ${isOnline ? "online" : "in-person"} session` : "1:1 session";
+    const modeSuffix = mode ? ` (${isGroup ? "group, " : ""}${isOnline ? "online" : "in person"})` : "";
     if (rate <= 0) return res.status(400).json({ error: "Practitioner has no rate set" });
 
     const commissionPct = Number(practitionerForPricing.commissionRatePct ?? 10);
@@ -323,7 +329,7 @@ router.post("/bookings", async (req, res) => {
             currency: "gbp",
             unit_amount: amountPence,
             product_data: {
-              name: `1:1 ${modeLabel}session with ${practitionerForPricing.name}`,
+              name: `${productLabel} with ${practitionerForPricing.name}`,
               description: `${practitionerForPricing.specialism ?? sessionType} — 60 minute session`,
             },
           },
