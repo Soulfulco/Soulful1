@@ -58,6 +58,7 @@ import { logger } from "../lib/logger";
           or(
             ilike(practitionersTable.name, `%${search}%`),
             ilike(practitionersTable.specialism, `%${search}%`),
+            ilike(practitionersTable.bio, `%${search}%`),
           ),
         );
       }
