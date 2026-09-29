@@ -53,7 +53,7 @@ export function MyOfferings() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/practitioner/me", { credentials: "include" });
+        const res = await fetch("https://api.soulfulco.uk/api/practitioner/me", { credentials: "include" });
         if (!res.ok) throw new Error("Could not load your profile");
         const data = await res.json();
         // If the API doesn't send the rate fields, don't show blanks that could
@@ -96,7 +96,7 @@ export function MyOfferings() {
     }
     setSaving(true);
     try {
-      const res = await fetch("/api/practitioner/profile", {
+      const res = await fetch("https://api.soulfulco.uk/api/practitioner/profile", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
