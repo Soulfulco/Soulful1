@@ -1,10 +1,11 @@
 import { Router, type Request } from "express";
-import { db, employeesTable } from "@workspace/db";
+import { db, employeesTable, practitionersTable, timeSlotsTable, companiesTable } from "@workspace/db";
 import { sql, eq } from "drizzle-orm";
 import { awardPoints } from "../lib/gamification";
 import { logRequirementSafe } from "../lib/wellbeingRequirements";
 import { logger } from "../lib/logger";
 import { isTrialLocked, TRIAL_LOCKED_MESSAGE } from "../lib/trialGate";
+import { getUncachableStripeClient } from "../stripeClient";
 import {
   isAdmin,
   isHr,
@@ -99,7 +100,9 @@ router.get("/group-sessions", async (req, res) => {
   }
 });
 
-// HR schedules a group session for their own company
+// HR schedules a group session for their own company. The company's card is
+// authorized now (capture_method: manual) but only captured once the
+// practitioner accepts, so a decline or expiry never needs a refund.
 router.post("/group-sessions", async (req, res) => {
   try {
     const viewer = await getViewer(req);
@@ -115,34 +118,131 @@ router.post("/group-sessions", async (req, res) => {
     if (!Number.isInteger(practitionerId) || !sessionType) {
       return res.status(400).json({ error: "practitionerId and sessionType are required" });
     }
-    const start = new Date(body.startTime);
-    const end = new Date(body.endTime);
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
-      return res.status(400).json({ error: "A valid start and end time are required" });
-    }
+    const timeSlotId = Number(body.timeSlotId);
+    if (!Number.isInteger(timeSlotId)) return res.status(400).json({ error: "Please choose a time from the practitioner's availability" });
+
     const maxAttendees = body.maxAttendees == null ? 20 : Number(body.maxAttendees);
-    if (!Number.isInteger(maxAttendees) || maxAttendees < 1 || maxAttendees > 500) {
-      return res.status(400).json({ error: "maxAttendees must be between 1 and 500" });
+    if (!Number.isInteger(maxAttendees) || maxAttendees < 1) {
+      return res.status(400).json({ error: "maxAttendees must be at least 1" });
     }
+    if (maxAttendees > 50) {
+      return res.status(400).json({
+        error: "Group sessions of more than 50 people need a bespoke quote. Please email hannah@soulfulco.uk to arrange one.",
+      });
+    }
+
+    const locationType = ["at_office", "virtual", "practitioner_space"].includes(body.locationType) ? body.locationType : "at_office";
+    const locationDescription = typeof body.locationDescription === "string" ? body.locationDescription.trim() : "";
+    if (locationType !== "virtual" && !locationDescription) {
+      return res.status(400).json({ error: "Please add a location for an in-person session" });
+    }
+
     if (await isTrialLocked(companyId)) {
       return res.status(402).json({ error: TRIAL_LOCKED_MESSAGE, locked: true });
     }
-    const pract = await db.execute(sql`SELECT is_active FROM practitioners WHERE id = ${practitionerId}`);
-    const practRow = pract.rows[0] as { is_active?: boolean } | undefined;
-    if (!practRow || !practRow.is_active) return res.status(404).json({ error: "Practitioner not found" });
+
+    const [pr] = await db
+      .select({
+        isActive: practitionersTable.isActive,
+        groupInPersonRateGbp: practitionersTable.groupInPersonRateGbp,
+        groupOnlineRateGbp: practitionersTable.groupOnlineRateGbp,
+        commissionRatePct: practitionersTable.commissionRatePct,
+        stripeConnectAccountId: practitionersTable.stripeConnectAccountId,
+      })
+      .from(practitionersTable)
+      .where(eq(practitionersTable.id, practitionerId));
+    if (!pr || !pr.isActive) return res.status(404).json({ error: "Practitioner not found" });
+
+    // Flat group rate for the whole session, the same way as 1:1 sessions: the
+    // practitioner's slot length doesn't change the price.
+    const rate = locationType === "virtual"
+      ? (pr.groupOnlineRateGbp != null ? Number(pr.groupOnlineRateGbp) : null)
+      : (pr.groupInPersonRateGbp != null ? Number(pr.groupInPersonRateGbp) : null);
+    if (rate == null || rate <= 0) {
+      return res.status(400).json({ error: "This practitioner hasn't set a group rate for that location type" });
+    }
+
+    const [slot] = await db.select().from(timeSlotsTable).where(eq(timeSlotsTable.id, timeSlotId));
+    if (!slot || slot.practitionerId !== practitionerId) {
+      return res.status(400).json({ error: "That time slot isn't available" });
+    }
+    if (slot.isBooked || slot.startTime.getTime() < Date.now()) {
+      return res.status(409).json({ error: "That time slot has just been taken. Please choose another." });
+    }
+
+    const [company] = await db
+      .select({ stripeCustomerId: companiesTable.stripeCustomerId })
+      .from(companiesTable)
+      .where(eq(companiesTable.id, companyId));
+    if (!company?.stripeCustomerId) {
+      return res.status(402).json({ error: "This company doesn't have a payment method on file. Please contact Soulful support." });
+    }
+
+    const stripe = await getUncachableStripeClient();
+    const paymentMethods = await stripe.paymentMethods.list({ customer: company.stripeCustomerId, type: "card" });
+    const paymentMethodId = paymentMethods.data[0]?.id;
+    if (!paymentMethodId) {
+      return res.status(402).json({ error: "No card on file for this company. Please update billing details before booking." });
+    }
+
+    let canSplit = false;
+    if (pr.stripeConnectAccountId) {
+      try {
+        const acct = await stripe.accounts.retrieve(pr.stripeConnectAccountId);
+        canSplit = Boolean(acct.payouts_enabled);
+      } catch {
+        canSplit = false;
+      }
+    }
+
+    const commissionPct = Number(pr.commissionRatePct ?? 10);
+    const amountPence = Math.round(rate * 100);
+
+    let paymentIntent;
+    try {
+      paymentIntent = await stripe.paymentIntents.create({
+        amount: amountPence,
+        currency: "gbp",
+        customer: company.stripeCustomerId,
+        payment_method: paymentMethodId,
+        // Authorize now, capture later: only takes the company's money once the
+        // practitioner accepts, so a decline or a missed 24-hour window never
+        // needs a refund.
+        capture_method: "manual",
+        confirm: true,
+        off_session: true,
+        description: `Soulful group session — ${sessionType} with practitioner #${practitionerId}`,
+        metadata: { practitionerId: String(practitionerId), companyId: String(companyId), kind: "group_session" },
+        ...(canSplit
+          ? {
+              application_fee_amount: Math.round(amountPence * (commissionPct / 100)),
+              transfer_data: { destination: pr.stripeConnectAccountId! },
+            }
+          : {}),
+      });
+    } catch (err) {
+      logger.error({ err, companyId, practitionerId }, "Failed to authorize payment for group session");
+      return res.status(402).json({ error: "Payment failed. Please check the company's card on file and try again." });
+    }
+    if (paymentIntent.status !== "requires_capture") {
+      return res.status(402).json({ error: "Payment could not be authorized. Please try again." });
+    }
 
     const result = await db.execute(sql`
       INSERT INTO group_sessions
         (company_id, practitioner_id, session_type, start_time, end_time,
-         max_attendees, location_type, location_description, notes, status, decide_by)
+         max_attendees, location_type, location_description, notes, status, decide_by,
+         time_slot_id, price_gbp, commission_rate_pct, payout_status, stripe_payment_intent_id)
       VALUES
         (${companyId}, ${practitionerId}, ${sessionType},
-         ${String(body.startTime)}::timestamp, ${String(body.endTime)}::timestamp,
-         ${maxAttendees}, ${body.locationType ?? "at_office"},
-         ${body.locationDescription ?? null}, ${body.notes ?? null},
-         'pending', NOW() + INTERVAL '${decisionDeadlineHours} hours')
+         ${slot.startTime.toISOString()}::timestamp, ${slot.endTime.toISOString()}::timestamp,
+         ${maxAttendees}, ${locationType}, ${locationDescription || null}, ${body.notes ?? null},
+         'pending', NOW() + INTERVAL '${decisionDeadlineHours} hours',
+         ${timeSlotId}, ${String(rate)}, ${String(commissionPct)},
+         ${canSplit ? "auto_pending" : "manual_pending"}, ${paymentIntent.id})
       RETURNING *
     `);
+    await db.update(timeSlotsTable).set({ isBooked: true }).where(eq(timeSlotsTable.id, timeSlotId));
     res.status(201).json(result.rows[0]);
   } catch (err) {
     logger.error({ err }, "Failed to create group session");
@@ -177,8 +277,28 @@ router.post("/practitioner/group-sessions/:id/accept", async (req, res) => {
     if (!viewer || viewer.kind !== "practitioner") return res.status(401).json({ error: "Authentication required" });
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return res.status(400).json({ error: "Invalid id" });
+    const [existing] = await db.execute(sql`
+      SELECT * FROM group_sessions
+      WHERE id = ${id} AND practitioner_id = ${viewer.practitionerId} AND status = 'pending'
+    `).then((r) => r.rows as any[]);
+    if (!existing) {
+      return res.status(404).json({ error: "This request is no longer available to accept" });
+    }
+    if (existing.stripe_payment_intent_id) {
+      try {
+        const stripe = await getUncachableStripeClient();
+        const captured = await stripe.paymentIntents.capture(existing.stripe_payment_intent_id);
+        if (captured.status !== "succeeded") {
+          return res.status(402).json({ error: "Payment could not be captured. Please contact Soulful support." });
+        }
+      } catch (err) {
+        logger.error({ err, groupSessionId: id }, "Failed to capture payment for accepted group session");
+        return res.status(402).json({ error: "Payment could not be captured. Please contact Soulful support." });
+      }
+    }
+    const payoutStatus = existing.payout_status === "auto_pending" ? "auto_paid" : existing.payout_status;
     const result = await db.execute(sql`
-      UPDATE group_sessions SET status = 'confirmed', decide_by = NULL
+      UPDATE group_sessions SET status = 'confirmed', decide_by = NULL, payout_status = ${payoutStatus}
       WHERE id = ${id} AND practitioner_id = ${viewer.practitionerId} AND status = 'pending'
       RETURNING *
     `);
@@ -210,6 +330,7 @@ router.post("/practitioner/group-sessions/:id/decline", async (req, res) => {
     if (!result.rows[0]) {
       return res.status(404).json({ error: "This request is no longer available to decline" });
     }
+    await releaseDeclinedGroupSession(result.rows[0] as any);
     await notifyHrOfDecline(result.rows[0] as any);
     res.json(result.rows[0]);
   } catch (err) {
@@ -351,6 +472,31 @@ router.patch("/group-sessions/:id", async (req, res) => {
 });
 
 
+// Releases the held time slot and cancels the still-authorized payment for a
+// group session that was declined or has just expired. Never throws: a failure
+// here shouldn't stop HR from being told the practitioner is unavailable.
+async function releaseDeclinedGroupSession(gs: {
+  id: number;
+  time_slot_id?: number | null;
+  stripe_payment_intent_id?: string | null;
+}) {
+  try {
+    if (gs.time_slot_id != null) {
+      await db.execute(sql`UPDATE time_slots SET is_booked = false WHERE id = ${gs.time_slot_id}`);
+    }
+    if (gs.stripe_payment_intent_id) {
+      const stripe = await getUncachableStripeClient();
+      await stripe.paymentIntents.cancel(gs.stripe_payment_intent_id).catch((err: unknown) => {
+        // Already captured, already canceled, or otherwise not cancelable — nothing
+        // further to do, but worth knowing about.
+        logger.warn({ err, groupSessionId: gs.id }, "Could not cancel group session payment authorization");
+      });
+    }
+  } catch (err) {
+    logger.error({ err, groupSessionId: gs.id }, "Failed to release a declined group session");
+  }
+}
+
 // Tells HR their chosen practitioner can't do this session, so they know to pick another —
 // used both when a practitioner actively declines and when 24 hours pass with no response.
 async function notifyHrOfDecline(gs: { id: number; company_id: number; session_type: string; start_time: string | Date }) {
@@ -379,9 +525,10 @@ export async function expireOverdueGroupSessionRequests(): Promise<void> {
       UPDATE group_sessions
       SET status = 'declined', decline_reason = 'No response within 24 hours', decide_by = NULL
       WHERE status = 'pending' AND decide_by IS NOT NULL AND decide_by < NOW()
-      RETURNING id, company_id, session_type, start_time
+      RETURNING id, company_id, session_type, start_time, time_slot_id, stripe_payment_intent_id
     `);
     for (const gs of overdue.rows as any[]) {
+      await releaseDeclinedGroupSession(gs);
       await notifyHrOfDecline(gs);
     }
   } catch (err) {
