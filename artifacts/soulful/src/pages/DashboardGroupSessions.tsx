@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { useListPractitioners, useListCompanies } from "@workspace/api-client-react";
+import { useListPractitioners, useListCompanies, useListPractitionerSlots, getListPractitionerSlotsQueryKey } from "@workspace/api-client-react";
 import { Card } from "@/components/ui/card";
+import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,9 +64,7 @@ const EMPTY_FORM = {
   companyId: "",
   practitionerId: "",
   sessionType: "",
-  date: "",
-  startTime: "",
-  durationMinutes: "60",
+  timeSlotId: "",
   maxAttendees: "20",
   locationType: "at_office",
   locationDescription: "",
@@ -86,6 +85,17 @@ export default function DashboardGroupSessions() {
   const { data: practitioners } = useListPractitioners({});
   const { data: companies } = useListCompanies();
 
+  const [pickerDate, setPickerDate] = useState<Date | undefined>(undefined);
+  const selectedPractitionerId = form.practitionerId ? Number(form.practitionerId) : 0;
+  const { data: practitionerSlots, isLoading: isLoadingSlots } = useListPractitionerSlots(selectedPractitionerId, {
+    query: { enabled: !!selectedPractitionerId, queryKey: getListPractitionerSlotsQueryKey(selectedPractitionerId) },
+  });
+  const availableDates = (practitionerSlots ?? []).filter(s => !s.isBooked).map(s => new Date(s.startTime));
+  const slotsForPickerDate = (practitionerSlots ?? []).filter(s =>
+    !s.isBooked && pickerDate && new Date(s.startTime).toDateString() === pickerDate.toDateString()
+  );
+  const requiresLocation = form.locationType !== "virtual";
+
   // Coming back from a practitioner's profile with ?practitionerId=X pre-fills
   // that practitioner and opens the scheduling dialog automatically, rather
   // than starting blind with an empty dropdown.
@@ -101,7 +111,7 @@ export default function DashboardGroupSessions() {
   const fetchSessions = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/group-sessions");
+      const res = await fetch("https://api.soulfulco.uk/api/group-sessions", { credentials: "include" });
       if (res.ok) setSessions(await res.json());
     } finally {
       setLoading(false);
@@ -113,7 +123,7 @@ export default function DashboardGroupSessions() {
   const fetchAttendees = async (id: number) => {
     if (attendees[id]) return;
     try {
-      const res = await fetch(`/api/group-sessions/${id}`);
+      const res = await fetch(`https://api.soulfulco.uk/api/group-sessions/${id}`, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         setAttendees(prev => ({ ...prev, [id]: data.attendees ?? [] }));
@@ -134,39 +144,60 @@ export default function DashboardGroupSessions() {
     setForm(f => ({ ...f, [field]: value }));
   };
 
+  const handlePractitionerChange = (v: string) => {
+    setForm(f => ({ ...f, practitionerId: v, timeSlotId: "" }));
+    setPickerDate(undefined);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.companyId || !form.practitionerId || !form.sessionType || !form.date || !form.startTime) {
-      toast({ title: "Missing fields", description: "Please fill in all required fields.", variant: "destructive" });
+    if (!form.companyId || !form.practitionerId || !form.sessionType || !form.timeSlotId) {
+      toast({ title: "Missing fields", description: "Please fill in all required fields and choose a time from the practitioner's availability.", variant: "destructive" });
+      return;
+    }
+    const maxAttendees = Number(form.maxAttendees);
+    if (!Number.isInteger(maxAttendees) || maxAttendees < 1) {
+      toast({ title: "Invalid group size", description: "Enter a number of at least 1.", variant: "destructive" });
+      return;
+    }
+    if (maxAttendees > 50) {
+      toast({
+        title: "Groups over 50 need a bespoke quote",
+        description: "Please email hannah@soulfulco.uk to arrange a session for more than 50 people.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (requiresLocation && !form.locationDescription.trim()) {
+      toast({ title: "Location needed", description: "Please add a location for an in-person session.", variant: "destructive" });
       return;
     }
     setSubmitting(true);
     try {
-      const startTime = new Date(`${form.date}T${form.startTime}`);
-      const endTime = new Date(startTime.getTime() + Number(form.durationMinutes) * 60000);
-
-      const res = await fetch("/api/group-sessions", {
+      const res = await fetch("https://api.soulfulco.uk/api/group-sessions", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           companyId: Number(form.companyId),
           practitionerId: Number(form.practitionerId),
           sessionType: form.sessionType,
-          startTime: startTime.toISOString(),
-          endTime: endTime.toISOString(),
-          maxAttendees: Number(form.maxAttendees),
+          timeSlotId: Number(form.timeSlotId),
+          maxAttendees,
           locationType: form.locationType,
           locationDescription: form.locationDescription || null,
           notes: form.notes || null,
         }),
       });
-      if (!res.ok) throw new Error();
-      toast({ title: "Group session scheduled", description: "Employees can now sign up from their portal." });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || "Could not schedule the session.");
+      toast({ title: "Request sent", description: "The practitioner has 24 hours to accept. You'll be notified if they can't make it." });
       setForm(EMPTY_FORM);
+      setPickerDate(undefined);
       setOpen(false);
       fetchSessions();
-    } catch {
-      toast({ title: "Error", description: "Could not schedule the session.", variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Error", description: err instanceof Error ? err.message : "Could not schedule the session.", variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
@@ -213,7 +244,7 @@ export default function DashboardGroupSessions() {
               </div>
               <div className="space-y-1.5">
                 <Label>Practitioner <span className="text-destructive">*</span></Label>
-                <Select value={form.practitionerId} onValueChange={v => handleChange("practitionerId", v)}>
+                <Select value={form.practitionerId} onValueChange={handlePractitionerChange}>
                   <SelectTrigger><SelectValue placeholder="Select practitioner" /></SelectTrigger>
                   <SelectContent>
                     {practitioners?.filter(p => p.isActive).map(p => (
@@ -234,31 +265,53 @@ export default function DashboardGroupSessions() {
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="date">Date <span className="text-destructive">*</span></Label>
-                <Input id="date" type="date" value={form.date} onChange={e => handleChange("date", e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="startTime">Start Time <span className="text-destructive">*</span></Label>
-                <Input id="startTime" type="time" value={form.startTime} onChange={e => handleChange("startTime", e.target.value)} />
-              </div>
+            <div className="space-y-1.5">
+              <Label>Time <span className="text-destructive">*</span></Label>
+              {!form.practitionerId ? (
+                <p className="text-sm text-muted-foreground py-2">Choose a practitioner to see their availability.</p>
+              ) : isLoadingSlots ? (
+                <div className="h-10 bg-muted rounded animate-pulse" />
+              ) : (
+                <>
+                  <Calendar
+                    mode="single"
+                    selected={pickerDate}
+                    onSelect={(d) => { setPickerDate(d); handleChange("timeSlotId", ""); }}
+                    disabled={(d) => {
+                      if (d < new Date(new Date().setHours(0, 0, 0, 0))) return true;
+                      return !availableDates.some(a => a.toDateString() === d.toDateString());
+                    }}
+                    className="rounded-xl border bg-background/50 p-3"
+                  />
+                  {pickerDate && (
+                    slotsForPickerDate.length > 0 ? (
+                      <div className="grid grid-cols-3 gap-2 mt-2">
+                        {slotsForPickerDate.map(slot => (
+                          <Button
+                            key={slot.id}
+                            type="button"
+                            variant={form.timeSlotId === String(slot.id) ? "default" : "outline"}
+                            className="w-full justify-center"
+                            onClick={() => handleChange("timeSlotId", String(slot.id))}
+                          >
+                            {format(new Date(slot.startTime), "h:mm a")}
+                          </Button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-center py-3 bg-muted/50 rounded-lg text-muted-foreground mt-2">
+                        No available times on this date.
+                      </div>
+                    )
+                  )}
+                </>
+              )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Duration</Label>
-                <Select value={form.durationMinutes} onValueChange={v => handleChange("durationMinutes", v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {DURATIONS.map(d => <SelectItem key={d.minutes} value={String(d.minutes)}>{d.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="maxAttendees">Max Attendees</Label>
-                <Input id="maxAttendees" type="number" min="1" max="200" value={form.maxAttendees} onChange={e => handleChange("maxAttendees", e.target.value)} />
-              </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="maxAttendees">Max Attendees</Label>
+              <Input id="maxAttendees" type="number" min="1" max="50" value={form.maxAttendees} onChange={e => handleChange("maxAttendees", e.target.value)} />
+              <p className="text-xs text-muted-foreground">For groups larger than 50, email hannah@soulfulco.uk for a bespoke quote.</p>
             </div>
 
             <div className="space-y-1.5">
@@ -272,7 +325,7 @@ export default function DashboardGroupSessions() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="locationDescription">Location Details</Label>
+              <Label htmlFor="locationDescription">Location Details{requiresLocation && <span className="text-destructive"> *</span>}</Label>
               <Input id="locationDescription" placeholder="e.g. Floor 3 boardroom, or Zoom link" value={form.locationDescription} onChange={e => handleChange("locationDescription", e.target.value)} />
             </div>
 
