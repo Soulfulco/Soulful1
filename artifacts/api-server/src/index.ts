@@ -6,6 +6,7 @@ import { logger } from "./lib/logger";
 import { baseUrl, apiBaseUrl } from "./lib/url";
 import { getStripeSync } from "./stripeClient";
 import { reconcileStripeToApp } from "./stripeReconcile";
+import { expireOverdueGroupSessionRequests } from "./routes/groupSessions";
 
 /**
  * stripe-replit-sync's migrations guard enum creation with an UNQUALIFIED
@@ -102,4 +103,10 @@ app.listen(port, (err) => {
   logger.info({ port }, "Server listening");
   // Initialize Stripe in the background; never block or crash the server.
   initStripe().catch((err) => logger.error({ err }, "initStripe threw unexpectedly"));
+
+  // Expire group session requests a practitioner hasn't responded to within 24 hours,
+  // notifying HR the same way a decline does. Runs once at startup, then every 15 minutes.
+  // Failures inside it are already caught and logged, never crash the server.
+  expireOverdueGroupSessionRequests();
+  setInterval(expireOverdueGroupSessionRequests, 15 * 60 * 1000);
 });
