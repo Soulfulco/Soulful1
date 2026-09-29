@@ -106,8 +106,7 @@ export default function PractitionerProfile({ id }: { id: string }) {
   const offeringOptions: { key: string; label: string }[] = [];
   if (inPersonRate != null) offeringOptions.push({ key: "in_person", label: `1:1 in-person, £${inPersonRate}` });
   if (onlineRate != null) offeringOptions.push({ key: "online", label: `1:1 online, £${onlineRate}` });
-  if (groupInPersonRate != null) offeringOptions.push({ key: "group_in_person", label: `Group in-person (up to 50 people), £${groupInPersonRate}` });
-  if (groupOnlineRate != null) offeringOptions.push({ key: "group_online", label: `Group online (up to 50 people), £${groupOnlineRate}` });
+  // Group sessions are booked through HR, not from this dropdown.
   const effectiveMode = offeringOptions.some((o) => o.key === sessionMode)
     ? sessionMode
     : (offeringOptions[0]?.key ?? "");
