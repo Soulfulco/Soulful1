@@ -10,7 +10,7 @@ interface DocumentUploadProps {
   label: string;
 }
 
-const MAX_BYTES = 10 * 1024 * 1024;
+const MAX_BYTES = 50 * 1024 * 1024;
 const ALLOWED_TYPES = new Set([
   "application/pdf",
   "application/msword",
@@ -38,7 +38,7 @@ export function DocumentUpload({ value, onChange, label }: DocumentUploadProps) 
       return;
     }
     if (file.size > MAX_BYTES) {
-      toast({ title: "File too large", description: "Please choose a file under 10MB.", variant: "destructive" });
+      toast({ title: "File too large", description: "Please choose a file under 50MB.", variant: "destructive" });
       return;
     }
     setFileName(file.name);

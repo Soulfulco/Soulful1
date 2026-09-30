@@ -26,7 +26,7 @@ const ALLOWED_UPLOAD_TYPES = new Set([
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]);
-const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 
 router.post("/storage/uploads/request-url", async (req: Request, res: Response) => {
   const parsed = RequestUploadUrlBody.safeParse(req.body);
@@ -41,7 +41,7 @@ router.post("/storage/uploads/request-url", async (req: Request, res: Response) 
   }
 
   if (parsed.data.size > MAX_UPLOAD_BYTES) {
-    res.status(400).json({ error: "File too large. Maximum size is 10MB." });
+    res.status(400).json({ error: "File too large. Maximum size is 50MB." });
     return;
   }
 

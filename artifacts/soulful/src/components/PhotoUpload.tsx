@@ -9,7 +9,7 @@ interface PhotoUploadProps {
   onChange: (url: string) => void;
 }
 
-const MAX_BYTES = 5 * 1024 * 1024;
+const MAX_BYTES = 50 * 1024 * 1024;
 
 export function PhotoUpload({ value, onChange }: PhotoUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -29,7 +29,7 @@ export function PhotoUpload({ value, onChange }: PhotoUploadProps) {
       return;
     }
     if (file.size > MAX_BYTES) {
-      toast({ title: "File too large", description: "Please choose an image under 5MB.", variant: "destructive" });
+      toast({ title: "File too large", description: "Please choose an image under 50MB.", variant: "destructive" });
       return;
     }
     await uploadFile(file);

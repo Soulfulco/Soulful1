@@ -53,6 +53,7 @@ export default function ForPractitioners() {
     insuranceFileUrl: "",
     avatarUrl: "",
     password: "",
+    confirmPassword: "",
     commissionRatePct: DEFAULT_COMMISSION_PCT,
   });
 
@@ -70,6 +71,10 @@ export default function ForPractitioners() {
     }
     if (formData.password.length < 8) {
       toast({ title: "Choose a password", description: "Your portal password must be at least 8 characters.", variant: "destructive" });
+      return;
+    }
+    if (formData.password !== formData.confirmPassword) {
+      toast({ title: "Passwords don't match", description: "Please make sure both password fields match.", variant: "destructive" });
       return;
     }
     const inPersonRate = formData.inPersonRateGbp ? parseInt(formData.inPersonRateGbp, 10) : undefined;
@@ -313,6 +318,21 @@ export default function ForPractitioners() {
                                         placeholder="At least 8 characters"
                                       />
                                       <p className="text-xs text-muted-foreground">You'll use this to log in to your practitioner portal and manage availability.</p>
+                                    </div>
+
+                                    <div className="grid gap-2">
+                                      <Label htmlFor="confirmPassword">Confirm Password</Label>
+                                      <Input
+                                        id="confirmPassword"
+                                        type="password"
+                                        required
+                                        minLength={8}
+                                        autoComplete="new-password"
+                                        className="bg-background h-11"
+                                        value={formData.confirmPassword}
+                                        onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+                                        placeholder="Re-enter your password"
+                                      />
                                     </div>
 
                                     <div className="grid md:grid-cols-2 gap-5">
