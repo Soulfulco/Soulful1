@@ -5,7 +5,7 @@ import { practitionersTable } from "./practitioners";
 import { companiesTable } from "./companies";
 import { timeSlotsTable } from "./timeslots";
 
-export const bookingStatusEnum = pgEnum("booking_status", ["pending", "confirmed", "completed", "cancelled"]);
+export const bookingStatusEnum = pgEnum("booking_status", ["pending", "confirmed", "completed", "cancelled", "declined"]);
 export const payoutStatusEnum = pgEnum("payout_status", [
   "auto_pending", "auto_paid", "manual_pending", "manual_paid",
 ]);
@@ -30,6 +30,14 @@ export const bookingsTable = pgTable("bookings", {
   shareWithEmployer: boolean("share_with_employer").notNull().default(true),
   sessionMode: text("session_mode"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  // A practitioner has 24 hours to accept or decline a pending request; null once decided.
+  decideBy: timestamp("decide_by"),
+  declineReason: text("decline_reason"),
+  // The underlying PaymentIntent to capture on accept or cancel on decline/expiry. For a
+  // corporate booking this is the same value as stripeSessionId; for a self-funded booking,
+  // stripeSessionId is the Checkout Session id, which is a different Stripe object, so the
+  // real PaymentIntent id is recorded here once Checkout completes.
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
 });
 
 export const insertBookingSchema = createInsertSchema(bookingsTable).omit({ id: true, createdAt: true, status: true });

@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
 import { db } from "@workspace/db";
 import { bookingsTable, practitionersTable, companiesTable, timeSlotsTable, employeesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
@@ -7,10 +7,21 @@ import { logger } from "../lib/logger";
 import { getUncachableStripeClient } from "../stripeClient";
 import { awardPoints } from "../lib/gamification";
 import { logRequirementSafe } from "../lib/wellbeingRequirements";
-import { isHr, isAdmin, isPractitioner, resolveHrCompanyId } from "../lib/roles";
+import {
+  isHr,
+  isAdmin,
+  isPractitioner,
+  isEmployee,
+  employeeId,
+  practitionerId as sessionPractitionerId,
+  resolveHrCompanyId,
+} from "../lib/roles";
 import { baseUrl } from "../lib/url";
 
 const router = Router();
+
+const decisionDeadlineHours = 24;
+
 
 // Self-funded bookings are excluded from gamification per the privacy model.
 async function awardBookingPoints(companyId: number, employeeEmail: string): Promise<void> {
@@ -27,6 +38,39 @@ async function awardBookingPoints(companyId: number, employeeEmail: string): Pro
   } catch (err) {
     logger.error({ err, companyId, employeeEmail }, "Failed to award gamification points for booking");
   }
+}
+
+// Only admin, the booking's company (HR), the employee who made it, or its practitioner
+// may view or change a booking.
+async function canAccessBooking(req: Request, b: typeof bookingsTable.$inferSelect): Promise<boolean> {
+  if (!req.isAuthenticated()) return false;
+  if (isAdmin(req)) return true;
+  if (isHr(req)) return (await resolveHrCompanyId(req)) === b.companyId;
+  if (isPractitioner(req)) return sessionPractitionerId(req) === b.practitionerId;
+  if (isEmployee(req)) {
+    const empId = employeeId(req);
+    if (empId == null) return false;
+    const [emp] = await db
+      .select({ email: employeesTable.email, companyId: employeesTable.companyId })
+      .from(employeesTable)
+      .where(eq(employeesTable.id, empId))
+      .limit(1);
+    return !!emp && emp.companyId === b.companyId && String(emp.email).toLowerCase() === String(b.employeeEmail).toLowerCase();
+  }
+  return false;
+}
+
+// HR sees bookings without notes, and without the employee's identity unless they chose to share it.
+function redactBookingForViewer(req: Request, b: any) {
+  if (!isHr(req)) return b;
+  const isPrivate = !b.shareWithEmployer;
+  return {
+    ...b,
+    notes: null,
+    employeeName: isPrivate ? null : b.employeeName,
+    employeeEmail: isPrivate ? null : b.employeeEmail,
+    isPrivateBooking: isPrivate,
+  };
 }
 
 function serializeBooking(
@@ -48,7 +92,7 @@ router.get("/bookings", async (req, res) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ error: "Authentication required" });
     }
-    if (isPractitioner(req)) {
+    if (isPractitioner(req) || isEmployee(req)) {
       return res.status(403).json({ error: "Not authorized to list bookings" });
     }
 
@@ -118,16 +162,22 @@ router.get("/bookings/confirm", async (req, res) => {
       .limit(1);
     if (!booking) return res.status(404).json({ error: "Booking not found" });
 
-    if (booking.status === "confirmed") return res.json({ status: "confirmed", bookingId: booking.id });
+    if (booking.status !== "pending") return res.json({ status: booking.status, bookingId: booking.id });
+    if (booking.stripePaymentIntentId) {
+      // Already authorized on an earlier call to this route; nothing further to do here.
+      return res.json({ status: booking.status, bookingId: booking.id, awaitingPractitioner: true });
+    }
 
     const stripe = await getUncachableStripeClient();
     const session = await stripe.checkout.sessions.retrieve(sessionId);
     if (session.payment_status === "paid") {
+      // The card is authorized, not yet charged: the practitioner still has to accept
+      // before the employee is actually billed.
       await db.update(bookingsTable).set({
-        status: "confirmed",
-        payoutStatus: booking.payoutStatus === "auto_pending" ? "auto_paid" : booking.payoutStatus,
+        stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id ?? null,
+        decideBy: new Date(Date.now() + decisionDeadlineHours * 3600000),
       }).where(eq(bookingsTable.id, booking.id));
-      return res.json({ status: "confirmed", bookingId: booking.id });
+      return res.json({ status: "pending", bookingId: booking.id, awaitingPractitioner: true });
     }
     res.json({ status: booking.status, bookingId: booking.id });
   } catch (err) {
@@ -138,7 +188,44 @@ router.get("/bookings/confirm", async (req, res) => {
 
 router.post("/bookings", async (req, res) => {
   try {
-    const { companyId, practitionerId, timeSlotId, sessionType, employeeName, employeeEmail, notes, paymentType, shareWithEmployer, sessionMode } = req.body;
+    const { companyId: bodyCompanyId, practitionerId, timeSlotId, sessionType, employeeName: bodyEmployeeName, employeeEmail: bodyEmployeeEmail, notes, paymentType, shareWithEmployer, sessionMode } = req.body;
+
+    // Who is booking? The company and the person come from the signed-in session, never
+    // from the request, so nobody can book against another company's card.
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Please sign in to book a session" });
+    let companyId: number;
+    let employeeName: string;
+    let employeeEmail: string;
+    if (isEmployee(req)) {
+      const empId = employeeId(req);
+      if (empId == null) return res.status(403).json({ error: "Your employee account could not be found" });
+      const [emp] = await db
+        .select({ companyId: employeesTable.companyId, name: employeesTable.name, email: employeesTable.email })
+        .from(employeesTable)
+        .where(eq(employeesTable.id, empId))
+        .limit(1);
+      if (!emp) return res.status(403).json({ error: "Your employee account could not be found" });
+      companyId = emp.companyId;
+      employeeName = emp.name;
+      employeeEmail = emp.email;
+    } else if (isHr(req)) {
+      const hrCompanyId = await resolveHrCompanyId(req);
+      if (hrCompanyId == null) return res.status(403).json({ error: "No company associated with this account" });
+      const u = req.user as any;
+      companyId = hrCompanyId;
+      employeeName = String(bodyEmployeeName ?? "").trim() || [u?.firstName, u?.lastName].filter(Boolean).join(" ") || "HR booking";
+      employeeEmail = String(bodyEmployeeEmail ?? "").trim() || String(u?.email ?? "");
+      if (!employeeEmail) return res.status(400).json({ error: "An email address is required" });
+    } else if (isAdmin(req)) {
+      companyId = Number(bodyCompanyId);
+      employeeName = String(bodyEmployeeName ?? "").trim();
+      employeeEmail = String(bodyEmployeeEmail ?? "").trim();
+      if (!Number.isInteger(companyId) || !employeeName || !employeeEmail) {
+        return res.status(400).json({ error: "companyId, employeeName and employeeEmail are required" });
+      }
+    } else {
+      return res.status(403).json({ error: "Only employees and HR can book sessions" });
+    }
 
     const effectivePaymentType: string = paymentType === "self" ? "self" : "corporate";
     const effectiveShare: boolean = effectivePaymentType === "corporate" ? true : (shareWithEmployer !== false);
@@ -166,6 +253,16 @@ router.post("/bookings", async (req, res) => {
     // Hidden practitioners (pending, rejected or deactivated) can't be booked.
     if (!practitionerForPricing.isActive) return res.status(404).json({ error: "Practitioner not found" });
 
+    // The slot must belong to this practitioner, still be free and be in the future.
+    if (!Number.isInteger(Number(timeSlotId))) return res.status(400).json({ error: "timeSlotId is required" });
+    const [slotToBook] = await db.select().from(timeSlotsTable).where(eq(timeSlotsTable.id, Number(timeSlotId))).limit(1);
+    if (!slotToBook || slotToBook.practitionerId !== Number(practitionerId)) {
+      return res.status(400).json({ error: "That time slot isn't available" });
+    }
+    if (slotToBook.isBooked || slotToBook.startTime.getTime() < Date.now()) {
+      return res.status(409).json({ error: "That time slot has just been taken. Please choose another." });
+    }
+
     const inPersonRate = practitionerForPricing.inPersonRateGbp != null ? Number(practitionerForPricing.inPersonRateGbp) : null;
     const onlineRate = practitionerForPricing.onlineRateGbp != null ? Number(practitionerForPricing.onlineRateGbp) : null;
     const groupInPersonRate = practitionerForPricing.groupInPersonRateGbp != null ? Number(practitionerForPricing.groupInPersonRateGbp) : null;
@@ -192,6 +289,9 @@ router.post("/bookings", async (req, res) => {
       (mode ? modeRates[mode] : (inPersonRate ?? onlineRate)) ?? practitionerForPricing.sessionRateGbp ?? 0
     );
     const isGroup = mode === "group_in_person" || mode === "group_online";
+    if (isGroup && !isHr(req) && !isAdmin(req)) {
+      return res.status(403).json({ error: "Group sessions are booked by your HR team. Once one is scheduled you can sign up to it from your dashboard." });
+    }
     const isOnline = mode === "online" || mode === "group_online";
     const productLabel = isGroup
       ? `Group ${isOnline ? "online" : "in-person"} session (up to 50 people)`
@@ -238,6 +338,10 @@ router.post("/bookings", async (req, res) => {
           payment_method: paymentMethodId,
           off_session: true,
           confirm: true,
+          // Authorize now, capture later: only takes the company's money once the
+          // practitioner accepts, so a decline or a missed 24-hour window never
+          // needs a refund.
+          capture_method: "manual",
           description: `Soulful session — ${practitionerForPricing.name} for ${employeeName}`,
           metadata: { practitionerId: String(practitionerId), companyId: String(companyId), sessionType: sessionType ?? "" },
           ...(canSplit
@@ -248,49 +352,33 @@ router.post("/bookings", async (req, res) => {
             : {}),
         });
       } catch (err) {
-        logger.error({ err, companyId, practitionerId }, "Failed to charge company for corporate booking");
+        logger.error({ err, companyId, practitionerId }, "Failed to authorize payment for corporate booking");
         return res.status(402).json({ error: "Payment failed. Please check the company's card on file and try again." });
       }
 
-      if (paymentIntent.status !== "succeeded") {
-        return res.status(402).json({ error: "Payment could not be completed. Please try again." });
+      if (paymentIntent.status !== "requires_capture") {
+        return res.status(402).json({ error: "Payment could not be authorized. Please try again." });
       }
 
       const [booking] = await db
         .insert(bookingsTable)
         .values({
           companyId, practitionerId, timeSlotId, sessionType, employeeName, employeeEmail, notes,
-        sessionMode: mode,
-          paymentType: "corporate", status: "confirmed", shareWithEmployer: effectiveShare,
+          sessionMode: mode,
+          paymentType: "corporate", status: "pending", shareWithEmployer: effectiveShare,
           priceGbp: String(rate),
           commissionRatePct: String(commissionPct),
-          payoutStatus: canSplit ? "auto_paid" : "manual_pending",
+          payoutStatus: canSplit ? "auto_pending" : "manual_pending",
           stripeSessionId: paymentIntent.id,
+          stripePaymentIntentId: paymentIntent.id,
+          decideBy: new Date(Date.now() + decisionDeadlineHours * 3600000),
         })
         .returning();
 
       await db.update(timeSlotsTable).set({ isBooked: true }).where(eq(timeSlotsTable.id, timeSlotId));
-      const prevTb = (await db.select({ tb: companiesTable.totalBookings }).from(companiesTable).where(eq(companiesTable.id, companyId)))[0]?.tb ?? 0;
-      await db.update(companiesTable).set({ totalBookings: prevTb + 1 }).where(eq(companiesTable.id, companyId));
 
       const [c] = await db.select({ name: companiesTable.name }).from(companiesTable).where(eq(companiesTable.id, companyId));
       const [slot] = await db.select().from(timeSlotsTable).where(eq(timeSlotsTable.id, timeSlotId));
-
-      if (practitionerForPricing.googleRefreshToken && slot) {
-        try {
-          const eventId = await createEvent(practitionerForPricing.googleRefreshToken, {
-            summary: `Soulful session — ${employeeName}`,
-            description: `${sessionType ?? "Wellbeing session"}${modeSuffix} with ${employeeName} (${employeeEmail})${c?.name ? `, ${c.name}` : ""}.${notes ? `\n\nNotes: ${notes}` : ""}`,
-            start: slot.startTime,
-            end: slot.endTime,
-            attendeeEmail: employeeEmail,
-          });
-          await db.update(bookingsTable).set({ googleEventId: eventId }).where(eq(bookingsTable.id, booking.id));
-          booking.googleEventId = eventId;
-        } catch (err) {
-          logger.warn({ err, bookingId: booking.id }, "Failed to push booking to Google Calendar");
-        }
-      }
 
       res.status(201).json(serializeBooking(booking, {
         practitionerName: practitionerForPricing.name,
@@ -298,8 +386,6 @@ router.post("/bookings", async (req, res) => {
         startTime: slot?.startTime?.toISOString(),
         endTime: slot?.endTime?.toISOString(),
       }));
-
-      awardBookingPoints(companyId, employeeEmail);
       return;
     }
 
@@ -335,14 +421,17 @@ router.post("/bookings", async (req, res) => {
           },
         },
       ],
-      ...(canSplit
-        ? {
-            payment_intent_data: {
+      payment_intent_data: {
+        // Same authorize-then-capture treatment as corporate bookings: the employee's
+        // card is only actually charged once the practitioner accepts.
+        capture_method: "manual",
+        ...(canSplit
+          ? {
               application_fee_amount: Math.round(amountPence * (commissionPct / 100)),
               transfer_data: { destination: practitionerForPricing.stripeConnectAccountId! },
-            },
-          }
-        : {}),
+            }
+          : {}),
+      },
       metadata: { bookingId: String(pending.id), practitionerId: String(practitionerId) },
       success_url: `${origin}/practitioners/${practitionerId}?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/practitioners/${practitionerId}?checkout=cancelled`,
@@ -366,15 +455,17 @@ router.get("/bookings/:id", async (req, res) => {
     const id = Number(req.params.id);
     const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, id));
     if (!booking) return res.status(404).json({ error: "Not found" });
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Authentication required" });
+    if (!(await canAccessBooking(req, booking))) return res.status(403).json({ error: "Not authorised" });
     const [p] = await db.select({ name: practitionersTable.name }).from(practitionersTable).where(eq(practitionersTable.id, booking.practitionerId));
     const [c] = await db.select({ name: companiesTable.name }).from(companiesTable).where(eq(companiesTable.id, booking.companyId));
     const [slot] = await db.select().from(timeSlotsTable).where(eq(timeSlotsTable.id, booking.timeSlotId));
-    res.json(serializeBooking(booking, {
+    res.json(redactBookingForViewer(req, serializeBooking(booking, {
       practitionerName: p?.name,
       companyName: c?.name,
       startTime: slot?.startTime?.toISOString(),
       endTime: slot?.endTime?.toISOString(),
-    }));
+    })));
   } catch {
     res.status(500).json({ error: "Failed to get booking" });
   }
@@ -384,11 +475,27 @@ router.patch("/bookings/:id", async (req, res) => {
   try {
     const id = Number(req.params.id);
     const { status, notes } = req.body;
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Authentication required" });
+    const [existingBooking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, id));
+    if (!existingBooking) return res.status(404).json({ error: "Not found" });
+    if (!(await canAccessBooking(req, existingBooking))) return res.status(403).json({ error: "Not authorised" });
+    if (status !== undefined && !["pending", "confirmed", "completed", "cancelled"].includes(status)) {
+      return res.status(400).json({ error: "Invalid status" });
+    }
+    // Employees can only cancel their own booking; they can't change anything else.
+    if (isEmployee(req) && (status !== "cancelled" || notes !== undefined)) {
+      return res.status(403).json({ error: "You can only cancel your own booking" });
+    }
     const updates: Record<string, unknown> = {};
     if (status !== undefined) updates.status = status;
     if (notes !== undefined) updates.notes = notes;
     const [booking] = await db.update(bookingsTable).set(updates).where(eq(bookingsTable.id, id)).returning();
     if (!booking) return res.status(404).json({ error: "Not found" });
+
+    // A cancelled booking frees its time slot again.
+    if (status === "cancelled" && existingBooking.status !== "cancelled") {
+      await db.update(timeSlotsTable).set({ isBooked: false }).where(eq(timeSlotsTable.id, booking.timeSlotId));
+    }
 
     if (status === "cancelled" && booking.googleEventId) {
       const [pr] = await db.select({ token: practitionersTable.googleRefreshToken }).from(practitionersTable).where(eq(practitionersTable.id, booking.practitionerId));
@@ -406,16 +513,227 @@ router.patch("/bookings/:id", async (req, res) => {
     const [p] = await db.select({ name: practitionersTable.name }).from(practitionersTable).where(eq(practitionersTable.id, booking.practitionerId));
     const [c] = await db.select({ name: companiesTable.name }).from(companiesTable).where(eq(companiesTable.id, booking.companyId));
     const [slot] = await db.select().from(timeSlotsTable).where(eq(timeSlotsTable.id, booking.timeSlotId));
-    res.json(serializeBooking(booking, {
+    res.json(redactBookingForViewer(req, serializeBooking(booking, {
       practitionerName: p?.name,
       companyName: c?.name,
       startTime: slot?.startTime?.toISOString(),
       endTime: slot?.endTime?.toISOString(),
-    }));
+    })));
   } catch {
     res.status(500).json({ error: "Failed to update booking" });
   }
 });
 
+
+
+// Practitioner: their own pending 1:1 booking requests. Self-funded bookings whose
+// employee hasn't completed payment yet have no stripePaymentIntentId, so they don't
+// show here — there's nothing for the practitioner to act on until payment is authorized.
+router.get("/practitioner/bookings/requests", async (req, res) => {
+  try {
+    const id = sessionPractitionerId(req);
+    if (!id) return res.status(401).json({ error: "Authentication required" });
+    const rows = await db
+      .select()
+      .from(bookingsTable)
+      .where(and(eq(bookingsTable.practitionerId, id), eq(bookingsTable.status, "pending")));
+    const withDetails = await Promise.all(
+      rows
+        .filter((b) => b.stripePaymentIntentId)
+        .map(async (b) => {
+          const [slot] = await db.select().from(timeSlotsTable).where(eq(timeSlotsTable.id, b.timeSlotId));
+          const [c] = await db.select({ name: companiesTable.name }).from(companiesTable).where(eq(companiesTable.id, b.companyId));
+          return serializeBooking(b, {
+            companyName: c?.name,
+            startTime: slot?.startTime?.toISOString(),
+            endTime: slot?.endTime?.toISOString(),
+          });
+        }),
+    );
+    res.json(withDetails);
+  } catch (err) {
+    logger.error({ err }, "Failed to list booking requests");
+    res.status(500).json({ error: "Failed to list requests" });
+  }
+});
+
+// Practitioner accepts a pending 1:1 booking: captures the held payment, creates the
+// calendar event, and only now counts towards gamification points and the company's
+// booking counter — none of that happened at request time.
+router.post("/practitioner/bookings/:id/accept", async (req, res) => {
+  try {
+    const practId = sessionPractitionerId(req);
+    if (!practId) return res.status(401).json({ error: "Authentication required" });
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: "Invalid id" });
+
+    const [existing] = await db
+      .select()
+      .from(bookingsTable)
+      .where(and(eq(bookingsTable.id, id), eq(bookingsTable.practitionerId, practId), eq(bookingsTable.status, "pending")));
+    if (!existing) {
+      return res.status(404).json({ error: "This request is no longer available to accept" });
+    }
+    if (existing.stripePaymentIntentId) {
+      try {
+        const stripe = await getUncachableStripeClient();
+        const captured = await stripe.paymentIntents.capture(existing.stripePaymentIntentId);
+        if (captured.status !== "succeeded") {
+          return res.status(402).json({ error: "Payment could not be captured. Please contact Soulful support." });
+        }
+      } catch (err) {
+        logger.error({ err, bookingId: id }, "Failed to capture payment for accepted booking");
+        return res.status(402).json({ error: "Payment could not be captured. Please contact Soulful support." });
+      }
+    }
+
+    const payoutStatus = existing.payoutStatus === "auto_pending" ? "auto_paid" : existing.payoutStatus;
+    const [booking] = await db
+      .update(bookingsTable)
+      .set({ status: "confirmed", decideBy: null, payoutStatus })
+      .where(and(eq(bookingsTable.id, id), eq(bookingsTable.practitionerId, practId), eq(bookingsTable.status, "pending")))
+      .returning();
+    if (!booking) {
+      return res.status(404).json({ error: "This request is no longer available to accept" });
+    }
+
+    if (existing.paymentType === "corporate") {
+      const prevTb = (await db.select({ tb: companiesTable.totalBookings }).from(companiesTable).where(eq(companiesTable.id, existing.companyId)))[0]?.tb ?? 0;
+      await db.update(companiesTable).set({ totalBookings: prevTb + 1 }).where(eq(companiesTable.id, existing.companyId));
+    }
+
+    const [pr] = await db
+      .select({ name: practitionersTable.name, specialism: practitionersTable.specialism, googleRefreshToken: practitionersTable.googleRefreshToken })
+      .from(practitionersTable)
+      .where(eq(practitionersTable.id, practId));
+    const [c] = await db.select({ name: companiesTable.name }).from(companiesTable).where(eq(companiesTable.id, booking.companyId));
+    const [slot] = await db.select().from(timeSlotsTable).where(eq(timeSlotsTable.id, booking.timeSlotId));
+
+    if (pr?.googleRefreshToken && slot) {
+      try {
+        const modeSuffixForEvent = booking.sessionMode ? ` (${booking.sessionMode === "online" ? "online" : "in person"})` : "";
+        const eventId = await createEvent(pr.googleRefreshToken, {
+          summary: `Soulful session — ${booking.employeeName}`,
+          description: `${booking.sessionType ?? "Wellbeing session"}${modeSuffixForEvent} with ${booking.employeeName} (${booking.employeeEmail})${c?.name ? `, ${c.name}` : ""}.${booking.notes ? `\n\nNotes: ${booking.notes}` : ""}`,
+          start: slot.startTime,
+          end: slot.endTime,
+          attendeeEmail: booking.employeeEmail,
+        });
+        await db.update(bookingsTable).set({ googleEventId: eventId }).where(eq(bookingsTable.id, booking.id));
+        booking.googleEventId = eventId;
+      } catch (err) {
+        logger.warn({ err, bookingId: booking.id }, "Failed to push accepted booking to Google Calendar");
+      }
+    }
+
+    if (existing.paymentType === "corporate") {
+      awardBookingPoints(booking.companyId, booking.employeeEmail);
+    }
+
+    res.json(serializeBooking(booking, {
+      practitionerName: pr?.name,
+      companyName: c?.name,
+      startTime: slot?.startTime?.toISOString(),
+      endTime: slot?.endTime?.toISOString(),
+    }));
+  } catch (err) {
+    logger.error({ err }, "Failed to accept booking");
+    res.status(500).json({ error: "Failed to accept" });
+  }
+});
+
+// Practitioner declines a pending 1:1 booking; a reason is required. The employee who
+// booked is told the practitioner is unavailable and to choose another time or practitioner
+// — there's no automatic replacement.
+router.post("/practitioner/bookings/:id/decline", async (req, res) => {
+  try {
+    const practId = sessionPractitionerId(req);
+    if (!practId) return res.status(401).json({ error: "Authentication required" });
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: "Invalid id" });
+    const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
+    if (!reason) return res.status(400).json({ error: "Please give a reason for declining" });
+
+    const [booking] = await db
+      .update(bookingsTable)
+      .set({ status: "declined", declineReason: reason.slice(0, 500), decideBy: null })
+      .where(and(eq(bookingsTable.id, id), eq(bookingsTable.practitionerId, practId), eq(bookingsTable.status, "pending")))
+      .returning();
+    if (!booking) {
+      return res.status(404).json({ error: "This request is no longer available to decline" });
+    }
+    await releaseDeclinedBooking(booking);
+    await notifyEmployeeOfDecline(booking);
+    res.json(booking);
+  } catch (err) {
+    logger.error({ err }, "Failed to decline booking");
+    res.status(500).json({ error: "Failed to decline" });
+  }
+});
+
+// Releases the held time slot and cancels the still-authorized payment for a booking
+// that was declined or has just expired. Never throws: a failure here shouldn't stop
+// the employee from being told the practitioner is unavailable.
+async function releaseDeclinedBooking(booking: {
+  id: number;
+  timeSlotId: number;
+  stripePaymentIntentId?: string | null;
+}) {
+  try {
+    await db.update(timeSlotsTable).set({ isBooked: false }).where(eq(timeSlotsTable.id, booking.timeSlotId));
+    if (booking.stripePaymentIntentId) {
+      const stripe = await getUncachableStripeClient();
+      await stripe.paymentIntents.cancel(booking.stripePaymentIntentId).catch((err: unknown) => {
+        logger.warn({ err, bookingId: booking.id }, "Could not cancel booking payment authorization");
+      });
+    }
+  } catch (err) {
+    logger.error({ err, bookingId: booking.id }, "Failed to release a declined booking");
+  }
+}
+
+// Tells the employee who booked that the practitioner is unavailable, so they know to
+// pick another time or practitioner — used both for an active decline and a 24-hour expiry.
+async function notifyEmployeeOfDecline(booking: {
+  id: number;
+  employeeEmail: string;
+  sessionType: string | null;
+}) {
+  try {
+    const { sendEmail } = await import("../lib/email");
+    await sendEmail(
+      booking.employeeEmail,
+      "Your practitioner is unavailable",
+      `<p>The practitioner for your "${booking.sessionType ?? "session"}" booking is unavailable.</p>
+<p>Please choose another time or practitioner to rebook.</p>`,
+    );
+  } catch (err) {
+    logger.error({ err, bookingId: booking.id }, "Failed to notify employee of a declined booking");
+  }
+}
+
+// Called on a timer from index.ts. Any pending 1:1 booking whose 24-hour window has
+// passed with no response is treated as a decline, and the employee is told the same way.
+export async function expireOverdueBookingRequests(): Promise<void> {
+  try {
+    const rows = await db
+      .select()
+      .from(bookingsTable)
+      .where(eq(bookingsTable.status, "pending"));
+    const overdue = rows.filter((b) => b.decideBy && b.decideBy.getTime() < Date.now());
+    for (const booking of overdue) {
+      const [updated] = await db
+        .update(bookingsTable)
+        .set({ status: "declined", declineReason: "No response within 24 hours", decideBy: null })
+        .where(and(eq(bookingsTable.id, booking.id), eq(bookingsTable.status, "pending")))
+        .returning();
+      if (!updated) continue;
+      await releaseDeclinedBooking(updated);
+      await notifyEmployeeOfDecline(updated);
+    }
+  } catch (err) {
+    logger.error({ err }, "Failed to expire overdue booking requests");
+  }
+}
 
 export default router;

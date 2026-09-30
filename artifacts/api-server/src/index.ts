@@ -7,6 +7,7 @@ import { baseUrl, apiBaseUrl } from "./lib/url";
 import { getStripeSync } from "./stripeClient";
 import { reconcileStripeToApp } from "./stripeReconcile";
 import { expireOverdueGroupSessionRequests } from "./routes/groupSessions";
+import { expireOverdueBookingRequests } from "./routes/bookings";
 
 /**
  * stripe-replit-sync's migrations guard enum creation with an UNQUALIFIED
@@ -109,4 +110,8 @@ app.listen(port, (err) => {
   // Failures inside it are already caught and logged, never crash the server.
   expireOverdueGroupSessionRequests();
   setInterval(expireOverdueGroupSessionRequests, 15 * 60 * 1000);
+
+  // Same 24-hour expiry, for pending 1:1 booking requests.
+  expireOverdueBookingRequests();
+  setInterval(expireOverdueBookingRequests, 15 * 60 * 1000);
 });

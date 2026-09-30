@@ -2,7 +2,7 @@ import { pgTable, serial, integer, text, timestamp, unique, numeric } from "driz
 import { companiesTable } from "./companies";
 import { practitionersTable } from "./practitioners";
 import { employeesTable } from "./employees";
-import { timeSlotsTable } from "./timeSlots";
+import { timeSlotsTable } from "./timeslots";
 
 export const groupSessionsTable = pgTable("group_sessions", {
   id: serial("id").primaryKey(),
