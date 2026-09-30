@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { DocumentUpload } from "@/components/DocumentUpload";
 import { MyOfferings } from "@/components/MyOfferings";
+import { SessionRequests } from "@/components/SessionRequests";
 
 type Slot = {
   id: number;
@@ -300,6 +301,8 @@ export default function PractitionerPortal() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+        <SessionRequests />
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
