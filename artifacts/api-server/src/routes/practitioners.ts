@@ -28,6 +28,10 @@ import { logger } from "../lib/logger";
       groupOnlineRateGbp: p.groupOnlineRateGbp != null ? Number(p.groupOnlineRateGbp) : null,
       commissionRatePct: Number(p.commissionRatePct),
       yearsOfExperience: p.yearsOfExperience ?? null,
+      // Whether they offer their own space is public, because it decides which booking options
+      // are shown. The address itself is never included here: it's only given to the person who
+      // books a session at that space.
+      hasOwnSpace: p.hasOwnSpace,
       isActive: p.isActive,
       approvalStatus: p.approvalStatus,
       subscriptionStatus: p.subscriptionStatus,

@@ -38,6 +38,11 @@ export const bookingsTable = pgTable("bookings", {
   // stripeSessionId is the Checkout Session id, which is a different Stripe object, so the
   // real PaymentIntent id is recorded here once Checkout completes.
   stripePaymentIntentId: text("stripe_payment_intent_id"),
+  // Where an in-person 1:1 session takes place: "at_office" (the client's office) or
+  // "practitioner_space". locationDescription is a copy of the practitioner's space
+  // details taken when the booking was made, so it stays right if they later change them.
+  locationType: text("location_type"),
+  locationDescription: text("location_description"),
 });
 
 export const insertBookingSchema = createInsertSchema(bookingsTable).omit({ id: true, createdAt: true, status: true });

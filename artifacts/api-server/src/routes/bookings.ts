@@ -70,6 +70,7 @@ function redactBookingForViewer(req: Request, b: any) {
     employeeName: isPrivate ? null : b.employeeName,
     employeeEmail: isPrivate ? null : b.employeeEmail,
     isPrivateBooking: isPrivate,
+    locationDescription: isPrivate ? null : b.locationDescription,
   };
 }
 
@@ -131,6 +132,7 @@ router.get("/bookings", async (req, res) => {
         employeeName: redactForHr && isPrivate ? null : b.employeeName,
         employeeEmail: redactForHr && isPrivate ? null : b.employeeEmail,
         isPrivateBooking: redactForHr && isPrivate,
+        locationDescription: redactForHr && isPrivate ? null : b.locationDescription,
         practitionerName: practMap[b.practitionerId] ?? null,
         companyName: compMap[b.companyId] ?? null,
         startTime: slotMap[b.timeSlotId]?.startTime?.toISOString() ?? null,
@@ -188,7 +190,7 @@ router.get("/bookings/confirm", async (req, res) => {
 
 router.post("/bookings", async (req, res) => {
   try {
-    const { companyId: bodyCompanyId, practitionerId, timeSlotId, sessionType, employeeName: bodyEmployeeName, employeeEmail: bodyEmployeeEmail, notes, paymentType, shareWithEmployer, sessionMode } = req.body;
+    const { companyId: bodyCompanyId, practitionerId, timeSlotId, sessionType, employeeName: bodyEmployeeName, employeeEmail: bodyEmployeeEmail, notes, paymentType, shareWithEmployer, sessionMode, locationType: bodyLocationType } = req.body;
 
     // Who is booking? The company and the person come from the signed-in session, never
     // from the request, so nobody can book against another company's card.
@@ -245,6 +247,8 @@ router.post("/bookings", async (req, res) => {
         commissionRatePct: practitionersTable.commissionRatePct,
         stripeConnectAccountId: practitionersTable.stripeConnectAccountId,
         googleRefreshToken: practitionersTable.googleRefreshToken,
+        hasOwnSpace: practitionersTable.hasOwnSpace,
+        ownSpaceDescription: practitionersTable.ownSpaceDescription,
       })
       .from(practitionersTable)
       .where(eq(practitionersTable.id, practitionerId));
@@ -298,6 +302,29 @@ router.post("/bookings", async (req, res) => {
       : mode ? `1:1 ${isOnline ? "online" : "in-person"} session` : "1:1 session";
     const modeSuffix = mode ? ` (${isGroup ? "group, " : ""}${isOnline ? "online" : "in person"})` : "";
     if (rate <= 0) return res.status(400).json({ error: "Practitioner has no rate set" });
+
+    // Where an in-person 1:1 session happens: the client's office, or the practitioner's own
+    // space if they've set one up. The practitioner's details are copied onto the booking so
+    // they stay correct if the practitioner later changes them. A location only means
+    // something for in-person 1:1 sessions, so it's ignored for online and group bookings.
+    let locationType: string | null = null;
+    let locationDescription: string | null = null;
+    if (bodyLocationType !== undefined && bodyLocationType !== null) {
+      if (bodyLocationType !== "at_office" && bodyLocationType !== "practitioner_space") {
+        return res.status(400).json({ error: "Invalid session location" });
+      }
+      if (mode === "in_person") {
+        if (bodyLocationType === "practitioner_space") {
+          if (!practitionerForPricing.hasOwnSpace || !practitionerForPricing.ownSpaceDescription) {
+            return res.status(400).json({ error: "This practitioner doesn't offer sessions at their own space" });
+          }
+          locationType = "practitioner_space";
+          locationDescription = practitionerForPricing.ownSpaceDescription;
+        } else {
+          locationType = "at_office";
+        }
+      }
+    }
 
     const commissionPct = Number(practitionerForPricing.commissionRatePct ?? 10);
     const amountPence = Math.round(rate * 100);
@@ -366,6 +393,7 @@ router.post("/bookings", async (req, res) => {
           companyId, practitionerId, timeSlotId, sessionType, employeeName, employeeEmail, notes,
           sessionMode: mode,
           paymentType: "corporate", status: "pending", shareWithEmployer: effectiveShare,
+          locationType, locationDescription,
           priceGbp: String(rate),
           commissionRatePct: String(commissionPct),
           payoutStatus: canSplit ? "auto_pending" : "manual_pending",
@@ -396,6 +424,7 @@ router.post("/bookings", async (req, res) => {
         companyId, practitionerId, timeSlotId, sessionType, employeeName, employeeEmail, notes,
         sessionMode: mode,
         paymentType: "self", status: "pending", shareWithEmployer: effectiveShare,
+        locationType, locationDescription,
         priceGbp: String(rate),
         commissionRatePct: String(commissionPct),
         payoutStatus: canSplit ? "auto_pending" : "manual_pending",
@@ -526,6 +555,65 @@ router.patch("/bookings/:id", async (req, res) => {
 
 
 
+// Readable location for a booking, used in emails and calendar events.
+function describeBookingLocation(b: {
+  sessionMode: string | null;
+  locationType: string | null;
+  locationDescription: string | null;
+}): string | null {
+  if (b.sessionMode === "online") return "Online";
+  if (b.locationType === "practitioner_space") {
+    return b.locationDescription
+      ? `At the practitioner's space — ${b.locationDescription}`
+      : "At the practitioner's space";
+  }
+  if (b.locationType === "at_office") return "At the company's office";
+  return null;
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// Tells whoever made the booking that it's confirmed, when, and where. This is also how
+// the address of a practitioner's own space reaches the person who booked it. Never throws:
+// a failed email must not undo an acceptance that has already taken the payment.
+async function notifyEmployeeOfConfirmation(
+  booking: {
+    id: number;
+    employeeName: string;
+    employeeEmail: string;
+    sessionType: string | null;
+    sessionMode: string | null;
+    locationType: string | null;
+    locationDescription: string | null;
+  },
+  details: { practitionerName: string | null; startTime: Date | null },
+) {
+  try {
+    const { sendEmail } = await import("../lib/email");
+    const when = details.startTime
+      ? details.startTime.toLocaleString("en-GB", { dateStyle: "full", timeStyle: "short", timeZone: "Europe/London" })
+      : null;
+    const location = describeBookingLocation(booking);
+    await sendEmail(
+      booking.employeeEmail,
+      "Your session is confirmed",
+      `<p>Hi ${escapeHtml(booking.employeeName)},</p>
+<p>${escapeHtml(details.practitionerName ?? "Your practitioner")} has confirmed your "${escapeHtml(booking.sessionType ?? "session")}" booking.</p>
+${when ? `<p><strong>When:</strong> ${escapeHtml(when)}</p>` : ""}
+${location ? `<p><strong>Where:</strong> ${escapeHtml(location)}</p>` : ""}`,
+    );
+  } catch (err) {
+    logger.error({ err, bookingId: booking.id }, "Failed to send booking confirmation email");
+  }
+}
+
 // Practitioner: their own pending 1:1 booking requests. Self-funded bookings whose
 // employee hasn't completed payment yet have no stripePaymentIntentId, so they don't
 // show here — there's nothing for the practitioner to act on until payment is authorized.
@@ -609,12 +697,14 @@ router.post("/practitioner/bookings/:id/accept", async (req, res) => {
     const [c] = await db.select({ name: companiesTable.name }).from(companiesTable).where(eq(companiesTable.id, booking.companyId));
     const [slot] = await db.select().from(timeSlotsTable).where(eq(timeSlotsTable.id, booking.timeSlotId));
 
+    const locationLine = describeBookingLocation(booking);
+
     if (pr?.googleRefreshToken && slot) {
       try {
         const modeSuffixForEvent = booking.sessionMode ? ` (${booking.sessionMode === "online" ? "online" : "in person"})` : "";
         const eventId = await createEvent(pr.googleRefreshToken, {
           summary: `Soulful session — ${booking.employeeName}`,
-          description: `${booking.sessionType ?? "Wellbeing session"}${modeSuffixForEvent} with ${booking.employeeName} (${booking.employeeEmail})${c?.name ? `, ${c.name}` : ""}.${booking.notes ? `\n\nNotes: ${booking.notes}` : ""}`,
+          description: `${booking.sessionType ?? "Wellbeing session"}${modeSuffixForEvent} with ${booking.employeeName} (${booking.employeeEmail})${c?.name ? `, ${c.name}` : ""}.${booking.notes ? `\n\nNotes: ${booking.notes}` : ""}${locationLine ? `\n\nLocation: ${locationLine}` : ""}`,
           start: slot.startTime,
           end: slot.endTime,
           attendeeEmail: booking.employeeEmail,
@@ -629,6 +719,12 @@ router.post("/practitioner/bookings/:id/accept", async (req, res) => {
     if (existing.paymentType === "corporate") {
       awardBookingPoints(booking.companyId, booking.employeeEmail);
     }
+
+    // Tell the person who booked that it's confirmed, when, and where.
+    void notifyEmployeeOfConfirmation(booking, {
+      practitionerName: pr?.name ?? null,
+      startTime: slot?.startTime ?? null,
+    });
 
     res.json(serializeBooking(booking, {
       practitionerName: pr?.name,

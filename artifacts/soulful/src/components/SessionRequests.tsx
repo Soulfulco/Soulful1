@@ -35,8 +35,8 @@ function normalizeBooking(b: any): UnifiedRequest {
     companyName: b.companyName ?? null,
     startTime: b.startTime ?? null,
     endTime: b.endTime ?? null,
-    locationType: b.sessionMode === "online" ? "virtual" : b.sessionMode === "in_person" ? "at_office" : null,
-    locationDescription: null,
+    locationType: b.sessionMode === "online" ? "virtual" : (b.locationType ?? (b.sessionMode === "in_person" ? "at_office" : null)),
+    locationDescription: b.locationType === "practitioner_space" ? (b.locationDescription ?? null) : null,
     maxAttendees: null,
     notes: b.notes ?? null,
     decideBy: b.decideBy ?? null,
@@ -169,7 +169,7 @@ function RequestCard({ request, onDecided }: { request: UnifiedRequest; onDecide
               <Building2 className="h-3 w-3" /> {request.companyName}
             </span>
           )}
-          {request.kind === "group" && request.locationType && (
+          {request.locationType && (
             <span className="flex items-center gap-1 bg-muted px-2 py-1 rounded-full">
               <MapPin className="h-3 w-3" />
               {LOCATION_LABELS[request.locationType] ?? request.locationType}

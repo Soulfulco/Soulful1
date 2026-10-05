@@ -51,6 +51,7 @@ export default function PractitionerProfile({ id }: { id: string }) {
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [shareWithEmployer, setShareWithEmployer] = useState(true);
   const [sessionMode, setSessionMode] = useState("");
+  const [locationChoice, setLocationChoice] = useState("");
   const [bookingForm, setBookingForm] = useState({
     employeeName: "",
     employeeEmail: "",
@@ -101,6 +102,7 @@ export default function PractitionerProfile({ id }: { id: string }) {
   const onlineRate: number | null = pr?.onlineRateGbp ?? null;
   const groupInPersonRate: number | null = pr?.groupInPersonRateGbp ?? null;
   const groupOnlineRate: number | null = pr?.groupOnlineRateGbp ?? null;
+  const hasOwnSpace: boolean = Boolean(pr?.hasOwnSpace);
   const isGroupOnly =
     inPersonRate == null && onlineRate == null && (groupInPersonRate != null || groupOnlineRate != null);
   const offeringOptions: { key: string; label: string }[] = [];
@@ -112,6 +114,8 @@ export default function PractitionerProfile({ id }: { id: string }) {
   const effectiveMode = offeringOptions.some((o) => o.key === sessionMode)
     ? sessionMode
     : (offeringOptions[0]?.key ?? "");
+  const askLocation = effectiveMode === "in_person" && hasOwnSpace;
+  const effectiveLocation = askLocation ? (locationChoice || "at_office") : undefined;
 
   const handleBooking = () => {
     if (!selectedSlot) return;
@@ -128,6 +132,7 @@ export default function PractitionerProfile({ id }: { id: string }) {
         paymentType: isSelfFunded ? "self" : "corporate",
         shareWithEmployer: isSelfFunded ? shareWithEmployer : true,
         ...({ sessionMode: effectiveMode || undefined } as any),
+        ...({ locationType: effectiveLocation } as any),
       }
     }, {
       onSuccess: (data: unknown) => {
@@ -336,6 +341,21 @@ export default function PractitionerProfile({ id }: { id: string }) {
                         <option key={o.key} value={o.key}>{o.label}</option>
                       ))}
                     </select>
+                  </div>
+                )}
+                {askLocation && (
+                  <div className="mb-6 space-y-2">
+                    <label htmlFor="locationChoice" className="text-sm font-medium">Where would you like to meet?</label>
+                    <select
+                      id="locationChoice"
+                      className="w-full h-11 rounded-xl border border-input bg-background px-3 text-sm"
+                      value={effectiveLocation}
+                      onChange={(e) => setLocationChoice(e.target.value)}
+                    >
+                      <option value="at_office">At your office</option>
+                      <option value="practitioner_space">At {practitioner?.name}'s space</option>
+                    </select>
+                    <p className="text-xs text-muted-foreground">If you choose their space, the address is emailed to you once the session is confirmed.</p>
                   </div>
                 )}
                 <Calendar
