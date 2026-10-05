@@ -14,11 +14,12 @@ import { logger } from "../lib/logger";
    * into responses: it carries secrets (passwordHash, googleRefreshToken, etc.)
    * that must not be exposed on public or admin practitioner endpoints.
    */
+  // The public view of a practitioner, safe to send to anyone. It deliberately leaves out their
+  // email address and their commission rate. Use serializePractitionerAdmin for admins.
   export function serializePractitioner(p: PractitionerRow) {
     return {
       id: p.id,
       name: p.name,
-      email: p.email,
       specialism: p.specialism,
       bio: p.bio,
       sessionRateGbp: Number(p.sessionRateGbp),
@@ -26,7 +27,6 @@ import { logger } from "../lib/logger";
       onlineRateGbp: p.onlineRateGbp != null ? Number(p.onlineRateGbp) : null,
       groupInPersonRateGbp: p.groupInPersonRateGbp != null ? Number(p.groupInPersonRateGbp) : null,
       groupOnlineRateGbp: p.groupOnlineRateGbp != null ? Number(p.groupOnlineRateGbp) : null,
-      commissionRatePct: Number(p.commissionRatePct),
       yearsOfExperience: p.yearsOfExperience ?? null,
       // Whether they offer their own space is public, because it decides which booking options
       // are shown. The address itself is never included here: it's only given to the person who
@@ -41,6 +41,16 @@ import { logger } from "../lib/logger";
       averageRating: p.averageRating != null ? Number(p.averageRating) : null,
       totalReviews: p.totalReviews,
       createdAt: p.createdAt.toISOString(),
+    };
+  }
+
+  // What a Soulful admin sees: everything in the public view, plus the two fields that must never
+  // reach the public, an employer or another practitioner.
+  export function serializePractitionerAdmin(p: PractitionerRow) {
+    return {
+      ...serializePractitioner(p),
+      email: p.email,
+      commissionRatePct: Number(p.commissionRatePct),
     };
   }
 
@@ -68,7 +78,7 @@ import { logger } from "../lib/logger";
       }
       if (filters.length > 0) query = query.where(and(...filters));
       const practitioners = await query;
-      res.json(practitioners.map(serializePractitioner));
+      res.json(practitioners.map((p) => (isAdmin(req) ? serializePractitionerAdmin(p) : serializePractitioner(p))));
     } catch (err) {
       res.status(500).json({ error: "Failed to list practitioners" });
     }
@@ -161,7 +171,7 @@ import { logger } from "../lib/logger";
         logger.warn({ err, email: normalizedEmail }, "Failed to send practitioner onboarding email"),
       );
     }
-    res.status(201).json(serializePractitioner(p));
+    res.status(201).json(isAdmin(req) ? serializePractitionerAdmin(p) : serializePractitioner(p));
     } catch (err) {
       logger.error({ err }, "Failed to create practitioner");
     if ((err as any)?.code === "23505" || (err as any)?.cause?.code === "23505") {
@@ -291,7 +301,7 @@ import { logger } from "../lib/logger";
         created: created.length,
         skipped: rows.length - created.length - invalid.length,
         invalid,
-        practitioners: created.map(serializePractitioner),
+        practitioners: created.map((p) => (isAdmin(req) ? serializePractitionerAdmin(p) : serializePractitioner(p))),
       });
       } catch {
         return res.status(500).json({ error: "Failed to import practitioners" });
@@ -304,7 +314,7 @@ import { logger } from "../lib/logger";
         const [p] = await db.select().from(practitionersTable).where(eq(practitionersTable.id, id));
         // Hidden practitioners are only viewable by admins, not via direct ID lookup.
         if (!p || (!p.isActive && !isAdmin(req))) return res.status(404).json({ error: "Not found" });
-        res.json(serializePractitioner(p));
+        res.json(isAdmin(req) ? serializePractitionerAdmin(p) : serializePractitioner(p));
       } catch (err) {
         res.status(500).json({ error: "Failed to get practitioner" });
       }
@@ -395,7 +405,7 @@ import { logger } from "../lib/logger";
 
         const [p] = await db.update(practitionersTable).set(updates).where(eq(practitionersTable.id, id)).returning();
         if (!p) return res.status(404).json({ error: "Not found" });
-        res.json(serializePractitioner(p));
+        res.json(isAdmin(req) ? serializePractitionerAdmin(p) : serializePractitioner(p));
       } catch (err) {
         res.status(500).json({ error: "Failed to update practitioner" });
       }
