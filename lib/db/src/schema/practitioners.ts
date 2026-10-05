@@ -40,6 +40,11 @@ export const practitionersTable = pgTable("practitioners", {
   stripeCustomerId: text("stripe_customer_id"),
   googleRefreshToken: text("google_refresh_token"),
   googleEmail: text("google_email"),
+  // Whether this practitioner offers their own space for in-person sessions, as an
+  // alternative to the client's office. Gates whether "at my space" appears as a
+  // bookable location option for their 1:1 sessions.
+  hasOwnSpace: boolean("has_own_space").notNull().default(false),
+  ownSpaceDescription: text("own_space_description"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

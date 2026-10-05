@@ -114,6 +114,8 @@ router.get("/practitioner/me", async (req, res) => {
     phoneNumber: p.phoneNumber,
     qualificationsFileUrl: p.qualificationsFileUrl,
     insuranceFileUrl: p.insuranceFileUrl,
+    hasOwnSpace: p.hasOwnSpace,
+    ownSpaceDescription: p.ownSpaceDescription ?? null,
   });
 });
 
@@ -189,11 +191,36 @@ router.patch("/practitioner/profile", async (req, res) => {
     const {
       phoneNumber, qualificationsFileUrl, insuranceFileUrl,
       inPersonRateGbp, onlineRateGbp, groupInPersonRateGbp, groupOnlineRateGbp,
+      hasOwnSpace, ownSpaceDescription,
     } = req.body ?? {};
     const updates: Record<string, unknown> = {};
     if (phoneNumber !== undefined) updates.phoneNumber = phoneNumber;
     if (qualificationsFileUrl !== undefined) updates.qualificationsFileUrl = qualificationsFileUrl;
     if (insuranceFileUrl !== undefined) updates.insuranceFileUrl = insuranceFileUrl;
+
+    // "I have my own space": lets employers choose the practitioner's space as the
+    // location for an in-person 1:1 session.
+    if (hasOwnSpace !== undefined || ownSpaceDescription !== undefined) {
+      if (hasOwnSpace !== undefined && typeof hasOwnSpace !== "boolean") {
+        return res.status(400).json({ error: "hasOwnSpace must be true or false" });
+      }
+      if (ownSpaceDescription !== undefined && ownSpaceDescription !== null && typeof ownSpaceDescription !== "string") {
+        return res.status(400).json({ error: "Space details must be text" });
+      }
+      const [existing] = await db.select().from(practitionersTable).where(eq(practitionersTable.id, id));
+      if (!existing) return res.status(404).json({ error: "Practitioner not found" });
+      const nextHasSpace = hasOwnSpace !== undefined ? hasOwnSpace : existing.hasOwnSpace;
+      const rawDescription = ownSpaceDescription !== undefined ? ownSpaceDescription : existing.ownSpaceDescription;
+      const nextDescription = typeof rawDescription === "string" ? rawDescription.trim() : "";
+      if (nextDescription.length > 500) {
+        return res.status(400).json({ error: "Space details must be 500 characters or fewer" });
+      }
+      if (nextHasSpace && !nextDescription) {
+        return res.status(400).json({ error: "Add your space's address or details so clients know where to go" });
+      }
+      updates.hasOwnSpace = nextHasSpace;
+      updates.ownSpaceDescription = nextHasSpace ? nextDescription : null;
+    }
 
     // Price list ("My Offerings"): 1:1 and group rates, in-person and online.
     // Omitted = unchanged; null/empty/0 = clear that offering. sessionRateGbp
@@ -239,6 +266,8 @@ router.patch("/practitioner/profile", async (req, res) => {
       onlineRateGbp: updated.onlineRateGbp != null ? Number(updated.onlineRateGbp) : null,
       groupInPersonRateGbp: updated.groupInPersonRateGbp != null ? Number(updated.groupInPersonRateGbp) : null,
       groupOnlineRateGbp: updated.groupOnlineRateGbp != null ? Number(updated.groupOnlineRateGbp) : null,
+      hasOwnSpace: updated.hasOwnSpace,
+      ownSpaceDescription: updated.ownSpaceDescription ?? null,
     });
   } catch (err) {
     logger.error({ err }, "Failed to update practitioner profile");

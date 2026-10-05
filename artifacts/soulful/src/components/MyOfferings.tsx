@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Info, PoundSterling } from "lucide-react";
 
 type Rates = {
@@ -44,6 +45,8 @@ function ratesFrom(data: Record<string, unknown>): Rates {
 
 export function MyOfferings() {
   const [rates, setRates] = useState<Rates>(EMPTY);
+  const [hasOwnSpace, setHasOwnSpace] = useState(false);
+  const [ownSpaceDescription, setOwnSpaceDescription] = useState("");
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [approval, setApproval] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -61,6 +64,8 @@ export function MyOfferings() {
         if (!("inPersonRateGbp" in data)) throw new Error("Rates missing from profile response");
         if (cancelled) return;
         setRates(ratesFrom(data));
+        setHasOwnSpace(Boolean(data.hasOwnSpace));
+        setOwnSpaceDescription(typeof data.ownSpaceDescription === "string" ? data.ownSpaceDescription : "");
         setApproval(typeof data.approvalStatus === "string" ? data.approvalStatus : null);
         setStatus("ready");
       } catch {
@@ -74,7 +79,7 @@ export function MyOfferings() {
 
   const save = async () => {
     setMessage(null);
-    const payload: Record<string, number | null> = {};
+    const payload: Record<string, number | null | boolean | string> = {};
     let anyRate = false;
     for (const o of OFFERINGS) {
       const raw = rates[o.key].trim();
@@ -94,6 +99,12 @@ export function MyOfferings() {
       setMessage({ kind: "error", text: "Set a price for at least one offering." });
       return;
     }
+    if (hasOwnSpace && !ownSpaceDescription.trim()) {
+      setMessage({ kind: "error", text: "Add your space's address or details, or turn off \"I have my own space\"." });
+      return;
+    }
+    payload.hasOwnSpace = hasOwnSpace;
+    payload.ownSpaceDescription = hasOwnSpace ? ownSpaceDescription.trim() : null;
     setSaving(true);
     try {
       const res = await fetch("https://api.soulfulco.uk/api/practitioner/profile", {
@@ -105,6 +116,8 @@ export function MyOfferings() {
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || "Could not save your price list");
       setRates(ratesFrom(body));
+      setHasOwnSpace(Boolean(body.hasOwnSpace));
+      setOwnSpaceDescription(typeof body.ownSpaceDescription === "string" ? body.ownSpaceDescription : "");
       setMessage({ kind: "ok", text: "Price list saved." });
     } catch (err) {
       setMessage({ kind: "error", text: err instanceof Error ? err.message : "Could not save your price list" });
@@ -170,6 +183,36 @@ export function MyOfferings() {
 
             <div className="rounded-xl bg-muted/50 p-4 text-sm text-muted-foreground">
               <strong className="text-foreground">Events</strong> are priced by bespoke quotation through Soulful, so there's no rate to set here.
+            </div>
+
+            <div className="rounded-xl border p-4 space-y-3">
+              <div className="flex items-start gap-2.5">
+                <Checkbox
+                  id="hasOwnSpace"
+                  checked={hasOwnSpace}
+                  onCheckedChange={(checked) => setHasOwnSpace(checked === true)}
+                  className="mt-0.5"
+                />
+                <div className="space-y-0.5">
+                  <Label htmlFor="hasOwnSpace" className="cursor-pointer">I have my own space for sessions</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Employers booking a 1:1 in-person session will be able to choose your space instead of their office.
+                  </p>
+                </div>
+              </div>
+              {hasOwnSpace && (
+                <div className="grid gap-1.5 pl-6">
+                  <Label htmlFor="ownSpaceDescription">Address or details</Label>
+                  <Input
+                    id="ownSpaceDescription"
+                    className="bg-background h-11"
+                    placeholder="e.g. 12 Oak Street, London, or a studio name and access notes"
+                    value={ownSpaceDescription}
+                    onChange={(e) => setOwnSpaceDescription(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">Shown to whoever books a session at your space.</p>
+                </div>
+              )}
             </div>
 
             <p className="text-xs text-muted-foreground">
