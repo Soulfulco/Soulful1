@@ -17,6 +17,7 @@ import {
   resolveHrCompanyId,
 } from "../lib/roles";
 import { baseUrl } from "../lib/url";
+import { isInsuranceExpired } from "../lib/insurance";
 
 const router = Router();
 
@@ -60,8 +61,21 @@ async function canAccessBooking(req: Request, b: typeof bookingsTable.$inferSele
   return false;
 }
 
+// Payment internals (Stripe identifiers and the Google Calendar event id) go to nobody but
+// Soulful admins. Customers (HR and employees) also never see the commission rate or the payout
+// status. A practitioner can see their own commission and payout status.
+function stripInternalBookingFields<T extends Record<string, any>>(req: Request, b: T): any {
+  if (isAdmin(req)) return b;
+  const hidden = ["stripeSessionId", "stripePaymentIntentId", "stripeTransferId", "googleEventId"];
+  if (!isPractitioner(req)) hidden.push("commissionRatePct", "payoutStatus");
+  const copy: Record<string, any> = { ...b };
+  for (const key of hidden) delete copy[key];
+  return copy;
+}
+
 // HR sees bookings without notes, and without the employee's identity unless they chose to share it.
-function redactBookingForViewer(req: Request, b: any) {
+function redactBookingForViewer(req: Request, rawBooking: any) {
+  const b = stripInternalBookingFields(req, rawBooking);
   if (!isHr(req)) return b;
   const isPrivate = !b.shareWithEmployer;
   return {
@@ -145,7 +159,7 @@ router.get("/bookings", async (req, res) => {
     if (practitionerIdParam) result = result.filter((b) => b.practitionerId === Number(practitionerIdParam));
     if (status) result = result.filter((b) => b.status === status);
 
-    res.json(result);
+    res.json(result.map((b) => stripInternalBookingFields(req, b)));
   } catch {
     res.status(500).json({ error: "Failed to list bookings" });
   }
@@ -249,6 +263,7 @@ router.post("/bookings", async (req, res) => {
         googleRefreshToken: practitionersTable.googleRefreshToken,
         hasOwnSpace: practitionersTable.hasOwnSpace,
         ownSpaceDescription: practitionersTable.ownSpaceDescription,
+        insuranceExpiresOn: practitionersTable.insuranceExpiresOn,
       })
       .from(practitionersTable)
       .where(eq(practitionersTable.id, practitionerId));
@@ -256,6 +271,10 @@ router.post("/bookings", async (req, res) => {
     if (!practitionerForPricing) return res.status(404).json({ error: "Practitioner not found" });
     // Hidden practitioners (pending, rejected or deactivated) can't be booked.
     if (!practitionerForPricing.isActive) return res.status(404).json({ error: "Practitioner not found" });
+    // Nor can one whose insurance has lapsed, until they add a new certificate and expiry date.
+    if (isInsuranceExpired(practitionerForPricing.insuranceExpiresOn)) {
+      return res.status(409).json({ error: "This practitioner is not available to book right now." });
+    }
 
     // The slot must belong to this practitioner, still be free and be in the future.
     if (!Number.isInteger(Number(timeSlotId))) return res.status(400).json({ error: "timeSlotId is required" });
@@ -408,12 +427,12 @@ router.post("/bookings", async (req, res) => {
       const [c] = await db.select({ name: companiesTable.name }).from(companiesTable).where(eq(companiesTable.id, companyId));
       const [slot] = await db.select().from(timeSlotsTable).where(eq(timeSlotsTable.id, timeSlotId));
 
-      res.status(201).json(serializeBooking(booking, {
+      res.status(201).json(stripInternalBookingFields(req, serializeBooking(booking, {
         practitionerName: practitionerForPricing.name,
         companyName: c?.name,
         startTime: slot?.startTime?.toISOString(),
         endTime: slot?.endTime?.toISOString(),
-      }));
+      })));
       return;
     }
 
@@ -631,11 +650,11 @@ router.get("/practitioner/bookings/requests", async (req, res) => {
         .map(async (b) => {
           const [slot] = await db.select().from(timeSlotsTable).where(eq(timeSlotsTable.id, b.timeSlotId));
           const [c] = await db.select({ name: companiesTable.name }).from(companiesTable).where(eq(companiesTable.id, b.companyId));
-          return serializeBooking(b, {
+          return stripInternalBookingFields(req, serializeBooking(b, {
             companyName: c?.name,
             startTime: slot?.startTime?.toISOString(),
             endTime: slot?.endTime?.toISOString(),
-          });
+          }));
         }),
     );
     res.json(withDetails);
@@ -661,6 +680,15 @@ router.post("/practitioner/bookings/:id/accept", async (req, res) => {
       .where(and(eq(bookingsTable.id, id), eq(bookingsTable.practitionerId, practId), eq(bookingsTable.status, "pending")));
     if (!existing) {
       return res.status(404).json({ error: "This request is no longer available to accept" });
+    }
+    const [lapseCheck] = await db
+      .select({ insuranceExpiresOn: practitionersTable.insuranceExpiresOn })
+      .from(practitionersTable)
+      .where(eq(practitionersTable.id, practId));
+    if (lapseCheck && isInsuranceExpired(lapseCheck.insuranceExpiresOn)) {
+      return res.status(409).json({
+        error: "Your insurance has expired. Add your new certificate and expiry date in your portal before accepting sessions.",
+      });
     }
     if (existing.stripePaymentIntentId) {
       try {
@@ -726,12 +754,12 @@ router.post("/practitioner/bookings/:id/accept", async (req, res) => {
       startTime: slot?.startTime ?? null,
     });
 
-    res.json(serializeBooking(booking, {
+    res.json(stripInternalBookingFields(req, serializeBooking(booking, {
       practitionerName: pr?.name,
       companyName: c?.name,
       startTime: slot?.startTime?.toISOString(),
       endTime: slot?.endTime?.toISOString(),
-    }));
+    })));
   } catch (err) {
     logger.error({ err }, "Failed to accept booking");
     res.status(500).json({ error: "Failed to accept" });
@@ -760,7 +788,7 @@ router.post("/practitioner/bookings/:id/decline", async (req, res) => {
     }
     await releaseDeclinedBooking(booking);
     await notifyEmployeeOfDecline(booking);
-    res.json(booking);
+    res.json(stripInternalBookingFields(req, booking));
   } catch (err) {
     logger.error({ err }, "Failed to decline booking");
     res.status(500).json({ error: "Failed to decline" });

@@ -108,6 +108,8 @@ router.get("/booking-requests", async (req, res) => {
   }
 });
 
+import { isInsuranceExpired } from "../lib/insurance";
+
 // Practitioner accepts a booking request
 router.post("/booking-requests/:id/accept", async (req, res) => {
   try {
@@ -115,10 +117,15 @@ router.post("/booking-requests/:id/accept", async (req, res) => {
     if (!practitionerEmail) return res.status(400).json({ error: "practitionerEmail required" });
 
     const pResult = await db.execute(sql`
-      SELECT id FROM practitioners WHERE email = ${practitionerEmail.toLowerCase().trim()} AND is_active = true
+      SELECT id, to_char(insurance_expires_on, 'YYYY-MM-DD') AS insurance_expires_on FROM practitioners WHERE email = ${practitionerEmail.toLowerCase().trim()} AND is_active = true
     `);
-    const practitioner = pResult.rows[0] as { id: number } | undefined;
+    const practitioner = pResult.rows[0] as { id: number; insurance_expires_on: string | null } | undefined;
     if (!practitioner) return res.status(404).json({ error: "No active practitioner found with that email" });
+    if (isInsuranceExpired(practitioner.insurance_expires_on)) {
+      return res.status(409).json({
+        error: "Your insurance has expired. Add your new certificate and expiry date in your portal before accepting sessions.",
+      });
+    }
 
     // Check request exists and is open
     const reqResult = await db.execute(sql`

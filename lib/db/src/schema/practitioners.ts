@@ -1,4 +1,4 @@
-import { pgTable, serial, text, numeric, boolean, integer, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, numeric, boolean, integer, timestamp, date, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -45,6 +45,13 @@ export const practitionersTable = pgTable("practitioners", {
   // bookable location option for their 1:1 sessions.
   hasOwnSpace: boolean("has_own_space").notNull().default(false),
   ownSpaceDescription: text("own_space_description"),
+  // The expiry date printed on their insurance certificate. Once it has passed they can't take new
+  // bookings and are hidden from the directory. Blank means no date recorded yet, which is not
+  // treated as expired. The two "sent for" dates record which expiry date a reminder was sent
+  // for, so each reminder goes out once per expiry date and not again every day.
+  insuranceExpiresOn: date("insurance_expires_on"),
+  insuranceReminderSentFor: date("insurance_reminder_sent_for"),
+  insuranceExpiredNoticeSentFor: date("insurance_expired_notice_sent_for"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

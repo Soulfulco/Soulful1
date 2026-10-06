@@ -34,6 +34,49 @@ function fmt(iso: string) {
   });
 }
 
+// --- insurance banner start ---
+// Today's date in the UK as YYYY-MM-DD, to compare with the insurance expiry date.
+function ukToday(): string {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+function daysBetween(fromYmd: string, toYmd: string): number {
+  const [fy, fm, fd] = fromYmd.split("-").map(Number);
+  const [ty, tm, td] = toYmd.split("-").map(Number);
+  return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86400000);
+}
+
+function formatDay(ymd: string): string {
+  return new Date(`${ymd}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+}
+
+type InsuranceBanner = { level: "expired" | "soon" | "missing"; message: string } | null;
+
+// What, if anything, to tell the practitioner about their insurance.
+function insuranceBanner(hasCertificate: boolean, expiresOn: string, today: string): InsuranceBanner {
+  if (!hasCertificate) return null;
+  if (!expiresOn) {
+    return { level: "missing", message: "Please add the expiry date from your insurance certificate below. We now need it to keep your profile live." };
+  }
+  const days = daysBetween(today, expiresOn);
+  if (days < 0) {
+    return {
+      level: "expired",
+      message: `Your insurance expired on ${formatDay(expiresOn)}. You can't take new bookings and your profile is hidden from the directory until you add a new certificate and expiry date below.`,
+    };
+  }
+  if (days <= 30) {
+    return {
+      level: "soon",
+      message: `Your insurance ${days === 0 ? "expires today" : `expires in ${days} day${days === 1 ? "" : "s"}, on ${formatDay(expiresOn)}`}. Add your new certificate before it runs out, or you won't be able to take bookings and your profile will be hidden.`,
+    };
+  }
+  return null;
+}
+// --- insurance banner end ---
+
 export default function PractitionerPortal() {
   const { practitionerSession, logout } = useAuth();
   const [slots, setSlots] = useState<Slot[]>([]);
@@ -57,7 +100,7 @@ export default function PractitionerPortal() {
   const [stripeStatus, setStripeStatus] = useState<{ connected: boolean; chargesEnabled: boolean; payoutsEnabled: boolean } | null>(null);
   const [stripeBusy, setStripeBusy] = useState(false);
 
-  const [profile, setProfile] = useState({ phoneNumber: "", qualificationsFileUrl: "", insuranceFileUrl: "" });
+  const [profile, setProfile] = useState({ phoneNumber: "", qualificationsFileUrl: "", insuranceFileUrl: "", insuranceExpiresOn: "" });
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMsg, setProfileMsg] = useState<string | null>(null);
 
@@ -110,6 +153,7 @@ export default function PractitionerPortal() {
         phoneNumber: data.phoneNumber ?? "",
         qualificationsFileUrl: data.qualificationsFileUrl ?? "",
         insuranceFileUrl: data.insuranceFileUrl ?? "",
+        insuranceExpiresOn: data.insuranceExpiresOn ?? "",
       });
     } catch {
       /* ignore */
@@ -198,10 +242,14 @@ export default function PractitionerPortal() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(profile),
       });
-      if (!res.ok) throw new Error("Failed to save");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Failed to save");
+      }
       setProfileMsg("Saved.");
-    } catch {
-      setProfileMsg("Couldn't save — please try again.");
+      await loadProfile();
+    } catch (err) {
+      setProfileMsg(err instanceof Error && err.message !== "Failed to save" ? err.message : "Couldn't save — please try again.");
     } finally {
       setProfileSaving(false);
     }
@@ -301,6 +349,20 @@ export default function PractitionerPortal() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+        {(() => {
+          const notice = insuranceBanner(Boolean(profile.insuranceFileUrl), profile.insuranceExpiresOn, ukToday());
+          if (!notice) return null;
+          return (
+            <Alert
+              variant={notice.level === "expired" ? "destructive" : "default"}
+              className={notice.level === "soon" ? "border-amber-300 bg-amber-50 text-amber-900" : undefined}
+            >
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{notice.message}</AlertDescription>
+            </Alert>
+          );
+        })()}
+
         <SessionRequests />
 
         <Card>
@@ -470,9 +532,23 @@ export default function PractitionerPortal() {
               <DocumentUpload
                 label="insurance certificate"
                 value={profile.insuranceFileUrl}
-                onChange={(url) => setProfile((p) => ({ ...p, insuranceFileUrl: url }))}
+                onChange={(url) => setProfile((p) => ({ ...p, insuranceFileUrl: url, insuranceExpiresOn: "" }))}
               />
             </div>
+            {profile.insuranceFileUrl && (
+              <div className="space-y-2">
+                <Label htmlFor="insuranceExpiresOn">Insurance expiry date</Label>
+                <Input
+                  id="insuranceExpiresOn"
+                  type="date"
+                  value={profile.insuranceExpiresOn}
+                  onChange={(e) => setProfile((p) => ({ ...p, insuranceExpiresOn: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  The date printed on your certificate. Once it passes you can't take new bookings, and your profile is hidden until you add a new certificate.
+                </p>
+              </div>
+            )}
             <Button onClick={handleProfileSave} disabled={profileSaving} size="sm">
               {profileSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save changes"}
             </Button>

@@ -51,6 +51,7 @@ export default function ForPractitioners() {
     yearsOfExperience: "",
     qualificationsFileUrl: "",
     insuranceFileUrl: "",
+    insuranceExpiresOn: "",
     avatarUrl: "",
     password: "",
     confirmPassword: "",
@@ -75,6 +76,10 @@ export default function ForPractitioners() {
     }
     if (formData.password !== formData.confirmPassword) {
       toast({ title: "Passwords don't match", description: "Please make sure both password fields match.", variant: "destructive" });
+      return;
+    }
+    if (formData.insuranceFileUrl && !formData.insuranceExpiresOn) {
+      toast({ title: "Add your insurance expiry date", description: "Enter the expiry date shown on your insurance certificate.", variant: "destructive" });
       return;
     }
     const inPersonRate = formData.inPersonRateGbp ? parseInt(formData.inPersonRateGbp, 10) : undefined;
@@ -114,6 +119,7 @@ export default function ForPractitioners() {
         qualifications: formData.qualifications,
         qualificationsFileUrl: formData.qualificationsFileUrl || undefined,
         insuranceFileUrl: formData.insuranceFileUrl || undefined,
+        ...({ insuranceExpiresOn: formData.insuranceFileUrl ? (formData.insuranceExpiresOn || undefined) : undefined } as any),
         avatarUrl: formData.avatarUrl || undefined,
         password: formData.password,
       }
@@ -447,10 +453,25 @@ export default function ForPractitioners() {
                                       <DocumentUpload
                                         label="insurance certificate"
                                         value={formData.insuranceFileUrl}
-                                        onChange={(url) => setFormData({...formData, insuranceFileUrl: url})}
+                                        onChange={(url) => setFormData({...formData, insuranceFileUrl: url, insuranceExpiresOn: ""})}
                                       />
                                       <p className="text-xs text-muted-foreground">Your current professional indemnity / public liability insurance certificate.</p>
                                     </div>
+
+                                    {formData.insuranceFileUrl && (
+                                      <div className="grid gap-2">
+                                        <Label htmlFor="insuranceExpiresOn">Insurance expiry date</Label>
+                                        <Input
+                                          id="insuranceExpiresOn"
+                                          type="date"
+                                          required
+                                          className="bg-background h-11"
+                                          value={formData.insuranceExpiresOn}
+                                          onChange={(e) => setFormData({...formData, insuranceExpiresOn: e.target.value})}
+                                        />
+                                        <p className="text-xs text-muted-foreground">The date printed on your certificate. We'll remind you before it runs out.</p>
+                                      </div>
+                                    )}
 
                                     <div className="grid gap-2">
                                       <Label htmlFor="bio">Professional Bio</Label>

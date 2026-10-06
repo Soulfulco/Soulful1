@@ -39,6 +39,7 @@ const EMPTY_FORM = {
   qualifications: "",
   qualificationsFileUrl: "",
   insuranceFileUrl: "",
+  insuranceExpiresOn: "",
   avatarUrl: "",
   subscriptionStatus: "trial" as "active" | "inactive" | "trial",
 };
@@ -177,6 +178,7 @@ export default function DashboardPractitioners() {
       qualifications: p.qualifications ?? "",
       qualificationsFileUrl: p.qualificationsFileUrl ?? "",
       insuranceFileUrl: p.insuranceFileUrl ?? "",
+      insuranceExpiresOn: (p as any).insuranceExpiresOn ?? "",
       avatarUrl: p.avatarUrl ?? "",
       subscriptionStatus: (p.subscriptionStatus ?? "trial") as "active" | "inactive" | "trial",
     });
@@ -238,6 +240,10 @@ export default function DashboardPractitioners() {
       toast({ title: "Add a rate", description: "Enter an in-person rate, an online rate, or both.", variant: "destructive" });
       return;
     }
+    if (form.insuranceFileUrl && !form.insuranceExpiresOn) {
+      toast({ title: "Add the insurance expiry date", description: "Enter the expiry date shown on the insurance certificate.", variant: "destructive" });
+      return;
+    }
     let commissionRatePct: number | undefined;
     if (form.commissionRatePct.trim()) {
       commissionRatePct = Number(form.commissionRatePct);
@@ -258,6 +264,7 @@ export default function DashboardPractitioners() {
             phoneNumber: form.phoneNumber,
             qualificationsFileUrl: form.qualificationsFileUrl,
             insuranceFileUrl: form.insuranceFileUrl,
+            ...({ insuranceExpiresOn: form.insuranceExpiresOn } as any),
             // Send null (not undefined) for a cleared rate so the API clears it;
             // the base sessionRateGbp is derived server-side from these two.
             inPersonRateGbp: inPersonRate ?? null,
@@ -297,6 +304,7 @@ export default function DashboardPractitioners() {
           qualifications: form.qualifications || undefined,
           qualificationsFileUrl: form.qualificationsFileUrl || undefined,
           insuranceFileUrl: form.insuranceFileUrl || undefined,
+          ...({ insuranceExpiresOn: form.insuranceFileUrl ? (form.insuranceExpiresOn || undefined) : undefined } as any),
           avatarUrl: form.avatarUrl || undefined,
           subscriptionStatus: form.subscriptionStatus,
           isActive: true,
@@ -545,8 +553,14 @@ export default function DashboardPractitioners() {
                                 </div>
                                 <div className="space-y-1.5">
                                   <Label>Insurance document</Label>
-                                  <DocumentUpload label="insurance certificate" value={form.insuranceFileUrl} onChange={(url) => handleChange("insuranceFileUrl", url)} />
+                                  <DocumentUpload label="insurance certificate" value={form.insuranceFileUrl} onChange={(url) => setForm((f) => ({ ...f, insuranceFileUrl: url, insuranceExpiresOn: "" }))} />
                                 </div>
+                                {form.insuranceFileUrl && (
+                                  <div className="space-y-1.5">
+                                    <Label htmlFor="insuranceExpiresOn">Insurance expiry date</Label>
+                                    <Input id="insuranceExpiresOn" type="date" value={form.insuranceExpiresOn} onChange={(e) => handleChange("insuranceExpiresOn", e.target.value)} />
+                                  </div>
+                                )}
                                 <div className="space-y-1.5">
                                   <Label>Profile photo</Label>
                                   <PhotoUpload value={form.avatarUrl} onChange={(url) => handleChange("avatarUrl", url)} />

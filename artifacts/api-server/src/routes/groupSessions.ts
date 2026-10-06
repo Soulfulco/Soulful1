@@ -6,6 +6,7 @@ import { logRequirementSafe } from "../lib/wellbeingRequirements";
 import { logger } from "../lib/logger";
 import { isTrialLocked, TRIAL_LOCKED_MESSAGE } from "../lib/trialGate";
 import { getUncachableStripeClient } from "../stripeClient";
+import { isInsuranceExpired } from "../lib/insurance";
 import {
   isAdmin,
   isHr,
@@ -53,6 +54,17 @@ async function getViewer(req: Request): Promise<Viewer | null> {
 const SESSION_STATUSES = ["pending", "confirmed", "cancelled", "declined"];
 const decisionDeadlineHours = 24;
 
+// The Stripe payment id goes to nobody but Soulful admins. Customers (HR and employees) also never
+// see the commission rate or the payout status. A practitioner can see their own.
+function stripInternalGroupFields(viewer: Viewer, row: Record<string, any>): Record<string, any> {
+  if (viewer.kind === "admin") return row;
+  const hidden = ["stripe_payment_intent_id"];
+  if (viewer.kind !== "practitioner") hidden.push("commission_rate_pct", "payout_status");
+  const copy: Record<string, any> = { ...row };
+  for (const key of hidden) delete copy[key];
+  return copy;
+}
+
 // List group sessions (with attendee count + practitioner name).
 // Employees see their own company's confirmed sessions; HR sees their company's sessions;
 // practitioners see their own; admin can see everything (or filter by ?companyId=).
@@ -93,7 +105,7 @@ router.get("/group-sessions", async (req, res) => {
       GROUP BY gs.id, p.name, p.specialism, c.name
       ORDER BY gs.start_time ASC
     `);
-    res.json(result.rows);
+    res.json(result.rows.map((r) => stripInternalGroupFields(viewer, r)));
   } catch (err) {
     logger.error({ err }, "Failed to list group sessions");
     res.status(500).json({ error: "Failed to list group sessions" });
@@ -148,10 +160,15 @@ router.post("/group-sessions", async (req, res) => {
         groupOnlineRateGbp: practitionersTable.groupOnlineRateGbp,
         commissionRatePct: practitionersTable.commissionRatePct,
         stripeConnectAccountId: practitionersTable.stripeConnectAccountId,
+        insuranceExpiresOn: practitionersTable.insuranceExpiresOn,
       })
       .from(practitionersTable)
       .where(eq(practitionersTable.id, practitionerId));
     if (!pr || !pr.isActive) return res.status(404).json({ error: "Practitioner not found" });
+    // Nor can one whose insurance has lapsed, until they add a new certificate and expiry date.
+    if (isInsuranceExpired(pr.insuranceExpiresOn)) {
+      return res.status(409).json({ error: "This practitioner is not available to book right now." });
+    }
 
     // Flat group rate for the whole session, the same way as 1:1 sessions: the
     // practitioner's slot length doesn't change the price.
@@ -243,7 +260,7 @@ router.post("/group-sessions", async (req, res) => {
       RETURNING *
     `);
     await db.update(timeSlotsTable).set({ isBooked: true }).where(eq(timeSlotsTable.id, timeSlotId));
-    res.status(201).json(result.rows[0]);
+    res.status(201).json(stripInternalGroupFields(viewer, result.rows[0]));
   } catch (err) {
     logger.error({ err }, "Failed to create group session");
     res.status(500).json({ error: "Failed to create group session" });
@@ -263,7 +280,7 @@ router.get("/practitioner/group-sessions/requests", async (req, res) => {
       WHERE gs.practitioner_id = ${viewer.practitionerId} AND gs.status = 'pending'
       ORDER BY gs.start_time ASC
     `);
-    res.json(result.rows);
+    res.json(result.rows.map((r) => stripInternalGroupFields(viewer, r)));
   } catch (err) {
     logger.error({ err }, "Failed to list group session requests");
     res.status(500).json({ error: "Failed to list requests" });
@@ -283,6 +300,15 @@ router.post("/practitioner/group-sessions/:id/accept", async (req, res) => {
     `).then((r) => r.rows as any[]);
     if (!existing) {
       return res.status(404).json({ error: "This request is no longer available to accept" });
+    }
+    const [lapseCheck] = await db
+      .select({ insuranceExpiresOn: practitionersTable.insuranceExpiresOn })
+      .from(practitionersTable)
+      .where(eq(practitionersTable.id, viewer.practitionerId));
+    if (lapseCheck && isInsuranceExpired(lapseCheck.insuranceExpiresOn)) {
+      return res.status(409).json({
+        error: "Your insurance has expired. Add your new certificate and expiry date in your portal before accepting sessions.",
+      });
     }
     if (existing.stripe_payment_intent_id) {
       try {
@@ -305,7 +331,7 @@ router.post("/practitioner/group-sessions/:id/accept", async (req, res) => {
     if (!result.rows[0]) {
       return res.status(404).json({ error: "This request is no longer available to accept" });
     }
-    res.json(result.rows[0]);
+    res.json(stripInternalGroupFields(viewer, result.rows[0]));
   } catch (err) {
     logger.error({ err }, "Failed to accept group session");
     res.status(500).json({ error: "Failed to accept" });
@@ -332,7 +358,7 @@ router.post("/practitioner/group-sessions/:id/decline", async (req, res) => {
     }
     await releaseDeclinedGroupSession(result.rows[0] as any);
     await notifyHrOfDecline(result.rows[0] as any);
-    res.json(result.rows[0]);
+    res.json(stripInternalGroupFields(viewer, result.rows[0]));
   } catch (err) {
     logger.error({ err }, "Failed to decline group session");
     res.status(500).json({ error: "Failed to decline" });
@@ -369,7 +395,7 @@ router.get("/group-sessions/:id", async (req, res) => {
     if (viewer.kind === "employee") {
       visible = visible.filter((a) => String(a.employee_email).toLowerCase() === viewer.email.toLowerCase());
     }
-    res.json({ ...row, attendee_count: attendees.rows.length, attendees: visible });
+    res.json({ ...stripInternalGroupFields(viewer, row), attendee_count: attendees.rows.length, attendees: visible });
   } catch (err) {
     logger.error({ err }, "Failed to get group session");
     res.status(500).json({ error: "Failed to get group session" });
@@ -464,7 +490,7 @@ router.patch("/group-sessions/:id", async (req, res) => {
       RETURNING *
     `);
     if (!result.rows[0]) return res.status(404).json({ error: "Not found" });
-    res.json(result.rows[0]);
+    res.json(stripInternalGroupFields(viewer, result.rows[0]));
   } catch (err) {
     logger.error({ err }, "Failed to update group session");
     res.status(500).json({ error: "Failed to update group session" });

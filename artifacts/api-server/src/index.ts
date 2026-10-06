@@ -8,6 +8,7 @@ import { getStripeSync } from "./stripeClient";
 import { reconcileStripeToApp } from "./stripeReconcile";
 import { expireOverdueGroupSessionRequests } from "./routes/groupSessions";
 import { expireOverdueBookingRequests } from "./routes/bookings";
+import { sendInsuranceNotices } from "./lib/insuranceNotices";
 
 /**
  * stripe-replit-sync's migrations guard enum creation with an UNQUALIFIED
@@ -114,4 +115,9 @@ app.listen(port, (err) => {
   // Same 24-hour expiry, for pending 1:1 booking requests.
   expireOverdueBookingRequests();
   setInterval(expireOverdueBookingRequests, 15 * 60 * 1000);
+
+  // Remind practitioners 30 days before their insurance expires, and tell them and Soulful once it
+  // has. Each notice is recorded against the expiry date it was for, so re-running is harmless.
+  sendInsuranceNotices();
+  setInterval(sendInsuranceNotices, 15 * 60 * 1000);
 });

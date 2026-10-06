@@ -14,6 +14,8 @@ import { logger } from "../lib/logger";
    * into responses: it carries secrets (passwordHash, googleRefreshToken, etc.)
    * that must not be exposed on public or admin practitioner endpoints.
    */
+  import { isInsuranceExpired, parseExpiryDate } from "../lib/insurance";
+
   // The public view of a practitioner, safe to send to anyone. It deliberately leaves out their
   // email address and their commission rate. Use serializePractitionerAdmin for admins.
   export function serializePractitioner(p: PractitionerRow) {
@@ -51,6 +53,7 @@ import { logger } from "../lib/logger";
       ...serializePractitioner(p),
       email: p.email,
       commissionRatePct: Number(p.commissionRatePct),
+      insuranceExpiresOn: p.insuranceExpiresOn ?? null,
     };
   }
 
@@ -78,7 +81,11 @@ import { logger } from "../lib/logger";
       }
       if (filters.length > 0) query = query.where(and(...filters));
       const practitioners = await query;
-      res.json(practitioners.map((p) => (isAdmin(req) ? serializePractitionerAdmin(p) : serializePractitioner(p))));
+      res.json(
+        practitioners
+          .filter((p) => isAdmin(req) || !isInsuranceExpired(p.insuranceExpiresOn))
+          .map((p) => (isAdmin(req) ? serializePractitionerAdmin(p) : serializePractitioner(p))),
+      );
     } catch (err) {
       res.status(500).json({ error: "Failed to list practitioners" });
     }
@@ -86,7 +93,7 @@ import { logger } from "../lib/logger";
 
   router.post("/practitioners", async (req, res) => {
     try {
-      const { name, email, specialism, bio, sessionRateGbp, inPersonRateGbp, onlineRateGbp, groupInPersonRateGbp, groupOnlineRateGbp, location, qualifications, avatarUrl, password, commissionRatePct, yearsOfExperience, phoneNumber, qualificationsFileUrl, insuranceFileUrl } = req.body;
+      const { name, email, specialism, bio, sessionRateGbp, inPersonRateGbp, onlineRateGbp, groupInPersonRateGbp, groupOnlineRateGbp, location, qualifications, avatarUrl, password, commissionRatePct, yearsOfExperience, phoneNumber, qualificationsFileUrl, insuranceFileUrl, insuranceExpiresOn } = req.body;
       let passwordHash: string | undefined;
       if (password !== undefined && password !== null && password !== "") {
         if (typeof password !== "string" || password.length < 8) {
@@ -128,6 +135,15 @@ import { logger } from "../lib/logger";
       const adminCreating = isAdmin(req);
     const cleanText = (v: unknown, max: number): string | null =>
       typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null;
+      // An insurance certificate has to come with the expiry date printed on it, so there is
+      // always something to check it against. Without a certificate, no date is kept.
+      let insuranceDate: string | null = null;
+      if (cleanText(insuranceFileUrl, 2000)) {
+        insuranceDate = parseExpiryDate(insuranceExpiresOn);
+        if (!insuranceDate) {
+          return res.status(400).json({ error: "Enter the expiry date shown on the insurance certificate" });
+        }
+      }
       const [p] = await db
         .insert(practitionersTable)
         .values({
@@ -149,6 +165,7 @@ import { logger } from "../lib/logger";
           phoneNumber: cleanText(phoneNumber, 40),
         qualificationsFileUrl: cleanText(qualificationsFileUrl, 2000),
         insuranceFileUrl: cleanText(insuranceFileUrl, 2000),
+        insuranceExpiresOn: insuranceDate,
         approvalStatus: adminCreating ? "approved" : "pending",
           isActive: adminCreating,
         })
@@ -313,7 +330,7 @@ import { logger } from "../lib/logger";
         const id = Number(req.params.id);
         const [p] = await db.select().from(practitionersTable).where(eq(practitionersTable.id, id));
         // Hidden practitioners are only viewable by admins, not via direct ID lookup.
-        if (!p || (!p.isActive && !isAdmin(req))) return res.status(404).json({ error: "Not found" });
+        if (!p || ((!p.isActive || isInsuranceExpired(p.insuranceExpiresOn)) && !isAdmin(req))) return res.status(404).json({ error: "Not found" });
         res.json(isAdmin(req) ? serializePractitionerAdmin(p) : serializePractitioner(p));
       } catch (err) {
         res.status(500).json({ error: "Failed to get practitioner" });
@@ -324,7 +341,7 @@ import { logger } from "../lib/logger";
       try {
         if (!isAdmin(req)) return res.status(401).json({ error: "Not authorised" });
         const id = Number(req.params.id);
-        const { name, bio, specialism, inPersonRateGbp, onlineRateGbp, groupInPersonRateGbp, groupOnlineRateGbp, location, qualifications, avatarUrl, isActive, approvalStatus, commissionRatePct, yearsOfExperience } = req.body;
+        const { name, bio, specialism, inPersonRateGbp, onlineRateGbp, groupInPersonRateGbp, groupOnlineRateGbp, location, qualifications, avatarUrl, isActive, approvalStatus, commissionRatePct, yearsOfExperience, phoneNumber, qualificationsFileUrl, insuranceFileUrl, insuranceExpiresOn } = req.body;
         const updates: Record<string, unknown> = {};
         if (name !== undefined) updates.name = name;
         if (bio !== undefined) updates.bio = bio;
@@ -332,6 +349,39 @@ import { logger } from "../lib/logger";
         if (location !== undefined) updates.location = location;
         if (qualifications !== undefined) updates.qualifications = qualifications;
         if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
+
+        // Contact and document fields. The dashboard's edit form has always sent these, but they were
+        // never read here, so changes to them were silently lost. The insurance certificate always
+        // travels with its expiry date, as it does when a practitioner edits their own profile.
+        const clean = (v: unknown, max: number): string | null =>
+          typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null;
+        if (phoneNumber !== undefined) updates.phoneNumber = clean(phoneNumber, 40);
+        if (qualificationsFileUrl !== undefined) updates.qualificationsFileUrl = clean(qualificationsFileUrl, 2000);
+        if (insuranceFileUrl !== undefined || insuranceExpiresOn !== undefined) {
+          const [cur] = await db.select().from(practitionersTable).where(eq(practitionersTable.id, id));
+          if (!cur) return res.status(404).json({ error: "Not found" });
+          const nextUrl = insuranceFileUrl !== undefined ? clean(insuranceFileUrl, 2000) : (cur.insuranceFileUrl ?? null);
+          const documentChanged = insuranceFileUrl !== undefined && nextUrl !== (cur.insuranceFileUrl || null);
+          let nextDate: string | null = cur.insuranceExpiresOn ?? null;
+          if (insuranceExpiresOn !== undefined) {
+            if (insuranceExpiresOn === null || insuranceExpiresOn === "") {
+              nextDate = null;
+            } else {
+              const parsed = parseExpiryDate(insuranceExpiresOn);
+              if (!parsed) {
+                return res.status(400).json({ error: "Enter the insurance expiry date as a real date, no more than 10 years ahead" });
+              }
+              nextDate = parsed;
+            }
+          }
+          if (!nextUrl) {
+            nextDate = null;
+          } else if (documentChanged && !nextDate) {
+            return res.status(400).json({ error: "Add the expiry date shown on the new insurance certificate" });
+          }
+          if (insuranceFileUrl !== undefined) updates.insuranceFileUrl = nextUrl;
+          updates.insuranceExpiresOn = nextDate;
+        }
         if (commissionRatePct !== undefined) {
           const pct = Number(commissionRatePct);
           if (!Number.isFinite(pct) || pct < 0 || pct > 100) {

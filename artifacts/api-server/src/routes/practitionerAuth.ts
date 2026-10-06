@@ -91,6 +91,8 @@ router.post("/practitioner/logout", async (req, res) => {
   res.json({ ok: true });
 });
 
+import { isInsuranceExpired, parseExpiryDate } from "../lib/insurance";
+
 // Current practitioner profile
 router.get("/practitioner/me", async (req, res) => {
   const id = practitionerId(req);
@@ -116,6 +118,8 @@ router.get("/practitioner/me", async (req, res) => {
     insuranceFileUrl: p.insuranceFileUrl,
     hasOwnSpace: p.hasOwnSpace,
     ownSpaceDescription: p.ownSpaceDescription ?? null,
+    insuranceExpiresOn: p.insuranceExpiresOn ?? null,
+    insuranceExpired: isInsuranceExpired(p.insuranceExpiresOn),
   });
 });
 
@@ -191,7 +195,7 @@ router.patch("/practitioner/profile", async (req, res) => {
     const {
       phoneNumber, qualificationsFileUrl, insuranceFileUrl,
       inPersonRateGbp, onlineRateGbp, groupInPersonRateGbp, groupOnlineRateGbp,
-      hasOwnSpace, ownSpaceDescription,
+      hasOwnSpace, ownSpaceDescription, insuranceExpiresOn,
     } = req.body ?? {};
     const updates: Record<string, unknown> = {};
     if (phoneNumber !== undefined) updates.phoneNumber = phoneNumber;
@@ -220,6 +224,34 @@ router.patch("/practitioner/profile", async (req, res) => {
       }
       updates.hasOwnSpace = nextHasSpace;
       updates.ownSpaceDescription = nextHasSpace ? nextDescription : null;
+    }
+
+    // Insurance certificate and its expiry date. A newly uploaded certificate must come with the
+    // expiry date printed on it, and removing the certificate clears the date. Practitioners who
+    // uploaded a certificate before expiry dates existed can still edit their other details.
+    if (insuranceFileUrl !== undefined || insuranceExpiresOn !== undefined) {
+      const [cur] = await db.select().from(practitionersTable).where(eq(practitionersTable.id, id));
+      if (!cur) return res.status(404).json({ error: "Practitioner not found" });
+      let nextDate: string | null = cur.insuranceExpiresOn ?? null;
+      if (insuranceExpiresOn !== undefined) {
+        if (insuranceExpiresOn === null || insuranceExpiresOn === "") {
+          nextDate = null;
+        } else {
+          const parsed = parseExpiryDate(insuranceExpiresOn);
+          if (!parsed) {
+            return res.status(400).json({ error: "Enter the insurance expiry date as a real date, no more than 10 years ahead" });
+          }
+          nextDate = parsed;
+        }
+      }
+      const nextUrl = insuranceFileUrl !== undefined ? (insuranceFileUrl || null) : (cur.insuranceFileUrl ?? null);
+      const documentChanged = insuranceFileUrl !== undefined && nextUrl !== (cur.insuranceFileUrl || null);
+      if (!nextUrl) {
+        nextDate = null;
+      } else if (documentChanged && !nextDate) {
+        return res.status(400).json({ error: "Add the expiry date shown on your new insurance certificate" });
+      }
+      updates.insuranceExpiresOn = nextDate;
     }
 
     // Price list ("My Offerings"): 1:1 and group rates, in-person and online.
@@ -268,6 +300,8 @@ router.patch("/practitioner/profile", async (req, res) => {
       groupOnlineRateGbp: updated.groupOnlineRateGbp != null ? Number(updated.groupOnlineRateGbp) : null,
       hasOwnSpace: updated.hasOwnSpace,
       ownSpaceDescription: updated.ownSpaceDescription ?? null,
+      insuranceExpiresOn: updated.insuranceExpiresOn ?? null,
+      insuranceExpired: isInsuranceExpired(updated.insuranceExpiresOn),
     });
   } catch (err) {
     logger.error({ err }, "Failed to update practitioner profile");
